@@ -2,11 +2,11 @@ module class_sys
   type :: sy
   contains
     procedure :: mkdir
-
     generic :: str => i2str, real2str, str2str
     procedure :: i2str
     procedure :: real2str
     procedure :: str2str
+    procedure :: find
   end type sy
 contains
   subroutine mkdir(this, dir)

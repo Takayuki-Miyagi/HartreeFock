@@ -14,8 +14,8 @@ LDFLAGS=-llapack -lblas
 OMP = -fopenmp
 FFLAGS=-O3 -Dtblock
 CFLAGS=-O3
-FDFLAGS=
-#FDFLAGS=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+FDFLAGS=-Ddebug
+FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 
 #--------------------------------------------------
 # Source Files

@@ -28,9 +28,10 @@ module InputParameters
     logical :: HFloop, NO2B  ! Hartree-Fock calculation
     logical :: sv_hf_rslt
     logical :: HFbasis
-    integer :: emax, e2max ! model space
+    integer :: emax, e2max, e3max ! model space
     real(8) :: conv ! tolerance
     character(256) :: egs = 'None', no2bhfile = 'None', fmt_hf_snt = 'None'
+    character(256) :: reference = 'None', nocoef = 'None'
 
   contains
     procedure :: GetFileName
@@ -48,7 +49,7 @@ contains
     character(256) :: inputfile, fmt_hf_snt
 
     logical :: sv_hf_rslt, HFloop, NO2B, HFbasis
-    integer :: emax, e2max
+    integer :: emax, e2max, e3max
     integer :: narg
     namelist /input/ pmass, nmass, mass, &
       & hw, conv, emax_2nf, e2max_2nf, &
@@ -62,10 +63,12 @@ contains
     open(118, file = inputfile, status = 'old')
     read(118, nml=input)
     close(118)
-    if(narg >= 2) call getarg(2, params%twbmefile)
-    if(narg >= 3) call getarg(3, params%thbmefile)
-    if(narg >= 4) call getarg(4, params%scfile2)
-    if(narg >= 5) call getarg(5, params%scfile3)
+    if(narg >= 2) call getarg(2, params%reference)
+    if(narg >= 3) call getarg(3, params%nocoef)
+    if(narg >= 4) call getarg(4, params%twbmefile)
+    if(narg >= 5) call getarg(5, params%thbmefile)
+    if(narg >= 6) call getarg(6, params%scfile2)
+    if(narg >= 7) call getarg(7, params%scfile3)
 
     params%rmass = (params%amp * params%amn) / (params%amp + params%amn)
     params%amnucl = (params%amp + params%amn) * 0.5d0
@@ -86,6 +89,7 @@ contains
     params%NO2B = NO2B
     params%emax = emax
     params%e2max = e2max
+    params%e3max = 18
     params%sv_hf_rslt = sv_hf_rslt
     if(present(emax_in)) then
       params%emax = emax_in
@@ -115,7 +119,11 @@ contains
       write(iunit,'(a, f6.2, a)') '! hw = ', params%hw, ' MeV'
       write(iunit,'(a,i3,a,i3,a,i3)') '! Z = ', params%pmass, &
       & ',  N = ', params%nmass, ',  A = ', params%mass
+      write(iunit,'(a,i3,a,i3)') '! emax = ', params%emax, &
+      & ',  e2max = ', params%e2max
       write(iunit,'(a)') '! Input Files:'
+      write(iunit,'(2a)') '! reference-state file: ', trim(params%reference)
+      write(iunit,'(2a)') '! normal-ordered-state file: ', trim(params%nocoef)
       write(iunit,'(2a)') '! 2BME file: ', trim(params%twbmefile)
       write(iunit,'(2a)') '! 3BME file: ', trim(params%thbmefile)
       write(iunit,'(2a)') '! 2BME scalar file: ', trim(params%scfile2)

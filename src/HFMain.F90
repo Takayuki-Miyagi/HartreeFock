@@ -1,26 +1,26 @@
-program UMOAMain
+program HartreeFockMain
   use InputParameters, only: parameters, set_parameters
-  use SingleParticleModule, only: sps_array
-!  use ModelSpace, only: Mspace
-!  use RotationGroup, only: init_dbinomial_triangle, fin_dbinomial_triangle
+  use ModelSpace, only: Mspace, spo_pn, spo_isospin
+  use RotationGroup, only: init_dbinomial_triangle, fin_dbinomial_triangle
 !  use read_3BME, only: ithbdy
 !  use Operators, only: Scalar, Tensor, OneBodyScalar
 !  use HFCalc, only: HartreeFock, NO2B
-!#ifdef MPI
-!  use mpi
-!  use MPIFunctions, only: myrank, nprocs, ierr
-!#else
-!  use MPIFunctions, only: myrank
-!#endif
+#ifdef MPI
+  use mpi
+  use MPIFunction, only: myrank, nprocs, ierr
+#else
+  use MPIFunction, only: myrank
+#endif
   use class_stopwatch, only: time_total, start_stopwatch, &
       & stop_stopwatch, print_summary_stopwatch, time_calcop, &
       & time_HF, time_MS, time_set_hamil, time_set_ope
   !$ use omp_lib
   implicit none
   type(parameters) :: params
-  type(sps_array) :: sps, isps
-!  type(MSpace) :: ms
-!  type(ithbdy) :: thbdyfrc, thbdyobs
+  type(spo_pn) :: sps
+  type(spo_isospin) :: isps
+  type(MSpace) :: ms
+!  type(ithbdy) :: thbdyfrc
 !  type(Scalar) :: hamil, s, x, sclop
 !  type(Tensor) :: tnsop
 !  type(OneBodyScalar) :: HFT
@@ -43,18 +43,18 @@ program UMOAMain
   call params%PrtParams(iunite)
 
   call init_dbinomial_triangle()
-  call sps%SetSPS(params)
+  call sps%init(params)
 
 !  ! Model Space
-!  call start_stopwatch(time_MS)
-!  call ms%SetModelSpace(sps, params)
-!  call stop_stopwatch(time_MS)
-!
-!  call start_stopwatch(time_set_hamil)
-!  ! Three-Body Force
-!  if(params%thbme) call isps%SetSPSIsospin(params)
-!  if(params%thbme) call thbdyfrc%SetThrBdyScl(isps, params, params%thbmefile)
-!  ! Hamiltonian
+  call start_stopwatch(time_MS)
+  call ms%init(sps, params)
+  call stop_stopwatch(time_MS)
+
+  call start_stopwatch(time_set_hamil)
+  ! Three-Body Force
+  if(params%thbmefile /= 'None') call isps%init(params)
+  if(params%thbmefile /= 'None') call thbdyfrc%SetThrBdyScl(isps, params, params%thbmefile)
+  ! Hamiltonian
 !  call hamil%InitScalar(ms, params)
 !  call hamil%SetHamil(sps, ms, params, thbdyfrc, params%twbmefile)
 !  call stop_stopwatch(time_set_hamil)
@@ -82,4 +82,4 @@ program UMOAMain
 !#endif
 !  call stop_stopwatch(time_total)
 !  call print_summary_stopwatch()
-end program UMOAMain
+end program HartreeFockMain
