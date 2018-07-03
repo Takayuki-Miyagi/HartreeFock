@@ -1,0 +1,420 @@
+module ModelSpace
+  use InputParameters
+  use SingleParticleModule
+  use MPIFunctions, only: myrank
+  implicit none
+  type :: ch_one
+    integer :: n
+    integer, allocatable :: num2label(:), label2num(:)
+    integer :: ne, nc, nv, nq
+  contains
+    procedure :: Init_ch => Init_ch1
+    procedure :: Set_ch => Set_ch1
+    procedure :: Release_ch => Release_ch1
+  end type ch_one
+
+  type :: ch_two
+    integer :: n
+    integer, allocatable :: num2label1(:), labels2num(:,:)
+    integer, allocatable :: num2label2(:)
+    integer, allocatable :: iphase(:,:)
+    integer :: ne, nc, nv, nq
+  contains
+    procedure :: Init_ch => Init_ch2
+    procedure :: Set_ch => Set_ch2
+    procedure :: Release_ch => Release_ch2
+  end type ch_two
+
+
+  type :: onbdy
+    type(ch_one), allocatable :: jptz(:)
+    integer, allocatable :: jptz2ich(:,:,:)
+    integer, allocatable :: label2ich(:)
+    integer, allocatable :: jj(:)
+    integer, allocatable :: pp(:)
+    integer, allocatable :: tz(:)
+    integer :: ichmax
+  contains
+    procedure :: SetStates => SetStates1
+    procedure :: SetJPTz => SetJPTz1
+    procedure :: Release => Release1
+  end type onbdy
+
+  type :: twbdy
+    type(ch_two), allocatable :: jptz(:)
+    integer, allocatable :: jptz2ich(:,:,:)
+    integer, allocatable :: jj(:)
+    integer, allocatable :: pp(:)
+    integer, allocatable :: tz(:)
+    integer :: ichmax
+    real(8) :: usedmem
+  contains
+    procedure :: SetStates => SetStates2
+    procedure :: SetJPTz => SetJPTz2
+    procedure :: Release => Release2
+  end type twbdy
+
+
+  type :: MSpace
+    type(onbdy) :: one
+    type(twbdy) :: two
+    real(8) :: usedmem
+  contains
+    procedure :: SetModelSpace
+    procedure :: ReleaseModelSpace
+  end type MSpace
+
+contains
+  subroutine SetModelSpace(ms, sps, params)
+    class(Mspace), intent(inout) :: ms
+    type(parameters), intent(in) :: params
+    type(sps_array), intent(in) :: sps
+
+    call ms%one%SetStates(sps, params)
+    call ms%two%SetStates(sps, params)
+    ms%usedmem = ms%two%usedmem
+    if(myrank == 0) then
+      write(*,'(a, f9.4, a)') &
+          & 'Estimated Memory for Model Space: ', &
+          &  ms%usedmem, " GB"
+    end if
+
+  end subroutine SetModelSpace
+
+  subroutine ReleaseModelSpace(ms, sps, params)
+    class(MSpace), intent(inout) :: ms
+    type(parameters), intent(in) :: params
+    type(sps_array), intent(in) :: sps
+    call ms%one%Release()
+    call ms%two%Release()
+  end subroutine ReleaseModelSpace
+
+  subroutine SetStates1(one, sps, params)
+    class(onbdy), intent(inout) :: one
+    type(parameters), intent(in) :: params
+    type(sps_array), intent(in) :: sps
+    integer :: ich
+    call one%SetJPTz(sps, params)
+#ifdef debug
+    write(*,'(a)') 'Set One-Body System'
+#endif
+    do ich = 1, one%ichmax
+      call one%jptz(ich)%init_ch(sps)
+#ifdef debug
+      write(*,'(a, i3, a, i3, a, i3, a, i3)') 'J = ', one%jj(ich), '/2,  P = ', &
+          & one%pp(ich), ',  Tz = ', one%tz(ich), '/2,  n = ', one%jptz(ich)%n
+#endif
+      call one%jptz(ich)%set_ch(params, sps, one%jj(ich), one%pp(ich), one%tz(ich))
+    end do
+#ifdef debug
+    write(*,*)
+#endif
+  end subroutine SetStates1
+
+  subroutine SetJPTz1(one, sps, params)
+    class(onbdy), intent(inout) :: one
+    type(parameters), intent(in) :: params
+    type(sps_array), intent(in) :: sps
+    integer :: emax, ich, n, i1
+    integer :: j, p, itz, loop
+    emax = params%emax
+    do loop = 1, 2
+      ich = 0
+      do j = 1, 2 * emax + 1, 2
+        do p = 1, -1, -2
+          do itz = -1, 1, 2
+            n = 0
+            do i1 = 1, sps%total_orbits
+              if(sps%jj(i1) /= j) cycle
+              if((-1) ** sps%ll(i1) /= p) cycle
+              if(sps%itz(i1) /= itz) cycle
+              n = n + 1
+            end do
+            if(n /= 0) ich = ich + 1
+            if(loop == 2 .and. n /= 0) then
+              one%jj(ich) = j
+              one%pp(ich) = p
+              one%tz(ich) = itz
+              one%jptz(ich)%n = n
+              one%jptz2ich(j, p, itz) = ich
+            end if
+          end do
+        end do
+      end do
+      if(loop == 1) then
+        one%ichmax = ich
+        allocate(one%jptz(ich))
+        allocate(one%jj(ich))
+        allocate(one%pp(ich))
+        allocate(one%tz(ich))
+        allocate(one%jptz2ich(2*emax+1,-1:1,-1:1))
+        one%jj(:) = 0
+        one%pp(:) = 0
+        one%tz(:) = 0
+        one%jptz2ich(:,:,:) = 0
+      end if
+    end do
+
+    allocate(one%label2ich(sps%total_orbits))
+    do i1 = 1, sps%total_orbits
+      j = sps%jj(i1)
+      p = (-1) ** sps%ll(i1)
+      itz = sps%itz(i1)
+      ich = one%jptz2ich(j, p, itz)
+      one%label2ich(i1) = ich
+    end do
+  end subroutine SetJPTz1
+
+  subroutine Release1(this)
+    class(onbdy), intent(inout) :: this
+    integer :: ich
+    do ich = 1, this%ichmax
+      call this%jptz(ich)%Release_ch()
+    end do
+    deallocate(this%jptz)
+    deallocate(this%jj)
+    deallocate(this%pp)
+    deallocate(this%tz)
+    deallocate(this%jptz2ich)
+    deallocate(this%label2ich)
+  end subroutine Release1
+
+  subroutine Init_ch1(this, sps)
+    class(ch_one), intent(inout) :: this
+    type(sps_array), intent(in) :: sps
+    integer :: n, m
+    n = this%n
+    m = sps%total_orbits
+    allocate(this%num2label(n))
+    allocate(this%label2num(m))
+    this%num2label(:) = 0
+    this%label2num(:) = 0
+  end subroutine Init_ch1
+
+  subroutine Release_ch1(this)
+    class(ch_one), intent(inout) :: this
+    deallocate(this%num2label)
+    deallocate(this%label2num)
+  end subroutine Release_ch1
+
+  subroutine set_ch1(this, params, sps, j, p, itz)
+    class(ch_one), intent(inout) :: this
+    type(sps_array), intent(in) :: sps
+    type(parameters), intent(in) :: params
+    integer, intent(in) :: j, p, itz
+    integer :: n, i1
+    integer, allocatable :: hlist(:)
+    integer, allocatable :: vlist(:)
+    integer :: ig, ih, iv
+    n = 0
+    this%ne = 0
+    this%nc = 0
+    this%nv = 0
+    this%nq = 0
+    allocate(hlist(2), vlist(2))
+    hlist = (/1, 0/)
+    vlist = (/0, 0/)
+    do ig = 1, size(hlist)
+      ih = hlist(ig)
+      iv = vlist(ig)
+      do i1 = 1, sps%total_orbits
+        if(sps%h_orbts(i1) /= ih) cycle
+        if(sps%jj(i1) /= j) cycle
+        if((-1) ** sps%ll(i1) /= p) cycle
+        if(sps%itz(i1) /= itz) cycle
+        n = n + 1
+        this%num2label(n) = i1
+        this%label2num(i1) = n
+      end do
+    end do
+    deallocate(hlist, vlist)
+  end subroutine set_ch1
+
+  subroutine SetStates2(two, sps, params)
+    class(twbdy), intent(inout) :: two
+    type(parameters), intent(in) :: params
+    type(sps_array), intent(in) :: sps
+    integer :: ich
+    real(8) :: cnt
+
+    call two%SetJPTz(sps, params)
+#ifdef debug
+    write(*,'(a)') 'Set Two-Body System'
+#endif
+    do ich = 1, two%ichmax
+      call two%jptz(ich)%Init_ch(sps)
+      call two%jptz(ich)%Set_ch(params, sps, two%jj(ich), two%pp(ich), two%tz(ich))
+#ifdef debug
+      write(*,'(a, i3, a, i3, a, i3, a, i3)') 'J = ', two%jj(ich), ',  P = ', &
+          & two%pp(ich), ',  Tz = ', two%tz(ich), ',  n = ', two%jptz(ich)%n
+#endif
+    end do
+#ifdef debug
+    write(*,*)
+#endif
+    cnt = 0.d0
+    do ich = 1, two%ichmax
+      cnt = cnt + dble(two%jptz(ich)%n * 2)
+      cnt = cnt + dble(sps%total_orbits ** 2) * 2
+    end do
+      two%usedmem = cnt * 4.d0 / (1024.d0 ** 3)
+
+  end subroutine SetStates2
+
+  subroutine SetJPTz2(this, sps, params)
+    class(twbdy), intent(inout) :: this
+    type(parameters), intent(in) :: params
+    type(sps_array), intent(in) :: sps
+    integer :: e2max, ich, n, i1, i2
+    integer :: j1, l1, itz1
+    integer :: j2, l2, itz2
+    integer :: j, p, itz, loop
+    e2max = params%e2max
+    do loop = 1, 2
+      ich = 0
+      do j = 0, e2max + 1
+        do p = 1, -1, -2
+          do itz = -1, 1
+            n = 0
+            do i1 = 1, sps%total_orbits
+              j1 = sps%jj(i1)
+              l1 = sps%ll(i1)
+              itz1 = sps%itz(i1)
+              do i2 = 1, i1
+                j2 = sps%jj(i2)
+                l2 = sps%ll(i2)
+                itz2 = sps%itz(i2)
+                if(sps%nshell(i1) + sps%nshell(i2) > e2max) cycle
+                if(triag(j1, j2, 2*j)) cycle
+                if((-1) ** (l1 + l2) /= p) cycle
+                if(itz1 + itz2 /= 2 * itz) cycle
+                if(i1 == i2 .and. mod(j, 2) == 1) cycle
+                n = n + 1
+              end do
+            end do
+            if(n /= 0) ich = ich + 1
+            if(loop == 2 .and. n /= 0) then
+              this%jj(ich) = j
+              this%pp(ich) = p
+              this%tz(ich) = itz
+              this%jptz(ich)%n = n
+              this%jptz2ich(j, p, itz) = ich
+            end if
+          end do
+        end do
+      end do
+      if(loop == 1) then
+        this%ichmax = ich
+        allocate(this%jptz(ich))
+        allocate(this%jj(ich))
+        allocate(this%pp(ich))
+        allocate(this%tz(ich))
+        allocate(this%jptz2ich(0:e2max+1,-1:1,-1:1))
+        this%jj(:) = 0
+        this%pp(:) = 0
+        this%tz(:) = 0
+        this%jptz2ich(:,:,:) = 0
+      end if
+    end do
+  end subroutine SetJPTz2
+
+  subroutine Release2(this)
+    class(twbdy), intent(inout) :: this
+    integer :: ich
+    do ich = 1, this%ichmax
+      call this%jptz(ich)%Release_ch()
+    end do
+    deallocate(this%jptz)
+    deallocate(this%jj)
+    deallocate(this%pp)
+    deallocate(this%tz)
+    deallocate(this%jptz2ich)
+  end subroutine Release2
+
+  subroutine Init_ch2(this, sps)
+    class(ch_two), intent(inout) :: this
+    type(sps_array), intent(in) :: sps
+    integer :: n, m
+    n = this%n
+    m = sps%total_orbits
+    allocate(this%num2label1(n))
+    allocate(this%num2label2(n))
+    allocate(this%labels2num(m,m))
+    allocate(this%iphase(m,m))
+    this%num2label1 = 0
+    this%num2label2 = 0
+    this%labels2num = 0
+    this%iphase = 0
+  end subroutine Init_ch2
+
+  subroutine Release_ch2(this)
+    class(ch_two), intent(inout) :: this
+    deallocate(this%num2label1)
+    deallocate(this%num2label2)
+    deallocate(this%labels2num)
+    deallocate(this%iphase)
+  end subroutine Release_ch2
+
+  subroutine Set_ch2(this, params, sps, j, p, itz)
+    class(ch_two), intent(inout) :: this
+    type(sps_array), intent(in) :: sps
+    type(parameters), intent(in) :: params
+    integer, intent(in) :: j, p, itz
+    integer :: n, e2max
+    integer :: i1, j1, l1, itz1
+    integer :: i2, j2, l2, itz2
+    integer, allocatable :: hlist(:)
+    integer, allocatable :: vlist(:)
+    integer :: ig, ih, iv
+    n = 0
+    this%ne = 0
+    this%nc = 0
+    this%nv = 0
+    this%nq = 0
+    allocate(hlist(3), vlist(3))
+    hlist = (/1, 2, 0/)
+    vlist = (/0, 0, 0/)
+    e2max = params%e2max
+    do ig = 1, size(hlist)
+      ih = hlist(ig)
+      iv = vlist(ig)
+      do i1 = 1, sps%total_orbits
+        j1 = sps%jj(i1)
+        l1 = sps%ll(i1)
+        itz1 = sps%itz(i1)
+        do i2 = 1, i1
+          j2 = sps%jj(i2)
+          l2 = sps%ll(i2)
+          itz2 = sps%itz(i2)
+          if(sps%nshell(i1) + sps%nshell(i2) > e2max) cycle
+          if(sps%h_orbts(i1) + sps%h_orbts(i2) /= ih) cycle
+          if(triag(j1, j2, 2*j)) cycle
+          if((-1) ** (l1 + l2) /= p) cycle
+          if(itz1 + itz2 /= 2 * itz) cycle
+          if(i1 == i2 .and. mod(j, 2) == 1) cycle
+          n = n + 1
+          this%num2label1(n) = i1
+          this%num2label2(n) = i2
+          this%labels2num(i1,i2) = n
+          this%labels2num(i2,i1) = n
+          this%iphase(i1,i2) = 1
+          this%iphase(i2,i1) = -(-1) ** ((j1 + j2) / 2 - j)
+        end do
+      end do
+    end do
+    deallocate(hlist, vlist)
+  end subroutine set_ch2
+
+  logical function triag(i,j,k)
+    implicit none
+    integer,intent(in)::i,j,k
+    triag = ((i-(j+k))*(i-abs(j-k)) > 0)
+  end function triag
+
+  real(8) function Del(i1, i2)
+    integer, intent(in) :: i1, i2
+    Del = 1.d0
+    if(i1 == i2) Del = dsqrt(2.d0)
+  end function Del
+
+end module ModelSpace
