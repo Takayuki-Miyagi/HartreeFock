@@ -40,7 +40,7 @@ MODF95 = $(SRCF95:$(SRCDIR)/%.F90=$(MODDIR)/%.mod)
 #--------------------------------------------------
 # Source Files (LinAlgf90)
 #--------------------------------------------------
-LINSRCDIR = src/LinAlg
+LINSRCDIR = src/LinAlgf90/src
 LINSRC = $(wildcard $(LINSRCDIR)/*.f90)
 LINOBJ = $(LINSRC:$(LINSRCDIR)/%.f90=$(OBJDIR)/%.o)
 LINMOD = $(LINSRC:$(LINSRCDIR)/%.f90=$(MODDIR)/%.mod)
