@@ -1,8 +1,8 @@
 program HartreeFockMain
   use InputParameters, only: parameters, set_parameters
   use RotationGroup, only: init_dbinomial_triangle, fin_dbinomial_triangle
-  use ModelSpace, only: Mspace, spo_pn, spo_isospin
-!  use read_3BME, only: iThreeBodyScalar
+  use ModelSpace, only: Mspace, spo_pn!, spo_isospin
+  use read_3BME, only: iThreeBodyScalar
 !  use Operators, only: Scalar, Tensor, OneBodyScalar
 !  use HFCalc, only: HartreeFock, NO2B
 #ifdef MPI
@@ -20,7 +20,7 @@ program HartreeFockMain
   type(spo_pn) :: sps
   type(spo_isospin) :: isps
   type(MSpace) :: ms
-!  type(iThreeBodyScalar) :: thbme
+  type(iThreeBodyScalar) :: thbme
 !  type(Scalar) :: hamil, s, x, sclop
 !  type(Tensor) :: tnsop
 !  type(OneBodyScalar) :: HFT
@@ -29,8 +29,8 @@ program HartreeFockMain
   integer :: iunito = 119
   integer :: iunits = 120
   integer :: iunith = 121
-!  character(10) :: RankOperator
-!  integer :: jr, pr, zr
+  character(10) :: RankOperator
+  integer :: jr, pr, zr
   call start_stopwatch(time_total)
 #ifdef MPI
   call mpi_init(ierr)
@@ -45,19 +45,19 @@ program HartreeFockMain
   call init_dbinomial_triangle()
   call sps%init(params)
 
-!  ! Model Space
+  ! Model Space
   call start_stopwatch(time_MS)
   call ms%init(sps, params)
   call stop_stopwatch(time_MS)
 
   call start_stopwatch(time_set_hamil)
-  ! Three-Body Force
-  !if(params%thbmefile /= 'None') call isps%init(params)
-  !if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
-  ! Hamiltonian
+ ! Three-Body Force
+ if(params%thbmefile /= 'None') call isps%init(params)
+ if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
+ ! Hamiltonian
 !  call hamil%InitScalar(ms, params)
 !  call hamil%SetHamil(sps, ms, params, thbdyfrc, params%twbmefile)
-!  call stop_stopwatch(time_set_hamil)
+  call stop_stopwatch(time_set_hamil)
 !
 !  ! Hartree-Fock calculation
 !  call start_stopwatch(time_HF)

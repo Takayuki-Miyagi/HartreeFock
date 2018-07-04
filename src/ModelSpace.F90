@@ -1,7 +1,8 @@
 module ModelSpace
-  use InputParameters
+  use InputParameters, only: parameters
   use MPIFunction, only: myrank
   implicit none
+  private :: triag, skip_comment, Aop3, A3drct, A3exc1, A3exc2
 
   ! single particle state (isospin symmetry)
   type :: spo_isospin
@@ -292,7 +293,7 @@ contains
     end if
   end subroutine GetNOCoef
 
-  ! Model Space
+ ! Model Space
   subroutine InitMSpace(this, sps, params)
     class(MSpace), intent(inout) :: this
     type(spo_pn), intent(in) :: sps
@@ -977,16 +978,14 @@ contains
   end function A3exc2
 
   subroutine skip_comment(nfile)
-      implicit none
-      integer,intent(in)::nfile
-      character(1),parameter::com1='!', com2='#'
-      character(1)::c1,c2
+    implicit none
+    integer,intent(in)::nfile
+    character(1),parameter::com1='!', com2='#'
+    character(1)::c1,c2
+    read(nfile,'(2a1)') c1, c2
+    do while  (c1 == com1 .or. c1 == com2 .or. c2 == com1 .or. c2 == com2)
       read(nfile,'(2a1)') c1, c2
-      do while  (c1 == com1 .or. c1 == com2 .or. c2 == com1 .or. c2 == com2)
-        read(nfile,'(2a1)') c1, c2
-      end do
-      backspace(nfile)
+    end do
+    backspace(nfile)
   end subroutine skip_comment
-
-
 end module ModelSpace

@@ -1,0 +1,3 @@
+[submodule "LinAlgf90"]
+	path = LinAlgf90
+	url = git@github.com:Takayuki-Miyagi/LinAlgf90.git

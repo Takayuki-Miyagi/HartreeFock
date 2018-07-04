@@ -12,10 +12,10 @@ CC=gcc
 FC=gfortran
 LDFLAGS=-llapack -lblas
 OMP = -fopenmp
-FFLAGS=-O3 -Dtblock
+FFLAGS=-O3
 CFLAGS=-O3
 FDFLAGS=-Ddebug
-FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 
 #--------------------------------------------------
 # Source Files
@@ -40,7 +40,7 @@ MODF95 = $(SRCF95:$(SRCDIR)/%.F90=$(MODDIR)/%.mod)
 #--------------------------------------------------
 # Source Files (LinAlgf90)
 #--------------------------------------------------
-LINSRCDIR = src/LinAlgf90/src
+LINSRCDIR = LinAlgf90/src
 LINSRC = $(wildcard $(LINSRCDIR)/*.f90)
 LINOBJ = $(LINSRC:$(LINSRCDIR)/%.f90=$(OBJDIR)/%.o)
 LINMOD = $(LINSRC:$(LINSRCDIR)/%.f90=$(MODDIR)/%.mod)
@@ -57,7 +57,7 @@ MODS = $(shell echo $(MODSUP) | tr A-Z a-z)
 #--------------------------------------------------
 # Rules
 #--------------------------------------------------
-all: $(TARGET)
+all: dirs $(TARGET)
 $(TARGET): $(OBJS)
 	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $(TARGET).exe $^ $(LDFLAGS)
 	if test -d $(INSTLDIR); then \
@@ -80,6 +80,19 @@ $(OBJDIR)/%.o:$(SRCDIR)/%.F90
 $(OBJDIR)/%.o:$(LINSRCDIR)/%.f90
 	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $< # for debug
 #	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
+
+dirs:
+	if test -d $(OBJDIR); then \
+		: ; \
+	else \
+		mkdir $(OBJDIR); \
+	fi
+	if test -d $(MODDIR); then \
+		: ; \
+	else \
+		mkdir $(MODDIR); \
+	fi
+
 
 dep:
 	$(FDEP) $(SRCS) -b $(OBJDIR)/ > $(DEPDIR)/makefile.d
