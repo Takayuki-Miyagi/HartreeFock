@@ -15,7 +15,7 @@ module ScalarOperator
       & one_body_element, read_2bme_pn_txt, read_2bme_pn_bin, &
       & read_2bme_snt_txt, read_2bme_snt_bin, calc_bare_2bme, &
       & two_body_element, r_dot_r, red_r_j, red_r_l, &
-      & p_dot_p, red_nab_j, red_nab_l
+      & p_dot_p, red_nab_j, red_nab_l, skip_comment, Del
   public :: assignment(=), operator(+), operator(-), &
       & operator(*), operator(/), NBodyScalars, ScalarOperators
 
@@ -85,7 +85,7 @@ contains
     n = nbody%n
     allocate(this%jptz(n))
     do ich = 1, nbody%n
-      n = nbody%ndim(ich)%n
+      n = nbody%ndim(ich)
       call this%jptz(ich)%ini(n,n)
     end do
   end subroutine InitNBodyScalars
@@ -264,7 +264,7 @@ contains
       j   = one%j(ich)
       p   = one%p(ich)
       itz = one%tz(ich)
-      n   = one%ndim(ich)%n
+      n   = one%jptz(ich)%n
       do bra = 1, n
         i1 = one%jptz(ich)%n2label(bra)
         n1 = sps%nn(i1)
@@ -331,8 +331,53 @@ contains
     type(spo_pn), intent(in) :: sps
     type(ThreeBodySpace), intent(in) :: thr
     type(iThreeBodyScalar), optional, intent(in) :: thbme
+    integer :: ich, j, p, tz
     if(.not. present(thbme)) return
+    do ich = 1, thr%n
+      j   = thr%j(ich)
+      p   = thr%p(ich)
+      tz = thr%tz(ich)
+      call TransOrthoNormalThree(thr%jptz(ich), this%jptz(ich), thr%jptz(ich), thbme, sps, params, j, p, tz)
+    end do
+
   end subroutine SetThreeBodyScalars
+
+  real(8) function Get3BMEpn(sps, thbme, &
+        & j, p, itz, a, b, c, jab, d, e, f, jde) result(v)
+    use read_3BME, only: iThreeBodyScalar
+    use RotationGroup, only: dcg
+    use read_3BME, only: Get3BME
+    type(iThreeBodyScalar), intent(in) :: thbme
+    type(spo_pn), intent(in) :: sps
+    integer, intent(in) :: j, p, itz
+    integer, intent(in) :: a, b, c, d, e, f, jab, jde
+    integer :: za, zb, zc, zd, ze, zf, tab, tde
+    integer :: t
+    integer :: ich
+    real(8) :: viso
+    v = 0.d0
+    if(a == b .and. mod(jab, 2) == 1) return
+    if(d == e .and. mod(jde, 2) == 1) return
+    za = sps%itz(a); zb = sps%itz(b); zc = sps%itz(c)
+    zd = sps%itz(d); ze = sps%itz(e); zf = sps%itz(f)
+    do tab = 0, 1
+      if(iabs(za + zb)/2 > tab) cycle
+      do tde = 0, 1
+        if(iabs(zd + ze)/2 > tde) cycle
+        do t = max(iabs(2*tab - 1), iabs(2*tde - 1)), &
+              & min(2*tab + 1, 2*tde + 1), 2
+          if(iabs(itz) > t) cycle
+          ich = thbme%jpt2n(j,p,t)
+          if(ich == 0) cycle
+          viso =  dble(Get3BME(thbme%jpt(ich), (a+1)/2, (b+1)/2, (c+1)/2, &
+              &  jab, tab, (d+1)/2, (e+1)/2, (f+1)/2, jde, tde))
+          v = v + viso * &
+              &  dcg(1, za, 1, zb, 2*tab, za+zb) * dcg(2*tab, za+zb, 1, zc, t, itz) * &
+              &  dcg(1, zd, 1, ze, 2*tde, zd+ze) * dcg(2*tde, zd+ze, 1, zf, t, itz)
+        end do
+      end do
+    end do
+  end function Get3BMEpn
 
   function one_body_element(n1, n2, l, j, tz, hw, A, Z, N, hc, am, oprtr) result(e)
     real(8) :: e
@@ -368,7 +413,7 @@ contains
       j    = two%j(ich)
       ipar = two%p(ich)
       itz  = two%tz(ich)
-      n    = two%ndim(ich)%n
+      n    = two%jptz(ich)%n
       !$omp parallel
       !$omp do private(i, a, b, k, c, d)
       do i = 1, n
@@ -545,6 +590,424 @@ contains
       nl = 0.d0
     end if
   end function red_nab_l
+
+  subroutine TransOneBodyScalar(thr, this, one, op1, sps, params, j, p, itz)
+    type(DMat), intent(inout) :: this
+    type(OneBodySpace), intent(in) :: one
+    type(ThreeBodyChannel), intent(in) :: thr
+    type(parameters), intent(in) :: params
+    type(NBodyScalars), intent(in) :: op1
+    type(spo_pn), intent(in) :: sps
+    integer, intent(in) :: j, p, itz
+    integer :: n, bra, ket
+    integer :: idxb, idxk
+    integer :: i1, i2, i3, i4, i5, i6
+    integer :: a, b, c, d, e, f, jab, jde
+    integer :: njb, njk, jb, jk
+    integer :: br, kt
+    real(8) :: v
+    type(DMat) :: cfpb, cfpk, vint, vfin
+    integer :: iblck1, iblck2, iblck3, iblck4, blcksize = 5000
+    integer :: n1, n2, m1, m2
+    integer :: n1s, n1e, n2s, n2e, m1s, m1e, m2s, m2e
+    integer :: ntot, mtot
+    ntot = thr%n
+    mtot = 0
+    do idxb = 1, thr%nsub
+      njb = thr%idx(idxb)%n
+      mtot = mtot + njb
+    end do
+
+    do iblck1 = 1, mtot / blcksize + 1
+      call block_dim(iblck1, blcksize, mtot, m1, m1s, m1e)
+      if(m1 == 0) cycle
+      do iblck2 = 1, mtot / blcksize + 1
+        call block_dim(iblck2, blcksize, mtot, m2, m2s, m2e)
+        if(m2 == 0) cycle
+        call vint%ini(m1,m2)
+        call MatOneBodyScalar(thr, vint, one, op1, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+
+        do iblck3 = 1, ntot / blcksize + 1
+          call block_dim(iblck3, blcksize, ntot, n1, n1s, n1e)
+          if(n1 == 0) cycle
+          call cfpb%ini(n1,m1)
+          call SetCFPmat(cfpb, params, sps, thr, n1s, n1e, m1s, m1e, 1)
+          do iblck4 = 1, ntot / blcksize + 1
+            call block_dim(iblck4, blcksize, ntot, n2, n2s, n2e)
+            if(n2 == 0) cycle
+            call cfpk%ini(m2,n2)
+            call SetCFPmat(cfpk, params, sps, thr, m2s, m2e, n2s, n2e, 0)
+            vfin = (cfpb * (vint * cfpk))
+
+            this%m(n1s:n1e, n2s:n2e) = this%m(n1s:n1e, n2s:n2e) + vfin%m(:,:)
+          end do
+        end do
+      end do
+    end do
+  contains
+    subroutine MatOneBodyScalar(thr, mat, one, op1, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+      type(DMat), intent(inout) :: mat
+      type(parameters), intent(in) :: params
+      type(spo_pn), intent(in) :: sps
+      type(ThreeBodyChannel), intent(in) :: thr
+      type(OneBodySpace), intent(in) :: one
+      type(NBodyScalars), intent(in) :: op1
+      integer, intent(in) :: j, p, itz, m1s, m1e, m2s, m2e
+      integer :: m1, m2, n, cnt1, cnt2, ich1, num1, num2
+      integer :: idxb, njb, jb
+      integer :: idxk, njk, jk
+      integer :: a, b, c, jab, d, e, f, jde
+      real(8) :: v
+
+      n = thr%nsub
+      cnt1 = 0
+      m1 = 0
+      !$omp parallel
+      !$omp do private(idxb, njb, jb, a, b, c, jab, &
+      !$omp &  cnt2, m2, idxk, njk, jk, d, e, f, jde, v, ich1, num1, num2) reduction(+: m1, cnt1)
+      do idxb = 1, n
+        njb = thr%idx(idxb)%n
+        do jb = 1, njb
+          m1 = m1 + 1
+          if(m1 < m1s) cycle
+          if(m1 > m1e) cycle
+          cnt1 = cnt1 + 1
+          a   = thr%idx(idxb)%n2label1(jb)
+          b   = thr%idx(idxb)%n2label2(jb)
+          c   = thr%idx(idxb)%n2label3(jb)
+          jab = thr%idx(idxb)%n2label4(jb)
+
+          cnt2 = 0
+          m2 = 0
+          do idxk = 1, n
+            njk = thr%idx(idxk)%n
+            do jk = 1, njk
+              m2 = m2 + 1
+              if(m2 < m2s) cycle
+              if(m2 > m2e) cycle
+              cnt2 = cnt2 + 1
+              d   = thr%idx(idxk)%n2label1(jk)
+              e   = thr%idx(idxk)%n2label2(jk)
+              f   = thr%idx(idxk)%n2label3(jk)
+              jde = thr%idx(idxk)%n2label4(jk)
+              if(b /= e) cycle
+              if(c /= f) cycle
+              if(jab /= jde) cycle
+              ich1 = one%label2jptz(a)
+              if(ich1 /= one%label2jptz(d)) cycle
+              num1 = one%jptz(ich1)%label2n(a)
+              num2 = one%jptz(ich1)%label2n(d)
+              v = op1%jptz(ich1)%m(num1, num2) * 3.d0
+              mat%m(cnt1, cnt2) = v
+            end do
+          end do
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+    end subroutine MatOneBodyScalar
+  end subroutine TransOneBodyScalar
+
+  subroutine TransTwoBodyScalar(thr, this, two, op2, sps, params, j, p, itz)
+    type(DMat), intent(inout) :: this
+    type(TwoBodySpace), intent(in) :: two
+    type(ThreeBodyChannel), intent(in) :: thr
+    type(parameters), intent(in) :: params
+    type(NBodyScalars), intent(in) :: op2
+    type(spo_pn), intent(in) :: sps
+    integer, intent(in) :: j, p, itz
+    integer :: n, bra, ket
+    integer :: idxb, idxk
+    integer :: i1, i2, i3, i4, i5, i6
+    integer :: a, b, c, d, e, f, jab, jde
+    integer :: njb, njk, jb, jk
+    integer :: br, kt
+    real(8) :: v
+    type(DMat) :: cfpb, cfpk, vint, vfin
+    integer :: iblck1, iblck2, iblck3, iblck4, blcksize = 5000
+    integer :: n1, n2, m1, m2
+    integer :: n1s, n1e, n2s, n2e, m1s, m1e, m2s, m2e
+    integer :: ntot, mtot
+    ntot = thr%n
+    mtot = 0
+    do idxb = 1, thr%nsub
+      njb = thr%idx(idxb)%n
+      mtot = mtot + njb
+    end do
+
+    do iblck1 = 1, mtot / blcksize + 1
+      call block_dim(iblck1, blcksize, mtot, m1, m1s, m1e)
+      if(m1 == 0) cycle
+      do iblck2 = 1, mtot / blcksize + 1
+        call block_dim(iblck2, blcksize, mtot, m2, m2s, m2e)
+        if(m2 == 0) cycle
+        call vint%ini(m1,m2)
+        call MatTwoBodyScalar(thr, vint, two, op2, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+
+        do iblck3 = 1, ntot / blcksize + 1
+          call block_dim(iblck3, blcksize, ntot, n1, n1s, n1e)
+          if(n1 == 0) cycle
+          call cfpb%ini(n1,m1)
+          call SetCFPmat(cfpb, params, sps, thr, n1s, n1e, m1s, m1e, 1)
+          do iblck4 = 1, ntot / blcksize + 1
+            call block_dim(iblck4, blcksize, ntot, n2, n2s, n2e)
+            if(n2 == 0) cycle
+            call cfpk%ini(m2,n2)
+            call SetCFPmat(cfpk, params, sps, thr, m2s, m2e, n2s, n2e, 0)
+            vfin = (cfpb * (vint * cfpk))
+
+            this%m(n1s:n1e, n2s:n2e) = this%m(n1s:n1e, n2s:n2e) + vfin%m(:,:)
+          end do
+        end do
+      end do
+    end do
+  contains
+    subroutine MatTwoBodyScalar(thr, mat, two, op2, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+      type(DMat), intent(inout) :: mat
+      type(parameters), intent(in) :: params
+      type(spo_pn), intent(in) :: sps
+      type(ThreeBodyChannel), intent(in) :: thr
+      type(TwoBodySpace), intent(in) :: two
+      type(NBodyScalars), intent(in) :: op2
+      integer, intent(in) :: j, p, itz, m1s, m1e, m2s, m2e
+      integer :: m1, m2, n, cnt1, cnt2, ich2
+      integer :: num1, num2, phase
+      integer :: idxb, njb, jb
+      integer :: idxk, njk, jk
+      integer :: a, b, c, jab, d, e, f, jde
+      real(8) :: v
+
+      n = thr%nsub
+      cnt1 = 0
+      m1 = 0
+      !$omp parallel
+      !$omp do private(idxb, njb, jb, a, b, c, jab, &
+      !$omp &  cnt2, m2, idxk, njk, jk, d, e, f, jde, v, ich2, num1, num2) reduction(+: m1, cnt1)
+      do idxb = 1, n
+        njb = thr%idx(idxb)%n
+        do jb = 1, njb
+          m1 = m1 + 1
+          if(m1 < m1s) cycle
+          if(m1 > m1e) cycle
+          cnt1 = cnt1 + 1
+          a   = thr%idx(idxb)%n2label1(jb)
+          b   = thr%idx(idxb)%n2label2(jb)
+          c   = thr%idx(idxb)%n2label3(jb)
+          jab = thr%idx(idxb)%n2label4(jb)
+
+          cnt2 = 0
+          m2 = 0
+          do idxk = 1, n
+            njk = thr%idx(idxk)%n
+            do jk = 1, njk
+              m2 = m2 + 1
+              if(m2 < m2s) cycle
+              if(m2 > m2e) cycle
+              cnt2 = cnt2 + 1
+              d   = thr%idx(idxk)%n2label1(jk)
+              e   = thr%idx(idxk)%n2label2(jk)
+              f   = thr%idx(idxk)%n2label3(jk)
+              jde = thr%idx(idxk)%n2label4(jk)
+              if(c /= f) cycle
+              if(jab /= jde) cycle
+              ich2 = two%jptz2n(jab, (-1)**(sps%ll(a) + sps%ll(b)), (sps%itz(a) + sps%itz(b))/2)
+              num1 = two%jptz(ich2)%labels2n(a,b)
+              num2 = two%jptz(ich2)%labels2n(d,e)
+              phase = two%jptz(ich2)%iphase(a,b) * two%jptz(ich2)%iphase(d,e)
+              v = op2%jptz(ich2)%m(num1, num2) * dble(phase) * Del(a,b) * Del(d,e) * 1.5d0
+              mat%m(cnt1, cnt2) = v
+            end do
+          end do
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+    end subroutine MatTwoBodyScalar
+  end subroutine TransTwoBodyScalar
+
+  subroutine TransThreeBodyScalar(thr, sc3, msin, thbme, sps, params, j, p, itz)
+    use read_3BME, only: iThreeBodyScalar
+    type(DMat), intent(inout) :: sc3
+    type(ThreeBodyChannel), intent(in) :: thr, msin
+    type(parameters), intent(in) :: params
+    type(iThreeBodyScalar), intent(in) :: thbme
+    type(spo_pn), intent(in) :: sps
+    integer, intent(in) :: j, p, itz
+    integer :: n, bra, ket
+    integer :: idxb, idxk
+    integer :: i1, i2, i3, i4, i5, i6
+    integer :: a, b, c, d, e, f, jab, jde
+    integer :: njb, njk, jb, jk
+    integer :: br, kt
+    real(8) :: v
+    type(DMat) :: cfpb, cfpk, vint, vfin
+    integer :: iblck1, iblck2, iblck3, iblck4, blcksize = 5000
+    integer :: n1, n2, m1, m2
+    integer :: n1s, n1e, n2s, n2e, m1s, m1e, m2s, m2e
+    integer :: ntot, mtot
+    ntot = thr%n
+    mtot = 0
+    do idxb = 1, thr%nsub
+      njb = thr%idx(idxb)%n
+      mtot = mtot + njb
+    end do
+
+    do iblck1 = 1, mtot / blcksize + 1
+      call block_dim(iblck1, blcksize, mtot, m1, m1s, m1e)
+      if(m1 == 0) cycle
+      do iblck2 = 1, mtot / blcksize + 1
+        call block_dim(iblck2, blcksize, mtot, m2, m2s, m2e)
+        if(m2 == 0) cycle
+        call vint%ini(m1,m2)
+        call MatThreeBodyScalar(vint, params, sps, thr, thbme, j, p, itz, m1s, m1e, m2s, m2e)
+
+        do iblck3 = 1, ntot / blcksize + 1
+          call block_dim(iblck3, blcksize, ntot, n1, n1s, n1e)
+          if(n1 == 0) cycle
+          call cfpb%ini(n1,m1)
+          call SetCFPmat(cfpb, params, sps, thr, n1s, n1e, m1s, m1e, 1)
+          do iblck4 = 1, ntot / blcksize + 1
+            call block_dim(iblck4, blcksize, ntot, n2, n2s, n2e)
+            if(n2 == 0) cycle
+            call cfpk%ini(m2,n2)
+            call SetCFPmat(cfpk, params, sps, thr, m2s, m2e, n2s, n2e, 0)
+            vfin = (cfpb * (vint * cfpk))
+
+            sc3%m(n1s:n1e, n2s:n2e) = sc3%m(n1s:n1e, n2s:n2e) + vfin%m(:,:)
+          end do
+        end do
+      end do
+    end do
+  contains
+
+    subroutine MatThreeBodyScalar(mat, params, sps, thr, thbme, j, p, itz, m1s, m1e, m2s, m2e)
+    use read_3BME, only: iThreeBodyScalar
+      type(DMat), intent(inout) :: mat
+      type(parameters), intent(in) :: params
+      type(spo_pn), intent(in) :: sps
+      type(ThreeBodyChannel), intent(in) :: thr
+      type(iThreeBodyScalar), intent(in) :: thbme
+      integer, intent(in) :: j, p, itz, m1s, m1e, m2s, m2e
+      integer :: m1, m2, n, cnt1, cnt2
+      integer :: idxb, njb, jb
+      integer :: idxk, njk, jk
+      integer :: a, b, c, jab, d, e, f, jde
+      real(8) :: v
+
+      n = thr%nsub
+      cnt1 = 0
+      m1 = 0
+      !$omp parallel
+      !$omp do private(idxb, njb, jb, a, b, c, jab, &
+      !$omp &  cnt2, m2, idxk, njk, jk, d, e, f, jde, v) reduction(+: m1, cnt1)
+      do idxb = 1, n
+        njb = thr%idx(idxb)%n
+        do jb = 1, njb
+          m1 = m1 + 1
+          if(m1 < m1s) cycle
+          if(m1 > m1e) cycle
+          cnt1 = cnt1 + 1
+          a   = thr%idx(idxb)%n2label1(jb)
+          b   = thr%idx(idxb)%n2label2(jb)
+          c   = thr%idx(idxb)%n2label3(jb)
+          jab = thr%idx(idxb)%n2label4(jb)
+          if(sps%nshell(a) > params%emax_3nf) cycle
+          if(sps%nshell(b) > params%emax_3nf) cycle
+          if(sps%nshell(c) > params%emax_3nf) cycle
+          if(sps%nshell(a) + sps%nshell(b) > params%e2max_3nf) cycle
+          if(sps%nshell(b) + sps%nshell(c) > params%e2max_3nf) cycle
+          if(sps%nshell(c) + sps%nshell(a) > params%e2max_3nf) cycle
+          if(sps%nshell(a) + sps%nshell(b) + sps%nshell(c) > params%e3max_3nf) cycle
+
+          cnt2 = 0
+          m2 = 0
+          do idxk = 1, n
+            njk = thr%idx(idxk)%n
+            do jk = 1, njk
+              m2 = m2 + 1
+              if(m2 < m2s) cycle
+              if(m2 > m2e) cycle
+              cnt2 = cnt2 + 1
+              d   = thr%idx(idxk)%n2label1(jk)
+              e   = thr%idx(idxk)%n2label2(jk)
+              f   = thr%idx(idxk)%n2label3(jk)
+              jde = thr%idx(idxk)%n2label4(jk)
+              if(sps%nshell(d) > params%emax_3nf) cycle
+              if(sps%nshell(e) > params%emax_3nf) cycle
+              if(sps%nshell(f) > params%emax_3nf) cycle
+              if(sps%nshell(d) + sps%nshell(e) > params%e2max_3nf) cycle
+              if(sps%nshell(e) + sps%nshell(f) > params%e2max_3nf) cycle
+              if(sps%nshell(f) + sps%nshell(d) > params%e2max_3nf) cycle
+              if(sps%nshell(d) + sps%nshell(e) + sps%nshell(f) > params%e3max_3nf) cycle
+              v = Get3BMEpn(sps, thbme, &
+                & j, p, itz, a, b, c, jab, d, e, f, jde) / 6.d0
+              mat%m(cnt1, cnt2) = v
+            end do
+          end do
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+    end subroutine MatThreeBodyScalar
+  end subroutine TransThreeBodyScalar
+
+  subroutine block_dim(i, sizeb, n, nn, nstart, nend)
+    integer, intent(in) :: i, sizeb, n
+    integer, intent(out) :: nn, nstart, nend
+    nn = min(sizeb, n - sizeb * (i-1))
+    nstart = (i - 1) * sizeb + 1
+    nend   = min(i * sizeb, n)
+  end subroutine block_dim
+
+  subroutine SetCFPmat(cfp, params, sps, thr, n1s, n1e, n2s, n2e, nt)
+    type(DMat), intent(inout) :: cfp
+    type(parameters), intent(in) :: params
+    type(spo_pn), intent(in) :: sps
+    type(ThreeBodyChannel), intent(in) :: thr
+    integer, intent(in) :: n1s, n1e, n2s, n2e, nt
+    integer :: m1s, m1e, m2s, m2e
+    integer :: bra, ket, m1, m2, n, cnt1, cnt2
+    integer :: kt, idxb, njb, jb
+    integer :: i1, i2, i3
+
+    m1s = n1s; m1e = n1e
+    m2s = n2s; m2e = n2e
+    if(nt == 1) then
+      m1s = n2s; m1e = n2e
+      m2s = n1s; m2e = n1e
+    end if
+    n = thr%nsub
+
+    cnt1 = 0
+    m1 = 0
+    !$omp parallel
+    !$omp do private(idxb, njb, jb, cnt2, ket, i1, i2, i3, kt) reduction(+: cnt1, m1)
+    do idxb = 1, n
+      njb = thr%idx(idxb)%n
+      do jb = 1, njb
+        m1 = m1 + 1
+        if(m1 < m1s) cycle
+        if(m1 > m1e) cycle
+        cnt1 = cnt1 + 1
+
+        cnt2 = 0
+        do ket = 1, thr%n
+          if(ket < m2s) cycle
+          if(ket > m2e) cycle
+          i1 = thr%n2label1(ket)
+          i2 = thr%n2label2(ket)
+          i3 = thr%n2label3(ket)
+          kt = thr%n2label4(ket)
+          cnt2 = cnt2 + 1
+          if(thr%labels2nsub(i1,i2,i3) /= idxb) cycle
+          if(nt == 0) cfp%m(cnt1, cnt2) = thr%idx(idxb)%cfp(jb, kt)
+          if(nt == 1) cfp%m(cnt2, cnt1) = thr%idx(idxb)%cfp(jb, kt)
+        end do
+      end do
+    end do
+    !$omp end do
+    !$omp end parallel
+  end subroutine SetCFPmat
 
 
 
@@ -820,4 +1283,9 @@ contains
     backspace(nfile)
   end subroutine skip_comment
 
+  real(8) function Del(i1, i2)
+    integer, intent(in) :: i1, i2
+    Del = 1.d0
+    if(i1 == i2) Del = dsqrt(2.d0)
+  end function Del
 end module ScalarOperator
