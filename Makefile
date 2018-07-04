@@ -15,7 +15,7 @@ OMP = -fopenmp
 FFLAGS=-O3
 CFLAGS=-O3
 FDFLAGS=-Ddebug
-#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 
 #--------------------------------------------------
 # Source Files
