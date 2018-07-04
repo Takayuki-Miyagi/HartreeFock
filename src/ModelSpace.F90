@@ -28,14 +28,18 @@ module ModelSpace
     procedure :: GetNOCoef
   end type spo_pn
 
+  type :: Channel
+    integer :: n
+  end type Channel
+
   type :: SpinParityTz
     integer :: n
     integer, allocatable :: j(:), p(:), tz(:)
     integer, allocatable :: jptz2n(:,:,:)
+    type(Channel), allocatable :: ndim(:)
   end type SpinParityTz
 
   type :: OneBodyChannel
-    integer :: n
     integer, allocatable :: n2label(:), label2n(:)
   contains
     procedure :: init => InitOneBodyChannel
@@ -43,7 +47,6 @@ module ModelSpace
   end type OneBodyChannel
 
   type :: TwoBodyChannel
-    integer :: n
     integer, allocatable :: n2label1(:), n2label2(:)
     integer, allocatable :: labels2n(:,:)
     integer, allocatable :: iphase(:,:)
@@ -66,7 +69,7 @@ module ModelSpace
   end type AdditionalQN
 
   type :: ThreeBodyChannel
-    integer :: n, nsub
+    integer :: nsub
     type(AdditionalQN), allocatable :: idx(:)
     integer, allocatable :: n2label1(:), n2label2(:), n2label3(:), n2label4(:)
     integer, allocatable :: labels2nsub(:,:,:)
@@ -300,14 +303,14 @@ contains
     type(parameters), intent(in) :: params
     call this%one%init(sps, params)
     call this%two%init(sps, params)
-    call this%thr%init(sps, params)
+    !call this%thr%init(sps, params)
   end subroutine InitMSpace
 
   subroutine FinMSpace(this)
     class(MSpace), intent(inout) :: this
     call this%one%fin()
     call this%two%fin()
-    call this%thr%fin()
+    !call this%thr%fin()
   end subroutine FinMSpace
 
   ! Model Space One Body
@@ -335,7 +338,7 @@ contains
               this%j(ich) = j
               this%p(ich) = p
               this%tz(ich) = itz
-              this%jptz(ich)%n = n
+              this%ndim(ich)%n = n
               this%jptz2n(j, p, itz) = ich
             end if
           end do
@@ -356,10 +359,10 @@ contains
     end do
 
     do ich = 1, this%n
-      call this%jptz(ich)%init(this%j(ich), this%p(ich), this%tz(ich), sps)
+      call this%jptz(ich)%init(this%j(ich), this%p(ich), this%tz(ich), this%ndim(ich)%n, sps)
 #ifdef debug
       write(*,'(a, i3, a, i3, a, i3, a, i3)') 'J = ', this%j(ich), '/2,  P = ', &
-          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%jptz(ich)%n
+          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%Ndim(ich)%n
 #endif
     end do
   end subroutine InitOneBodySpace
@@ -377,12 +380,12 @@ contains
     deallocate(this%jptz2n)
   end subroutine FinOneBodySpace
 
-  subroutine InitOneBodyChannel(this, j, p, tz, sps)
+  subroutine InitOneBodyChannel(this, j, p, tz, ndim, sps)
     class(OneBodyChannel), intent(inout) :: this
     type(spo_pn), intent(in) :: sps
-    integer, intent(in) :: j, p, tz
+    integer, intent(in) :: j, p, tz, ndim
     integer :: n, m, i1
-    n = this%n
+    n = ndim
     m = sps%n
     allocate(this%n2label(n))
     allocate(this%label2n(m))
@@ -442,7 +445,7 @@ contains
               this%j(ich) = j
               this%p(ich) = p
               this%tz(ich) = itz
-              this%jptz(ich)%n = n
+              this%ndim(ich)%n = n
               this%jptz2n(j, p, itz) = ich
             end if
           end do
@@ -463,10 +466,10 @@ contains
     end do
 
     do ich = 1, this%n
-      call this%jptz(ich)%Init(params, sps, this%j(ich), this%p(ich), this%tz(ich))
+      call this%jptz(ich)%Init(params, sps, this%j(ich), this%p(ich), this%tz(ich), this%ndim(ich)%n)
 #ifdef debug
       write(*,'(a, i3, a, i3, a, i3, a, i6)') 'J = ', this%j(ich), ',  P = ', &
-          & this%p(ich), ',  Tz = ', this%tz(ich), ',  n = ', this%jptz(ich)%n
+          & this%p(ich), ',  Tz = ', this%tz(ich), ',  n = ', this%ndim(ich)%n
 #endif
     end do
 #ifdef debug
@@ -488,14 +491,14 @@ contains
     deallocate(this%jptz2n)
   end subroutine FinTwoBodySpace
 
-  subroutine InitTwoBodyChannel(this, params, sps, j, p, tz)
+  subroutine InitTwoBodyChannel(this, params, sps, j, p, tz, ndim)
     class(TwoBodyChannel), intent(inout) :: this
     type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
-    integer, intent(in) :: j, p, tz
+    integer, intent(in) :: j, p, tz, ndim
     integer :: n, m, i1, i2
     integer :: j1, l1, tz1, j2, l2, tz2
-    n = this%n
+    n = ndim
     m = sps%n
     allocate(this%n2label1(n))
     allocate(this%n2label2(n))
@@ -615,10 +618,10 @@ contains
     deallocate(labels2idx)
 
     do ich = 1, this%n
-      call this%jptz(ich)%init(sps, params, this%j(ich), this%p(ich), this%tz(ich))
+      call this%jptz(ich)%init(sps, params, this%j(ich), this%p(ich), this%tz(ich), this%ndim(ich)%n)
 #ifdef debug
       write(*,'(a, i3, a, i3, a, i3, a, i8)') 'J = ', this%j(ich), '/2,  P = ', &
-          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%jptz(ich)%n
+          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%ndim(ich)%n
 #endif
     end do
 #ifdef debug
@@ -631,7 +634,6 @@ contains
     class(ThreeBodySpace), intent(inout) :: this
     integer :: ich
     do ich = 1, this%n
-      if(this%jptz(ich)%n < 1) cycle
       call this%jptz(ich)%fin()
     end do
     deallocate(this%jptz2n)
@@ -640,11 +642,12 @@ contains
     deallocate(this%tz)
   end subroutine FinThreeBodySpace
 
-  subroutine InitThreeBodyChannel(this, sps, params, j, p, tz)
+  subroutine InitThreeBodyChannel(this, sps, params, j, p, tz, ndim)
     class(ThreeBodyChannel), intent(inout) :: this
     type(spo_pn), intent(in) :: sps
     type(parameters), intent(in) :: params
     integer, intent(in) :: j, p, tz
+    integer, intent(out) :: ndim
     integer :: m, n, idx, ni, nj, nn
     integer :: i1, i2, i3
 
@@ -685,7 +688,7 @@ contains
         end do
       end do
     end do
-    this%n = n
+    ndim = n
     if(n < 1) return
     allocate(this%n2label1(n))
     allocate(this%n2label2(n))
@@ -722,12 +725,10 @@ contains
   subroutine FinThreeBodyChannel(this)
     class(ThreeBodyChannel), intent(inout) :: this
     integer :: idx
-    if(this%n > 0) then
-      deallocate(this%n2label1)
-      deallocate(this%n2label2)
-      deallocate(this%n2label3)
-      deallocate(this%n2label4)
-    end if
+    deallocate(this%n2label1)
+    deallocate(this%n2label2)
+    deallocate(this%n2label3)
+    deallocate(this%n2label4)
     do idx = 1, this%nsub
       call this%idx(idx)%Fin()
     end do

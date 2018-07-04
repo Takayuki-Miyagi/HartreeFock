@@ -72,13 +72,13 @@ $(OBJDIR)/%.o:$(SRCDIR)/%.c
 $(OBJDIR)/%.o:$(SRCDIR)/%.f
 	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR)/%.f90
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $<  # for debug
+	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $<  # for debug
 #	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR)/%.F90
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $< # for debug
+	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS)  -o $@ -c $< # for debug
 #	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:$(LINSRCDIR)/%.f90
-	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $< # for debug
+	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $< # for debug
 #	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
 
 dirs:
@@ -99,7 +99,7 @@ dep:
 
 clean:
 	rm -f $(TARGET).exe
-	rm -f $(MODS)
+	rm -f $(MODS) ./*.mod
 	rm -f $(OBJS)
 
 #--------------------------------------------------

@@ -1,7 +1,7 @@
 program HartreeFockMain
   use InputParameters, only: parameters, set_parameters
   use RotationGroup, only: init_dbinomial_triangle, fin_dbinomial_triangle
-  use ModelSpace, only: Mspace, spo_pn!, spo_isospin
+  use ModelSpace, only: Mspace, spo_pn, spo_isospin
   use read_3BME, only: iThreeBodyScalar
 !  use Operators, only: Scalar, Tensor, OneBodyScalar
 !  use HFCalc, only: HartreeFock, NO2B

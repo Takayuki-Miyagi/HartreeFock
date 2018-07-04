@@ -173,7 +173,7 @@ contains
     deallocate(labels2idx)
 
     do ich = 1, this%n
-!      call this%jpt(ich)%InitiThreeBodyChannel(params, sps, this%j(ich), this%p(ich), this%t(ich))
+      call this%jpt(ich)%InitiThreeBodyChannel(params, sps, this%j(ich), this%p(ich), this%t(ich))
       cnt = cnt + dble(this%jpt(ich)%n) * (dble(this%jpt(ich)%n) + 1) / 2
       this%usedmem = this%usedmem + this%jpt(ich)%usedmem
     end do
@@ -993,7 +993,6 @@ contains
         end do
       end do
     end do
-
   end subroutine Store3BME
 
   real(8) function hat(i)

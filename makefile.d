@@ -6,6 +6,7 @@ obj/HFMain.o : src/HFMain.F90 obj/class_stopwatch.o obj/MPIFunction.o obj/Read3B
 obj/MPIFunction.o : src/MPIFunction.F90 
 obj/ModelSpace.o : src/ModelSpace.F90 obj/RotationGroup.o obj/LinAlgLib.o obj/VectorDouble.o obj/MatrixDouble.o obj/MPIFunction.o obj/HFInput.o 
 obj/Read3BME.o : src/Read3BME.F90 obj/class_sys.o obj/RotationGroup.o obj/ModelSpace.o obj/MPIFunction.o obj/HFInput.o 
+obj/ScalarOperator.o : src/ScalarOperator.F90 obj/Read3BME.o obj/LinAlgLib.o obj/VectorDouble.o obj/MatrixDouble.o obj/ModelSpace.o obj/HFInput.o 
 obj/class_stopwatch.o : src/class_stopwatch.F90 obj/MPIFunction.o 
 obj/LinAlgLib.o : LinAlgf90/src/LinAlgLib.f90 obj/Parameters.o obj/MatVecComplex.o obj/MatVecDouble.o obj/MatrixComplex.o obj/MatrixDouble.o obj/VectorComplex.o obj/VectorDouble.o 
 obj/MatVecComplex.o : LinAlgf90/src/MatVecComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o 
