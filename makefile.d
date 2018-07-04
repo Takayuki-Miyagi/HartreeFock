@@ -2,7 +2,7 @@ obj/wallclock.o : src/wallclock.c
 obj/RotationGroup.o : src/RotationGroup.f90 
 obj/class_sys.o : src/class_sys.f90 
 obj/HFInput.o : src/HFInput.F90 obj/class_sys.o obj/MPIFunction.o 
-obj/HFMain.o : src/HFMain.F90 obj/class_stopwatch.o obj/MPIFunction.o obj/RotationGroup.o obj/ModelSpace.o obj/HFInput.o 
+obj/HFMain.o : src/HFMain.F90 obj/class_stopwatch.o obj/MPIFunction.o obj/Read3BME.o obj/RotationGroup.o obj/ModelSpace.o obj/HFInput.o 
 obj/MPIFunction.o : src/MPIFunction.F90 
 obj/ModelSpace.o : src/ModelSpace.F90 obj/RotationGroup.o obj/LinAlgLib.o obj/VectorDouble.o obj/MatrixDouble.o obj/MPIFunction.o obj/HFInput.o 
 obj/Read3BME.o : src/Read3BME.F90 obj/class_sys.o obj/RotationGroup.o obj/ModelSpace.o obj/MPIFunction.o obj/HFInput.o 

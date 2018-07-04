@@ -240,7 +240,6 @@ contains
   subroutine GetReferenceState(this, params)
     class(spo_pn), intent(inout) :: this
     type(parameters), intent(in) :: params
-    character(256) :: ref
     integer :: num, i
     integer :: n, l, j, itz
     integer :: iunit = 40
@@ -268,7 +267,6 @@ contains
   subroutine GetNOCoef(this, params)
     class(spo_pn), intent(inout) :: this
     type(parameters), intent(in) :: params
-    character(256) :: no
     integer :: num, i
     integer :: n, l, j, itz
     integer :: iunit = 40
@@ -545,7 +543,7 @@ contains
     type(spo_pn), intent(in) :: sps
     type(parameters), intent(in) :: params
     integer :: ich, n
-    integer :: i1, j1, l1, itz1, j12
+    integer :: i1, j1, l1, itz1
     integer :: i2, j2, l2, itz2
     integer :: i3, j3, l3, itz3
     integer :: j, p, itz, loop, ni, nj
@@ -654,7 +652,11 @@ contains
     m = sps%n
     do i1 = 1, m
       do i2 = 1, i1
+        if(sps%nshell(i1) + sps%nshell(i2) > params%e2max) cycle
         do i3 = 1, i2
+          if(sps%nshell(i1) + sps%nshell(i3) > params%e2max) cycle
+          if(sps%nshell(i2) + sps%nshell(i3) > params%e2max) cycle
+          if(sps%nshell(i1) + sps%nshell(i2) + sps%nshell(i3) > params%e3max) cycle
           if(sps%itz(i1) + sps%itz(i2) + sps%itz(i3) /= tz) cycle
           if((-1) ** (sps%ll(i1) + sps%ll(i2) + sps%ll(i3)) /= p) cycle
           idx = this%labels2nsub(i1,i2,i3)
