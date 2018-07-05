@@ -267,7 +267,6 @@ contains
                   & thr%jptz(ichb)%idx(idxk)%cfp(ljcd, i456)
             end do
           end do
-
           w2(bra2, ket2) = 6.d0 * w12 / (dble(2*j2 + 1) * Del(a,b) * Del(c,d))
           w2(ket2, bra2) = w2(bra2, ket2)
         end do
@@ -327,7 +326,7 @@ contains
       w2(:,:) = 0.d0
       !$omp parallel
       !$omp do private(bra2, a, b, ket2, c, d, w12, n, &
-      !$omp & ich1, j3, p3, itz3, e, f, eho, fho, ehf, v) schedule(dynamic)
+      !$omp & m, ich1, j3, p3, itz3, e, f, eho, fho, ehf, v) schedule(dynamic)
       do bra2 = 1, n2
         a = two%jptz(ich2)%n2label1(bra2)
         b = two%jptz(ich2)%n2label2(bra2)
