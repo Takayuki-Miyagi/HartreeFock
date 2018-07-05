@@ -367,11 +367,12 @@ contains
 
   end subroutine SetThreeBodyScalars
 
-  real(8) function Get3BMEpn(sps, thbme, &
+  real(8) function Get3BMEpn(params, sps, thbme, &
         & j, p, itz, a, b, c, jab, d, e, f, jde) result(v)
     use read_3BME, only: iThreeBodyScalar
     use RotationGroup, only: dcg
     use read_3BME, only: Get3BME
+    type(parameters), intent(in) :: params
     type(iThreeBodyScalar), intent(in) :: thbme
     type(spo_pn), intent(in) :: sps
     integer, intent(in) :: j, p, itz
@@ -381,6 +382,8 @@ contains
     integer :: ich
     real(8) :: viso
     v = 0.d0
+    if(sps%nshell(a) + sps%nshell(b) + sps%nshell(c) > params%e3cut) return
+    if(sps%nshell(d) + sps%nshell(e) + sps%nshell(f) > params%e3cut) return
     if(a == b .and. mod(jab, 2) == 1) return
     if(d == e .and. mod(jde, 2) == 1) return
     za = sps%itz(a); zb = sps%itz(b); zc = sps%itz(c)
@@ -1059,7 +1062,7 @@ contains
               if(sps%nshell(e) + sps%nshell(f) > params%e2max_3nf) cycle
               if(sps%nshell(f) + sps%nshell(d) > params%e2max_3nf) cycle
               if(sps%nshell(d) + sps%nshell(e) + sps%nshell(f) > params%e3max_3nf) cycle
-              v = Get3BMEpn(sps, thbme, &
+              v = Get3BMEpn(params, sps, thbme, &
                 & j, p, itz, a, b, c, jab, d, e, f, jde) / 6.d0
               mat%m(cnt1, cnt2) = v
             end do

@@ -67,6 +67,7 @@ contains
       w1f = NormOrd(params, sps, ms%one, ms%two, v2f)
       if(present(thbme)) then
         w2i = NormOrd(params, sps, this%HFBasis, ms%two, thbme, NO)
+        !stop
         w2f = TwoBodyScalarHFBasis(ms%one, ms%two, w2i, this%HFBasis)
         w12 = NormOrd(params, sps, ms%one, ms%two, w2f)
       end if
@@ -116,7 +117,7 @@ contains
       this%e1ho = NormOrd(sps, ms%one, hamil%one)
       this%e2ho = NormOrd(sps, ms%one, w1i) * 0.5d0
       this%e3ho = NormOrd(sps, ms%one, w12) / 6.d0
-      this%eho = this%e1hf + this%e2hf + this%e3hf
+      this%eho = this%e1ho + this%e2ho + this%e3ho
       w1i = w1i + 0.5d0 * w12
       if(myrank == 0) then
         write(*,'(a, f9.4, a)') &

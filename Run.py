@@ -2,6 +2,7 @@
 import sys
 import os.path
 import subprocess
+HOME = os.path.expanduser('~')
 class Orbit:
     def __init__(self):
         self.nlj_list = [{"n": 0, "l": 0, "j": 1},
@@ -121,6 +122,7 @@ e2max_2nf = 12
 pot = 'N3LO_EM500'
 txtbin_2n = 'txt'
 fom_2n = 'myg'
+twbmefile = HOME + '/HF/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw35_emax6_e2max12.txt.myg'
 
 f3path = './'
 emax_3nf = 6
@@ -134,6 +136,7 @@ cd = -0.2
 ce = 0.098
 lambda_local = 400
 txtbin_3n = 'txt'
+thbmefile = HOME + '/HF/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max6_hw35_NNN-full.txt'
 
 pmass = 8
 nmass = 8
@@ -147,8 +150,8 @@ thbme = True
 sv_hf_rslt = True
 vac = 'ref'
 fmt_hf_snt = 'bin'
-emax = 6
-e2max = 12
+emax = 3
+e2max = 6
 conv = 1.e-8
 params['hw'] = hw
 params['emax_2nf'] = emax_2nf
@@ -199,7 +202,8 @@ f.write('! n, l, j, itz, fraction \n')
 for o, fr in no.items():
     f.write(str(o[0]) + ' ' + str(o[1]) + ' ' + str(o[2]) + ' ' + str(o[3]) + ' ' + str(fr) + '\n')
 f.close()
-cmd = str(exe) + ' ' + name + ' ' + name1 + ' ' + name2
+cmd = str(exe) + ' ' + name + ' ' + name1 + ' ' + name2 + ' ' + \
+        twbmefile + ' ' + thbmefile
 subprocess.call(cmd, shell=True)
 
 

@@ -48,7 +48,6 @@ module NormalOrdering
 
   type :: hole
     integer :: n
-    integer, allocatable :: h2label(:), label2h(:)
     type(braket), allocatable :: h(:)
   end type  hole
 
@@ -157,9 +156,8 @@ contains
     type(OneBodySpace), intent(in) :: one
     type(TwoBodySpace), intent(in) :: two
     integer :: ich2, j2, p2, tz2, n, bra2, num
-    integer :: a, b, c, e3max, loop
+    integer :: a, b, c, loop
     real(8) :: cnt
-    e3max = params%e3max_3nf
     cnt = 0.d0
     allocate(this%jptz(two%n))
     do ich2 = 1, two%n
@@ -176,21 +174,14 @@ contains
           num = 0
           do c = 1, sps%n
             if(abs(sps%NOCoef(c)) < 1.d-4) cycle
-            if(sps%nshell(a) + sps%nshell(b) + sps%nshell(c) > params%e3max_3nf) cycle
             num = num + 1
             if(loop == 1) cycle
-            this%jptz(ich2)%idx(bra2)%label2h(num) = c
-            this%jptz(ich2)%idx(bra2)%h2label(c) = num
             call this%jptz(ich2)%idx(bra2)%h(num)%store_idx(params,sps,one,j2,p2,tz2,a,b,c)
             cnt = cnt + dble(this%jptz(ich2)%idx(bra2)%h(num)%n * 9) * 4.d0
           end do
           if(loop == 1) then
             this%jptz(ich2)%idx(bra2)%n = num
             allocate(this%jptz(ich2)%idx(bra2)%h(num))
-            allocate(this%jptz(ich2)%idx(bra2)%label2h(num))
-            allocate(this%jptz(ich2)%idx(bra2)%h2label(sps%n))
-            this%jptz(ich2)%idx(bra2)%label2h = 0
-            this%jptz(ich2)%idx(bra2)%h2label = 0
           end if
         end do
 
@@ -292,12 +283,10 @@ contains
     type(TwoBodySpace), intent(in) :: two
     type(NOThree2Two_HFbasis), intent(in) :: no
     integer, allocatable :: slranks(:)
-    integer :: e3max
 #ifdef MPI
     integer :: ich
 #endif
     call sc2%init(two%SpinParityTz)
-    e3max = params%e3max_3nf
     call master_slave(insideNO2, two%n, slranks)
 #ifdef MPI
     call mpi_bcast(slranks(1), two%ichmax, mpi_integer, 0, mpi_comm_world, ierr)
@@ -348,7 +337,7 @@ contains
               eho  = no%jptz(ich2)%idx(bra2)%h(n)%num(7, m)
               fho  = no%jptz(ich2)%idx(bra2)%h(n)%num(8, m)
               ehf  = no%jptz(ich2)%idx(bra2)%h(n)%num(9, m)
-              v = Get3BMEpn(sps,thbme,j3,p3,itz3,a,b,e,j2,c,d,f,j2)
+              v = Get3BMEpn(params, sps,thbme,j3,p3,itz3,a,b,e,j2,c,d,f,j2)
               w12 = w12 + dble(j3 + 1) * v * &
                   & HF%jptz(ich1)%m(eho, ehf) * &
                   & HF%jptz(ich1)%m(fho, ehf)
@@ -496,14 +485,10 @@ contains
         if(j1 /= sps%jj(eho1)) cycle
         if(p1 /= (-1) ** sps%ll(eho1)) cycle
         if(itz1 /= sps%itz(eho1)) cycle
-        if(sps%nshell(a) + sps%nshell(b) + sps%nshell(eho1) > e3max) cycle
-        if(sps%nshell(a) + sps%nshell(b) + sps%nshell(eho1) > e3cut) cycle
         do eho2 = 1, sps%n
           if(j1 /= sps%jj(eho2)) cycle
           if(p1 /= (-1) ** sps%ll(eho2)) cycle
           if(itz1 /= sps%itz(eho2)) cycle
-          if(sps%nshell(a) + sps%nshell(b) + sps%nshell(eho2) > e3max) cycle
-          if(sps%nshell(a) + sps%nshell(b) + sps%nshell(eho2) > e3cut) cycle
 
 
           p3 = p1 * p2
