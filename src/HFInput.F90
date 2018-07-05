@@ -25,11 +25,12 @@ module InputParameters
     integer :: pmass ! Z
     integer :: nmass ! N
     integer :: mass  ! A
-    logical :: HFloop, NO2B  ! Hartree-Fock calculation
+    logical :: HFloop ! Hartree-Fock calculation
     logical :: sv_hf_rslt
     logical :: HFbasis
     integer :: emax, e2max, e3max ! model space
     real(8) :: conv ! tolerance
+    character(256) :: vac = 'ref'
     character(256) :: egs = 'None', no2bhfile = 'None', fmt_hf_snt = 'None'
     character(256) :: reference = 'None', nocoef = 'None'
 
@@ -46,7 +47,7 @@ contains
     real(8) :: hw, conv
     integer :: emax_2nf, e2max_2nf
     integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
-    character(256) :: inputfile, fmt_hf_snt
+    character(256) :: inputfile, fmt_hf_snt, vac
 
     logical :: sv_hf_rslt, HFloop, NO2B, HFbasis
     integer :: emax, e2max, e3max
@@ -56,7 +57,7 @@ contains
       & emax_3nf, e2max_3nf, e3max_3nf, &
       & sv_hf_rslt, HFbasis, &
       & HFloop, NO2B, emax, e2max, &
-      & e3cut, fmt_hf_snt
+      & e3cut, fmt_hf_snt, vac
 
     narg = command_argument_count()
     call getarg(1, inputfile)
@@ -86,11 +87,11 @@ contains
     params%e3cut = e3cut
     params%HFloop = HFloop
     params%HFbasis = HFbasis
-    params%NO2B = NO2B
     params%emax = emax
     params%e2max = e2max
     params%e3max = 18
     params%sv_hf_rslt = sv_hf_rslt
+    params%vac = vac
     if(present(emax_in)) then
       params%emax = emax_in
       params%e2max = 2 * emax_in
@@ -106,7 +107,7 @@ contains
     params%no2bhfile = 'None'
     basis = 'HO'
     if(params%HFbasis) basis = 'HF'
-    params%no2bhfile = 'Hamil.out'
+    params%no2bhfile = 'Hamil.snt.txt'
     params%egs = 'Energy.out'
   end subroutine GetFileName
 
@@ -134,7 +135,6 @@ contains
     if(params%sv_hf_rslt) then
       write(iunit,'(2a)') '! NO2B file: ', trim(params%no2bhfile)
     end if
-
   end subroutine PrtParams
 end module InputParameters
 

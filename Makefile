@@ -14,8 +14,8 @@ LDFLAGS=-llapack -lblas
 OMP = -fopenmp
 FFLAGS=-O3
 CFLAGS=-O3
-FDFLAGS=-Ddebug
-FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+#FDFLAGS=-Ddebug
+#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 
 #--------------------------------------------------
 # Source Files
@@ -66,6 +66,7 @@ $(TARGET): $(OBJS)
 		mkdir $(INSTLDIR); \
 	fi
 	cp $(TARGET).exe $(INSTLDIR)
+	cp Run.py $(INSTLDIR)
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<

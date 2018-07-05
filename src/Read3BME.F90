@@ -172,6 +172,7 @@ contains
     end do
     deallocate(labels2idx)
 
+    cnt = 0.d0
     do ich = 1, this%n
       call this%jpt(ich)%InitiThreeBodyChannel(params, sps, this%j(ich), this%p(ich), this%t(ich))
       cnt = cnt + dble(this%jpt(ich)%n) * (dble(this%jpt(ich)%n) + 1) / 2

@@ -15,12 +15,17 @@ module ScalarOperator
       & one_body_element, read_2bme_pn_txt, read_2bme_pn_bin, &
       & read_2bme_snt_txt, read_2bme_snt_bin, calc_bare_2bme, &
       & two_body_element, r_dot_r, red_r_j, red_r_l, &
-      & p_dot_p, red_nab_j, red_nab_l, skip_comment, Del
+      & p_dot_p, red_nab_j, red_nab_l, skip_comment, Del, &
+      & OneBodyScalarEmbedded3, OneBodyScalarEmbedded2, &
+      & TwoBodyScalarEmbedded3, TransOrthoNormalThree, &
+      & get_element_twobody, get_Uelement_twobody
   public :: assignment(=), operator(+), operator(-), &
-      & operator(*), operator(/), NBodyScalars, ScalarOperators
+      & operator(*), operator(/), NBodyScalars, ScalarOperators, &
+      & ScalarEmbedded, UEmbedded
 
   type :: NBodyScalars
     type(DMat), allocatable :: jptz(:)
+    real(8) :: usedmem = 0.d0
   contains
     procedure :: init => InitNBodyScalars
     procedure :: fin => FinNBodyScalars
@@ -32,6 +37,8 @@ module ScalarOperator
 
   type :: ScalarOperators
     type(NBodyScalars) :: one, two, thr
+    real(8) :: zero = 0.d0
+    real(8) :: usedmem = 0.d0
   contains
     procedure :: init => InitScalarOperators
     procedure :: fin => FinScalarOperators
@@ -58,6 +65,11 @@ module ScalarOperator
   interface operator(/)
     module procedure :: DivideScalarOperators, DivideNBodyScalars
   end interface operator(/)
+
+  interface ScalarEmbedded
+    module procedure :: OneBodyScalarEmbedded3, &
+          & OneBodyScalarEmbedded2, TwoBodyScalarEmbedded3
+  end interface ScalarEmbedded
 contains
   ! Constructor and Destructor
   subroutine InitScalarOperators(this, ms)
@@ -68,6 +80,7 @@ contains
     if(allocated(ms%thr%jptz)) then
       call this%thr%init(ms%thr%SpinParityTz)
     end if
+    this%usedmem = this%one%usedmem + this%two%usedmem + this%thr%usedmem
   end subroutine InitScalarOperators
 
   subroutine FinScalarOperators(this)
@@ -81,13 +94,17 @@ contains
     class(NBodyScalars), intent(out) :: this
     type(SpinParityTz), intent(in) :: nbody
     integer :: ich, n
+    real(8) :: cnt
     if(allocated(this%jptz)) call this%fin()
     n = nbody%n
     allocate(this%jptz(n))
+    cnt = 0.d0
     do ich = 1, nbody%n
       n = nbody%ndim(ich)
       call this%jptz(ich)%ini(n,n)
+      cnt = cnt + n ** 2
     end do
+    this%usedmem = 8.d0 * cnt / (1024.d0) ** 3
   end subroutine InitNBodyScalars
 
   subroutine FinNBodyScalars(this)
@@ -127,7 +144,9 @@ contains
     type(ScalarOperators) :: c
     type(ScalarOperators), intent(in) :: a, b
     call CopyNBodyScalars(c%one, SumNBodyScalars(a%one, b%one))
+    call CopyNBodyScalars(c%two, SumNBodyScalars(a%two, b%two))
     if(allocated(a%thr%jptz) .and. allocated(b%thr%jptz)) then
+      call CopyNBodyScalars(c%thr, SumNBodyScalars(a%thr, b%thr))
     end if
   end function SumScalarOperators
 
@@ -135,6 +154,7 @@ contains
     type(NBodyScalars) :: c
     type(NBodyScalars), intent(in) :: a, b
     integer :: ich, n
+    call CopyNBodyScalars(c, a)
     n = size(a%jptz)
     do ich = 1, n
       c%jptz(ich) = a%jptz(ich) + b%jptz(ich)
@@ -156,6 +176,7 @@ contains
     type(NBodyScalars), intent(in) :: a, b
     integer :: ich, n
     n = size(a%jptz)
+    call CopyNBodyScalars(c, a)
     do ich = 1, n
       c%jptz(ich) = a%jptz(ich) - b%jptz(ich)
     end do
@@ -178,6 +199,7 @@ contains
     type(NBodyScalars), intent(in) :: b
     integer :: ich, n
     n = size(b%jptz)
+    call CopyNBodyScalars(c, b)
     do ich = 1, n
       c%jptz(ich) = a * b%jptz(ich)
     end do
@@ -200,6 +222,7 @@ contains
     type(NBodyScalars), intent(in) :: b
     integer :: ich, n
     n = size(b%jptz)
+    call CopyNBodyScalars(c, b)
     do ich = 1, n
       c%jptz(ich) = a * b%jptz(ich)
     end do
@@ -222,6 +245,7 @@ contains
     type(NBodyScalars), intent(in) :: b
     integer :: ich, n
     n = size(b%jptz)
+    call CopyNBodyScalars(c, b)
     do ich = 1, n
       c%jptz(ich) = b%jptz(ich) / a
     end do
@@ -236,6 +260,7 @@ contains
     character(*), intent(in) :: oprtr
     character(*), optional, intent(in) :: f2
     type(iThreeBodyScalar), optional, intent(in) :: thbme
+    type(NBodyScalars) :: two
 
     call this%one%SetOneBodyScalars(params, sps, ms%one, oprtr)
     call this%two%SetTwoBodyScalars(params, sps, ms%two, oprtr, f2)
@@ -243,10 +268,12 @@ contains
       call this%thr%SetThreeBodyScalars(params, sps, ms%thr, thbme)
     end if
 
-    select case(oprtr)
-    case('Hamil', 'hamil')
-    case('Rm', 'rm')
-    end select
+    if(oprtr == 'hamil' .or. oprtr == 'Hamil') then
+      call two%init(ms%two%SpinParityTz)
+      call calc_bare_2bme('H_p_dot_p', params, sps, ms%two, two)
+      call CopyNBodyScalars(this%two, SubtractNBodyScalars(this%two, two))
+      call two%fin()
+    end if
   end subroutine SetScalarOperators
 
   subroutine SetOneBodyScalars(this, params, sps, one, oprtr)
@@ -272,9 +299,7 @@ contains
         do ket = 1, n
           i2 = one%jptz(ich)%n2label(ket)
           n2 = sps%nn(i2)
-          e = one_body_element(n1, n2, l1, j, itz, params%hw, &
-              & params%mass, params%pmass, params%nmass, &
-              & params%hc, params%amnucl, oprtr)
+          e = one_body_element(n1, n2, l1, j, itz, params, oprtr)
           this%jptz(ich)%m(bra, ket) = e
         end do
       end do
@@ -313,14 +338,14 @@ contains
 
     end if
 
-    if(sys%find(f2, '.txt') .and. sys%find(f2, '.snt')) then
+    if(sys%find(f2, '.txt') .and. sys%find(f2, '.myg')) then
       call read_2bme_pn_txt(f2, params, sps, two, this)
-    elseif(sys%find(f2, '.bin') .and. sys%find(f2, '.snt')) then
-      call read_2bme_pn_bin(f2, params, sps, two, this)
-    elseif(sys%find(f2, '.txt') .and. sys%find(f2, '.myg')) then
-      call read_2bme_snt_txt(f2, params, sps, two, this)
     elseif(sys%find(f2, '.bin') .and. sys%find(f2, '.myg')) then
-      call read_2bme_snt_bin(f2, params, sps, two, this)
+      call read_2bme_pn_bin(f2, params, sps, two, this)
+    elseif(sys%find(f2, '.txt') .and. sys%find(f2, '.snt')) then
+      call read_2bme_snt_txt(f2, sps, two, this)
+    elseif(sys%find(f2, '.bin') .and. sys%find(f2, '.snt')) then
+      call read_2bme_snt_bin(f2, sps, two, this)
     end if
   end subroutine SetTwoBodyScalars
 
@@ -337,7 +362,7 @@ contains
       j   = thr%j(ich)
       p   = thr%p(ich)
       tz = thr%tz(ich)
-      call TransOrthoNormalThree(thr%jptz(ich), this%jptz(ich), thr%jptz(ich), thbme, sps, params, j, p, tz)
+      call TransOrthoNormalThree(thr%jptz(ich), this%jptz(ich), thbme, sps, params, j, p, tz)
     end do
 
   end subroutine SetThreeBodyScalars
@@ -379,12 +404,21 @@ contains
     end do
   end function Get3BMEpn
 
-  function one_body_element(n1, n2, l, j, tz, hw, A, Z, N, hc, am, oprtr) result(e)
+  function one_body_element(n1, n2, l, j, tz, params, oprtr) result(e)
     real(8) :: e
-    integer, intent(in) :: n1, n2, l, j, tz, A, Z, N
-    real(8), intent(in) :: hw, hc, am
+    type(parameters), intent(in) :: params
+    integer, intent(in) :: n1, n2, l, j, tz
+    integer :: A, Z, N
+    real(8) :: hw, hc, am
     character(*), intent(in) :: oprtr
+    A = params%mass
+    Z = params%pmass
+    N = params%nmass
+    hw = params%hw
+    hc = params%hc
+    am = params%amnucl
 
+    e = 0.d0
     select case(oprtr)
     case('Hamil','hamil')
       if(n1 == n2) e = dble(2 * n1 + l) + 1.5d0
@@ -431,8 +465,8 @@ contains
     end do
   end subroutine calc_bare_2bme
 
-  function two_body_element(oprtr, params, sps, i1, i2, i3, i4, j) result(e)
-    real(8) :: e
+  function two_body_element(oprtr, params, sps, i1, i2, i3, i4, j) result(ele)
+    real(8) :: ele
     type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, j
@@ -445,13 +479,14 @@ contains
     hc = params%hc
     hw = params%hw
     am = params%amnucl
+    ele = 0.d0
     select case(oprtr)
     case('H_r_dot_r') ! rirj / A
-      e = r_dot_r(sps, i1, i2, i3, i4, j) * hw / dble(A)
+      ele = r_dot_r(sps, i1, i2, i3, i4, j) * hw / dble(A)
     case('H_p_dot_p') ! pipj / A
-      e = p_dot_p(sps, i1, i2, i3, i4, j) * hw / dble(A)
+      ele = p_dot_p(sps, i1, i2, i3, i4, j) * hw / dble(A)
     case('R_r_dot_r') ! - 4 * rirj / A**2 mc**2 hw
-      e = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (dble(A) * am * hw)
+      ele = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (dble(A) * am * hw)
     end select
   end function two_body_element
 
@@ -591,21 +626,121 @@ contains
     end if
   end function red_nab_l
 
-  subroutine TransOneBodyScalar(thr, this, one, op1, sps, params, j, p, itz)
+  subroutine UEmbedded(two, this, one, op1)
+    type(DMat), intent(inout) :: this
+    type(OneBodySpace), intent(in) :: one
+    type(TwoBodyChannel), intent(in) :: two
+    type(NBodyScalars), intent(in) :: op1
+    integer :: bra, ket, phb, a, b, c, d, n
+    real(8) :: o12
+    n = two%n
+    !$omp parallel
+    !$omp do private(bra, a, b, phb, ket, c, d, o12)
+    do bra = 1, n
+      a = two%n2label1(bra)
+      b = two%n2label2(bra)
+      phb = two%iphase(b,a)
+      do ket = 1, n
+        c = two%n2label1(ket)
+        d = two%n2label2(ket)
+        o12 = get_Uelement_twobody(a, b, c, d, phb, one, op1)
+        this%m(bra,ket) = o12
+      end do
+    end do
+    !$omp end do
+    !$omp end parallel
+  end subroutine UEmbedded
+
+  function get_Uelement_twobody(a, b, c, d, phb, one, op1) result(o12)
+    real(8) :: o12
+    integer, intent(in) :: a, b, c, d, phb
+    type(OneBodySpace), intent(in) :: one
+    type(NBodyScalars), intent(in) :: op1
+    integer :: icha, ichb, ichc, ichd
+    real(8) :: u1, u2
+    icha = one%label2jptz(a)
+    ichb = one%label2jptz(b)
+    ichc = one%label2jptz(c)
+    ichd = one%label2jptz(d)
+    o12 = 0.d0
+    if(icha == ichc .and. ichb == ichd) then
+      u1 = op1%jptz(icha)%m(one%jptz(icha)%label2n(a), one%jptz(icha)%label2n(c))
+      u2 = op1%jptz(ichb)%m(one%jptz(ichb)%label2n(b), one%jptz(ichb)%label2n(d))
+      o12 = u1 * u2
+    end if
+
+    if(icha == ichd .and. ichb == ichc) then
+      u1 = op1%jptz(icha)%m(one%jptz(icha)%label2n(a), one%jptz(icha)%label2n(d))
+      u2 = op1%jptz(ichb)%m(one%jptz(ichb)%label2n(b), one%jptz(ichb)%label2n(c))
+      o12 = o12 + u1 * u2 * dble(phb)
+    end if
+    o12 = o12 / (Del(a,b) * Del(c, d))
+  end function get_Uelement_twobody
+
+  subroutine OneBodyScalarEmbedded2(two, this, one, op1, isgn)
+    type(DMat), intent(inout) :: this
+    type(OneBodySpace), intent(in) :: one
+    type(TwoBodyChannel), intent(in) :: two
+    type(NBodyScalars), intent(in) :: op1
+    integer, intent(in) :: isgn
+    integer :: bra, ket, phb, phk, a, b, c, d, n
+    real(8) :: o12
+    n = two%n
+    !$omp parallel
+    !$omp do private(bra, a, b, phb, ket, c, d, phk, o12)
+    do bra = 1, n
+      a = two%n2label1(bra)
+      b = two%n2label2(bra)
+      phb = two%iphase(b,a)
+      do ket = 1, bra
+        c = two%n2label1(ket)
+        d = two%n2label2(ket)
+        phk = two%iphase(d,c)
+        o12 = get_element_twobody(a, b, c, d, phb, phk, one, op1)
+        this%m(bra,ket) = o12
+        this%m(ket,bra) = o12 * dble(isgn)
+      end do
+    end do
+    !$omp end do
+    !$omp end parallel
+  end subroutine OneBodyScalarEmbedded2
+
+  function get_element_twobody(a, b, c, d, phb, phk, one, op1) result(o12)
+    real(8) :: o12
+    integer, intent(in) :: a, b, c, d, phb, phk
+    type(OneBodySpace), intent(in) :: one
+    type(NBodyScalars), intent(in) :: op1
+    integer :: icha, ichb, ichc, ichd
+    icha = one%label2jptz(a)
+    ichb = one%label2jptz(b)
+    ichc = one%label2jptz(c)
+    ichd = one%label2jptz(d)
+    o12 = 0.d0
+    if(b == d .and. icha == ichc) then
+      o12 = o12 + op1%jptz(icha)%m(one%jptz(icha)%label2n(a), one%jptz(icha)%label2n(c))
+    end if
+
+    if(b == c .and. icha == ichd) then
+      o12 = o12 + op1%jptz(icha)%m(one%jptz(icha)%label2n(a), one%jptz(icha)%label2n(d)) * dble(phk)
+    end if
+
+    if(a == d .and. ichb == ichc) then
+      o12 = o12 + op1%jptz(ichb)%m(one%jptz(ichb)%label2n(b), one%jptz(ichb)%label2n(c)) * dble(phb)
+    end if
+
+    if(a == c .and. ichb == ichd) then
+      o12 = o12 + op1%jptz(ichb)%m(one%jptz(ichb)%label2n(b), one%jptz(ichb)%label2n(d)) * dble(phb) * dble(phk)
+    end if
+    o12 = o12 / (Del(a,b) * Del(c, d))
+  end function get_element_twobody
+
+  subroutine OneBodyScalarEmbedded3(thr, this, one, op1)
     type(DMat), intent(inout) :: this
     type(OneBodySpace), intent(in) :: one
     type(ThreeBodyChannel), intent(in) :: thr
-    type(parameters), intent(in) :: params
     type(NBodyScalars), intent(in) :: op1
-    type(spo_pn), intent(in) :: sps
-    integer, intent(in) :: j, p, itz
-    integer :: n, bra, ket
-    integer :: idxb, idxk
-    integer :: i1, i2, i3, i4, i5, i6
-    integer :: a, b, c, d, e, f, jab, jde
-    integer :: njb, njk, jb, jk
-    integer :: br, kt
-    real(8) :: v
+    integer :: idxb
+    integer :: njb
     type(DMat) :: cfpb, cfpk, vint, vfin
     integer :: iblck1, iblck2, iblck3, iblck4, blcksize = 5000
     integer :: n1, n2, m1, m2
@@ -625,18 +760,18 @@ contains
         call block_dim(iblck2, blcksize, mtot, m2, m2s, m2e)
         if(m2 == 0) cycle
         call vint%ini(m1,m2)
-        call MatOneBodyScalar(thr, vint, one, op1, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+        call MatOneBodyScalar(thr, vint, one, op1, m1s, m1e, m2s, m2e)
 
         do iblck3 = 1, ntot / blcksize + 1
           call block_dim(iblck3, blcksize, ntot, n1, n1s, n1e)
           if(n1 == 0) cycle
           call cfpb%ini(n1,m1)
-          call SetCFPmat(cfpb, params, sps, thr, n1s, n1e, m1s, m1e, 1)
+          call SetCFPmat(cfpb, thr, n1s, n1e, m1s, m1e, 1)
           do iblck4 = 1, ntot / blcksize + 1
             call block_dim(iblck4, blcksize, ntot, n2, n2s, n2e)
             if(n2 == 0) cycle
             call cfpk%ini(m2,n2)
-            call SetCFPmat(cfpk, params, sps, thr, m2s, m2e, n2s, n2e, 0)
+            call SetCFPmat(cfpk, thr, m2s, m2e, n2s, n2e, 0)
             vfin = (cfpb * (vint * cfpk))
 
             this%m(n1s:n1e, n2s:n2e) = this%m(n1s:n1e, n2s:n2e) + vfin%m(:,:)
@@ -645,14 +780,12 @@ contains
       end do
     end do
   contains
-    subroutine MatOneBodyScalar(thr, mat, one, op1, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+    subroutine MatOneBodyScalar(thr, mat, one, op1, m1s, m1e, m2s, m2e)
       type(DMat), intent(inout) :: mat
-      type(parameters), intent(in) :: params
-      type(spo_pn), intent(in) :: sps
       type(ThreeBodyChannel), intent(in) :: thr
       type(OneBodySpace), intent(in) :: one
       type(NBodyScalars), intent(in) :: op1
-      integer, intent(in) :: j, p, itz, m1s, m1e, m2s, m2e
+      integer, intent(in) :: m1s, m1e, m2s, m2e
       integer :: m1, m2, n, cnt1, cnt2, ich1, num1, num2
       integer :: idxb, njb, jb
       integer :: idxk, njk, jk
@@ -706,23 +839,16 @@ contains
       !$omp end do
       !$omp end parallel
     end subroutine MatOneBodyScalar
-  end subroutine TransOneBodyScalar
+  end subroutine OneBodyScalarEmbedded3
 
-  subroutine TransTwoBodyScalar(thr, this, two, op2, sps, params, j, p, itz)
+  subroutine TwoBodyScalarEmbedded3(thr, this, two, op2, sps)
     type(DMat), intent(inout) :: this
     type(TwoBodySpace), intent(in) :: two
     type(ThreeBodyChannel), intent(in) :: thr
-    type(parameters), intent(in) :: params
     type(NBodyScalars), intent(in) :: op2
     type(spo_pn), intent(in) :: sps
-    integer, intent(in) :: j, p, itz
-    integer :: n, bra, ket
-    integer :: idxb, idxk
-    integer :: i1, i2, i3, i4, i5, i6
-    integer :: a, b, c, d, e, f, jab, jde
-    integer :: njb, njk, jb, jk
-    integer :: br, kt
-    real(8) :: v
+    integer :: idxb
+    integer :: njb
     type(DMat) :: cfpb, cfpk, vint, vfin
     integer :: iblck1, iblck2, iblck3, iblck4, blcksize = 5000
     integer :: n1, n2, m1, m2
@@ -742,18 +868,18 @@ contains
         call block_dim(iblck2, blcksize, mtot, m2, m2s, m2e)
         if(m2 == 0) cycle
         call vint%ini(m1,m2)
-        call MatTwoBodyScalar(thr, vint, two, op2, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+        call MatTwoBodyScalar(thr, vint, two, op2, sps, m1s, m1e, m2s, m2e)
 
         do iblck3 = 1, ntot / blcksize + 1
           call block_dim(iblck3, blcksize, ntot, n1, n1s, n1e)
           if(n1 == 0) cycle
           call cfpb%ini(n1,m1)
-          call SetCFPmat(cfpb, params, sps, thr, n1s, n1e, m1s, m1e, 1)
+          call SetCFPmat(cfpb, thr, n1s, n1e, m1s, m1e, 1)
           do iblck4 = 1, ntot / blcksize + 1
             call block_dim(iblck4, blcksize, ntot, n2, n2s, n2e)
             if(n2 == 0) cycle
             call cfpk%ini(m2,n2)
-            call SetCFPmat(cfpk, params, sps, thr, m2s, m2e, n2s, n2e, 0)
+            call SetCFPmat(cfpk, thr, m2s, m2e, n2s, n2e, 0)
             vfin = (cfpb * (vint * cfpk))
 
             this%m(n1s:n1e, n2s:n2e) = this%m(n1s:n1e, n2s:n2e) + vfin%m(:,:)
@@ -762,14 +888,13 @@ contains
       end do
     end do
   contains
-    subroutine MatTwoBodyScalar(thr, mat, two, op2, params, sps, j, p, itz, m1s, m1e, m2s, m2e)
+    subroutine MatTwoBodyScalar(thr, mat, two, op2, sps, m1s, m1e, m2s, m2e)
       type(DMat), intent(inout) :: mat
-      type(parameters), intent(in) :: params
       type(spo_pn), intent(in) :: sps
       type(ThreeBodyChannel), intent(in) :: thr
       type(TwoBodySpace), intent(in) :: two
       type(NBodyScalars), intent(in) :: op2
-      integer, intent(in) :: j, p, itz, m1s, m1e, m2s, m2e
+      integer, intent(in) :: m1s, m1e, m2s, m2e
       integer :: m1, m2, n, cnt1, cnt2, ich2
       integer :: num1, num2, phase
       integer :: idxb, njb, jb
@@ -823,23 +948,18 @@ contains
       !$omp end do
       !$omp end parallel
     end subroutine MatTwoBodyScalar
-  end subroutine TransTwoBodyScalar
+  end subroutine TwoBodyScalarEmbedded3
 
-  subroutine TransThreeBodyScalar(thr, sc3, msin, thbme, sps, params, j, p, itz)
+  subroutine TransOrthoNormalThree(thr, sc3, thbme, sps, params, j, p, itz)
     use read_3BME, only: iThreeBodyScalar
     type(DMat), intent(inout) :: sc3
-    type(ThreeBodyChannel), intent(in) :: thr, msin
+    type(ThreeBodyChannel), intent(in) :: thr
     type(parameters), intent(in) :: params
     type(iThreeBodyScalar), intent(in) :: thbme
     type(spo_pn), intent(in) :: sps
     integer, intent(in) :: j, p, itz
-    integer :: n, bra, ket
-    integer :: idxb, idxk
-    integer :: i1, i2, i3, i4, i5, i6
-    integer :: a, b, c, d, e, f, jab, jde
-    integer :: njb, njk, jb, jk
-    integer :: br, kt
-    real(8) :: v
+    integer :: idxb
+    integer :: njb
     type(DMat) :: cfpb, cfpk, vint, vfin
     integer :: iblck1, iblck2, iblck3, iblck4, blcksize = 5000
     integer :: n1, n2, m1, m2
@@ -865,12 +985,12 @@ contains
           call block_dim(iblck3, blcksize, ntot, n1, n1s, n1e)
           if(n1 == 0) cycle
           call cfpb%ini(n1,m1)
-          call SetCFPmat(cfpb, params, sps, thr, n1s, n1e, m1s, m1e, 1)
+          call SetCFPmat(cfpb, thr, n1s, n1e, m1s, m1e, 1)
           do iblck4 = 1, ntot / blcksize + 1
             call block_dim(iblck4, blcksize, ntot, n2, n2s, n2e)
             if(n2 == 0) cycle
             call cfpk%ini(m2,n2)
-            call SetCFPmat(cfpk, params, sps, thr, m2s, m2e, n2s, n2e, 0)
+            call SetCFPmat(cfpk, thr, m2s, m2e, n2s, n2e, 0)
             vfin = (cfpb * (vint * cfpk))
 
             sc3%m(n1s:n1e, n2s:n2e) = sc3%m(n1s:n1e, n2s:n2e) + vfin%m(:,:)
@@ -949,7 +1069,7 @@ contains
       !$omp end do
       !$omp end parallel
     end subroutine MatThreeBodyScalar
-  end subroutine TransThreeBodyScalar
+  end subroutine TransOrthoNormalThree
 
   subroutine block_dim(i, sizeb, n, nn, nstart, nend)
     integer, intent(in) :: i, sizeb, n
@@ -959,14 +1079,12 @@ contains
     nend   = min(i * sizeb, n)
   end subroutine block_dim
 
-  subroutine SetCFPmat(cfp, params, sps, thr, n1s, n1e, n2s, n2e, nt)
+  subroutine SetCFPmat(cfp, thr, n1s, n1e, n2s, n2e, nt)
     type(DMat), intent(inout) :: cfp
-    type(parameters), intent(in) :: params
-    type(spo_pn), intent(in) :: sps
     type(ThreeBodyChannel), intent(in) :: thr
     integer, intent(in) :: n1s, n1e, n2s, n2e, nt
     integer :: m1s, m1e, m2s, m2e
-    integer :: bra, ket, m1, m2, n, cnt1, cnt2
+    integer :: ket, m1, n, cnt1, cnt2
     integer :: kt, idxb, njb, jb
     integer :: i1, i2, i3
 
@@ -1008,8 +1126,6 @@ contains
     !$omp end do
     !$omp end parallel
   end subroutine SetCFPmat
-
-
 
   !--------------------------------------------------
   !
@@ -1139,9 +1255,8 @@ contains
     deallocate(v1save)
   end subroutine read_2bme_pn_bin
 
-  subroutine read_2bme_snt_txt(f2, params, sps, two, tbme)
+  subroutine read_2bme_snt_txt(f2, sps, two, tbme)
     type(NBodyScalars), intent(inout) :: tbme
-    type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
     character(*), optional, intent(in) :: f2
@@ -1157,7 +1272,7 @@ contains
     integer :: iunit = 19
     open(iunit, file = f2, status = "old")
     call skip_comment(iunit)
-    read(iunit,*)num_p_orb,num_n_orb,num_p_core,num_n_core
+    read(iunit,*) num_p_orb,num_n_orb,num_p_core,num_n_core
     num_orb=num_p_orb+num_n_orb
     do i = 1, num_orb
       read(iunit,*)num,n,l,j,itz
@@ -1192,11 +1307,10 @@ contains
     end do
   end subroutine read_2bme_snt_txt
 
-  subroutine read_2bme_snt_bin(f2, params, sps, two, tbme)
+  subroutine read_2bme_snt_bin(f2, sps, two, tbme)
     use class_stopwatch, only: start_stopwatch, stop_stopwatch, &
         & time_io_read
     type(NBodyScalars), intent(inout) :: tbme
-    type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
     character(*), optional, intent(in) :: f2

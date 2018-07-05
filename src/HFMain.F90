@@ -3,8 +3,10 @@ program HartreeFockMain
   use RotationGroup, only: init_dbinomial_triangle, fin_dbinomial_triangle
   use ModelSpace, only: Mspace, spo_pn, spo_isospin
   use read_3BME, only: iThreeBodyScalar
-!  use Operators, only: Scalar, Tensor, OneBodyScalar
-!  use HFCalc, only: HartreeFock, NO2B
+  use ScalarOperator
+  use NormalOrdering
+  use HFSolver, only: HFSol
+  use WriteOperator
 #ifdef MPI
   use mpi
   use MPIFunction, only: myrank, nprocs, ierr
@@ -21,16 +23,9 @@ program HartreeFockMain
   type(spo_isospin) :: isps
   type(MSpace) :: ms
   type(iThreeBodyScalar) :: thbme
-!  type(Scalar) :: hamil, s, x, sclop
-!  type(Tensor) :: tnsop
-!  type(OneBodyScalar) :: HFT
-!  type(HartreeFock) :: HF
+  type(ScalarOperators) :: hamil
+  type(HFSol) :: sol
   integer :: iunite = 118
-  integer :: iunito = 119
-  integer :: iunits = 120
-  integer :: iunith = 121
-  character(10) :: RankOperator
-  integer :: jr, pr, zr
   call start_stopwatch(time_total)
 #ifdef MPI
   call mpi_init(ierr)
@@ -39,8 +34,6 @@ program HartreeFockMain
 #endif
 
   call set_parameters(params)
-  open(iunite, file=params%egs, status = 'replace')
-  call params%PrtParams(iunite)
 
   call init_dbinomial_triangle()
   call sps%init(params)
@@ -51,35 +44,49 @@ program HartreeFockMain
   call stop_stopwatch(time_MS)
 
   call start_stopwatch(time_set_hamil)
- ! Three-Body Force
- if(params%thbmefile /= 'None') call isps%init(params)
- if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
- ! Hamiltonian
-!  call hamil%InitScalar(ms, params)
-!  call hamil%SetHamil(sps, ms, params, thbdyfrc, params%twbmefile)
+  ! Three-Body Force
+  if(params%thbmefile /= 'None') call isps%init(params)
+  if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
+  ! Hamiltonian
+  call hamil%init(ms)
+  call hamil%set(params, sps, ms, 'hamil', params%twbmefile, thbme)
   call stop_stopwatch(time_set_hamil)
-!
-!  ! Hartree-Fock calculation
-!  call start_stopwatch(time_HF)
-!  call HFT%InitOneBodyScalar(ms%one)
-!  call HF%HFLoop(params, sps, ms, hamil, HFT, thbdyfrc, iunite)
-!  if(params%sv_hf_rslt) then
-!    call HF%PrintHFResult(params, sps, ms, hamil)
-!  end if
-!  call stop_stopwatch(time_HF)
-!  if(myrank == 0) write(iunite,'(4f15.6, a)') HF%e1, HF%e2, HF%e3, HF%etot, ' HF'
-!  if(params%thbme) call thbdyfrc%ReleaseJPT(isps)
-!  if(params%thbme) call isps%ReleaseSPSIsospin()
-!
-!  call hamil%ReleaseScalar(ms, params)
-!  call HFT%ReleaseOneBodyScalar(ms%one)
-!  call ms%ReleaseModelSpace(sps, params)
-!  call sps%ReleaseSPS()
-!  call fin_dbinomial_triangle()
-!
-!#ifdef MPI
-!  call mpi_finalize(ierr)
-!#endif
-!  call stop_stopwatch(time_total)
-!  call print_summary_stopwatch()
+
+
+  ! Hartree-Fock calculation
+  call start_stopwatch(time_HF)
+  call sol%init(ms)
+  if(params%thbmefile /= 'None') call sol%solve(params, sps, ms, hamil, thbme)
+  if(params%thbmefile == 'None') call sol%solve(params, sps, ms, hamil)
+  call stop_stopwatch(time_HF)
+
+  if(params%thbmefile /= 'None') call thbme%fin(isps)
+  if(params%thbmefile /= 'None') call isps%fin()
+  open(iunite, file=params%egs, status = 'replace')
+  call params%PrtParams(iunite)
+  call params%PrtParams(iunite)
+  if(myrank == 0) write(iunite,'(4f15.6, a)') sol%e1ho, sol%e2ho, sol%e3ho, sol%eho, ' HO'
+  if(myrank == 0) write(iunite,'(4f15.6, a)') sol%e1hf, sol%e2hf, sol%e3hf, sol%ehf, ' HF'
+
+  if(params%sv_hf_rslt) then
+    call write_hamil(params, sps, ms, hamil)
+  end if
+  call hamil%fin()
+
+  ! --- other scalar operators
+
+
+
+
+  ! --- other scalar operators
+  call sol%fin()
+  call ms%fin()
+  call sps%fin()
+
+  call fin_dbinomial_triangle()
+#ifdef MPI
+  call mpi_finalize(ierr)
+#endif
+  call stop_stopwatch(time_total)
+  call print_summary_stopwatch()
 end program HartreeFockMain

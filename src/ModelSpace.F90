@@ -361,10 +361,10 @@ contains
     end do
 
     do ich = 1, this%n
-      call this%jptz(ich)%init(this%j(ich), this%p(ich), this%tz(ich), ich, sps)
+      call this%jptz(ich)%init(this%j(ich), this%p(ich), this%tz(ich), sps)
 #ifdef debug
       write(*,'(a, i3, a, i3, a, i3, a, i3)') 'J = ', this%j(ich), '/2,  P = ', &
-          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%Ndim(ich)%n
+          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%jptz(ich)%n
 #endif
     end do
 
@@ -374,6 +374,7 @@ contains
       p = (-1) ** sps%ll(i1)
       itz = sps%itz(i1)
       ich = this%jptz2n(j, p, itz)
+      this%label2jptz(i1) = ich
     end do
 
   end subroutine InitOneBodySpace
@@ -392,10 +393,10 @@ contains
     deallocate(this%label2jptz)
   end subroutine FinOneBodySpace
 
-  subroutine InitOneBodyChannel(this, j, p, tz, ich, sps)
+  subroutine InitOneBodyChannel(this, j, p, tz, sps)
     class(OneBodyChannel), intent(inout) :: this
     type(spo_pn), intent(in) :: sps
-    integer, intent(in) :: j, p, tz, ich
+    integer, intent(in) :: j, p, tz
     integer :: n, m, i1
     n = this%n
     m = sps%n
@@ -484,7 +485,7 @@ contains
       call this%jptz(ich)%Init(params, sps, this%j(ich), this%p(ich), this%tz(ich))
 #ifdef debug
       write(*,'(a, i3, a, i3, a, i3, a, i6)') 'J = ', this%j(ich), ',  P = ', &
-          & this%p(ich), ',  Tz = ', this%tz(ich), ',  n = ', this%ndim(ich)%n
+          & this%p(ich), ',  Tz = ', this%tz(ich), ',  n = ', this%jptz(ich)%n
 #endif
     end do
 #ifdef debug
@@ -639,7 +640,7 @@ contains
       this%ndim(ich) = this%jptz(ich)%n
 #ifdef debug
       write(*,'(a, i3, a, i3, a, i3, a, i8)') 'J = ', this%j(ich), '/2,  P = ', &
-          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%ndim(ich)%n
+          & this%p(ich), ',  Tz = ', this%tz(ich), '/2,  n = ', this%jptz(ich)%n
 #endif
     end do
 #ifdef debug
