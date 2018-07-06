@@ -1,10 +1,79 @@
-module RotationGroup
-  ! cache for dbinomial and triangular relation to accelerate d6j and dcj
-  integer, parameter :: n_dbinomial = 200, n_triag = 100
-  real(8), allocatable  :: dbinomial(:,:), triangle_c(:,:,:)
-  private :: n_dbinomial, n_triag, dbinomial, triangle_c
+module common_library
+  use class_sys, only: sy
+  implicit none
+  type(sy), private :: sys
+  integer, private, parameter :: n_dbinomial = 200, n_triag = 100
+  real(8), private, allocatable  :: dbinomial(:,:), triangle_c(:,:,:)
+  real(8), parameter :: pi = 3.141592741012573d0 ! \pi
+  real(8), parameter:: hc = 197.32705d0         ! \hbar c [MeV fm]
+  real(8), parameter :: alpha = 137.035999d0     ! electric fine structure constant
+  real(8) :: amp      ! proton mass [MeV] can be changed in LQCD calc.
+  real(8) :: amn      ! neutron mass [MeV] can be changed in LQCD calc.
+  real(8) :: rmass    ! reduced mass
+  real(8) :: amnucl   ! averaged nucleon mass
 
 contains
+  subroutine set_physics_constant
+    amp = 938.27231d0        ! proton mass [MeV] can be changed in LQCD calc.
+    amn = 939.56563d0        ! neutron mass [MeV] can be changed in LQCD calc.
+    rmass = (amp * amn) / (amp + amn)
+    amnucl = (amp + amn) * 0.5d0
+  end subroutine set_physics_constant
+
+  subroutine skip_comment(nfile, comment)
+    implicit none
+    integer,intent(in)::nfile
+    character(*), intent(in) :: comment
+    character(20) :: line
+    read(nfile,'(a)') line
+    do while  (sys%find(line, comment))
+      read(nfile,'(a)') line
+    end do
+    backspace(nfile)
+  end subroutine skip_comment
+
+  real(8) function Del(i1, i2)
+    integer, intent(in) :: i1, i2
+    Del = 1.d0
+    if(i1 == i2) Del = dsqrt(2.d0)
+  end function Del
+
+  real(8) function red_nab_l(n1, l1, n2, l2) result(nl)
+    integer, intent(in) :: n1, l1, n2, l2
+    if(n1 == n2 .and. l1 == l2+1) then
+      nl = -dsqrt(dble(l2 + 1)*(dble(n2 + l2) + 1.5d0))
+    elseif(n1 == n2-1 .and. l1 == l2+1) then
+      nl = -dsqrt(dble(l2 + 1)*dble(n2))
+    elseif(n1 == n2 .and. l1 == l2-1) then
+      nl = -dsqrt(dble(l2)*(dble(n2 + l2) + 0.5d0))
+    elseif(n1 == n2+1 .and. l1==l2-1) then
+      nl = -dsqrt(dble(l2)*dble(n2 + 1))
+    else
+      nl = 0.d0
+    end if
+  end function red_nab_l
+
+  real(8) function red_r_l(n1, l1, n2, l2) result(rl)
+    integer, intent(in) :: n1, l1, n2, l2
+    if (n1 == n2 .and. l1 == l2-1) then
+      rl = -dsqrt(dble(l2)*(dble(n2 + l2) + 0.5d0))
+    elseif (n1 == n2-1 .and. l1 == l2+1) then
+      rl = -dsqrt(dble(l2 + 1)*dble(n2))
+    elseif (n1 == n2+1 .and. l1 == l2-1) then
+      rl = dsqrt(dble(l2)*(dble(n2  + 1)))
+    elseif (n1 == n2 .and. l1==l2+1) then
+      rl = dsqrt(dble(l2+1)*(dble(n2 +l2)+1.5d0))
+    else
+      rl = 0.d0
+    end if
+  end function red_r_l
+
+  logical function triag(i,j,k)
+    implicit none
+    integer,intent(in)::i,j,k
+    triag = ((i-(j+k))*(i-abs(j-k)) > 0)
+  end function triag
+
   subroutine init_dbinomial_triangle()
     ! cache for tuning 6-j coefficient
     integer :: n, m, i, j, k, info
@@ -288,4 +357,4 @@ contains
 
   end subroutine triangle
 
-end module RotationGroup
+end module common_library

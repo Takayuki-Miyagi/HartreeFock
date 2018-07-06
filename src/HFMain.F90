@@ -1,6 +1,7 @@
 program HartreeFockMain
+  use common_library, only: init_dbinomial_triangle, fin_dbinomial_triangle, &
+      & set_physics_constant
   use InputParameters, only: parameters, set_parameters
-  use RotationGroup, only: init_dbinomial_triangle, fin_dbinomial_triangle
   use ModelSpace, only: Mspace, spo_pn, spo_isospin
   use read_3BME, only: iThreeBodyScalar
   use ScalarOperator
@@ -33,6 +34,7 @@ program HartreeFockMain
   call mpi_comm_rank(mpi_comm_world, myrank, ierr)
 #endif
 
+  call set_physics_constant()
   call set_parameters(params)
 
   call init_dbinomial_triangle()

@@ -9,7 +9,7 @@ module NormalOrdering
   implicit none
   private :: NormOrd_idx, NormOrd_ket, InitNOThree2Two, FinNOThree2Two, &
       & hole, braket, store_idx, InitNOThree2Two_HFbasis, &
-      & FinNOThree2Two_HFbasis, Del, ScalarNOThree2Two, &
+      & FinNOThree2Two_HFbasis, ScalarNOThree2Two, &
       & ScalarNOThree2Two_HFBasis, ScalarNOTwo2One, ScalarNOOne2Zero
   public :: NOThree2Two, NOThree2Two_HFbasis, NormOrd
 
@@ -192,6 +192,7 @@ contains
   end subroutine FinNOThree2Two_HFbasis
 
   function ScalarNOThree2Two(params, two, thr, sc3, no) result(sc2)
+    use common_library, only: Del
     type(NBodyScalars) :: sc2
     type(parameters), intent(in) :: params
     type(TwoBodySpace), intent(in) :: two
@@ -284,6 +285,7 @@ contains
   contains
     subroutine insideNO2(ich2)
       use ScalarOperator, only: get3BMEpn
+      use common_library, only: Del
       integer, intent(in) :: ich2
       integer :: n, m
       integer :: j2, p2, itz2, n2
@@ -341,6 +343,7 @@ contains
   end function ScalarNOThree2Two_HFBasis
 
   function ScalarNOTwo2One(params, sps, one, two, sc2) result(sc1)
+    use common_library, only: Del
     type(NBodyScalars) :: sc1
     type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
@@ -495,10 +498,4 @@ contains
       end if
     end do
   end subroutine store_idx
-
-  real(8) function Del(i1, i2)
-    integer, intent(in) :: i1, i2
-    Del = 1.d0
-    if(i1 == i2) Del = dsqrt(2.d0)
-  end function Del
 end module NormalOrdering

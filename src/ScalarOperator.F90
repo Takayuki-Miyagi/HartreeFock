@@ -1,4 +1,5 @@
 module ScalarOperator
+  use class_sys, only: sy
   use InputParameters, only: parameters
   use ModelSpace, only: spo_pn, MSpace, OneBodySpace, TwoBodySpace, ThreeBodySpace, &
       & OneBodyChannel, TwoBodyChannel, ThreeBodyChannel, SpinParityTz
@@ -14,15 +15,14 @@ module ScalarOperator
       & DivideScalarOperators, DivideNBodyScalars, &
       & one_body_element, read_2bme_pn_txt, read_2bme_pn_bin, &
       & read_2bme_snt_txt, read_2bme_snt_bin, calc_bare_2bme, &
-      & two_body_element, r_dot_r, red_r_j, red_r_l, &
-      & p_dot_p, red_nab_j, red_nab_l, skip_comment, Del, &
+      & two_body_element, r_dot_r, red_r_j, p_dot_p, red_nab_j, &
       & OneBodyScalarEmbedded3, OneBodyScalarEmbedded2, &
       & TwoBodyScalarEmbedded3, TransOrthoNormalThree, &
       & get_element_twobody, get_Uelement_twobody
   public :: assignment(=), operator(+), operator(-), &
       & operator(*), operator(/), NBodyScalars, ScalarOperators, &
       & ScalarEmbedded, UEmbedded
-
+  type(sy), private :: sys
   type :: NBodyScalars
     type(DMat), allocatable :: jptz(:)
     real(8) :: usedmem = 0.d0
@@ -374,7 +374,7 @@ contains
   real(8) function Get3BMEpn(params, sps, thbme, &
         & j, p, itz, a, b, c, jab, d, e, f, jde) result(v)
     use read_3BME, only: iThreeBodyScalar
-    use RotationGroup, only: dcg
+    use common_library, only: dcg
     use read_3BME, only: Get3BME
     type(parameters), intent(in) :: params
     type(iThreeBodyScalar), intent(in) :: thbme
@@ -412,18 +412,17 @@ contains
   end function Get3BMEpn
 
   function one_body_element(n1, n2, l, j, tz, params, oprtr) result(e)
+    use common_library, only: hc, amnucl
     real(8) :: e
     type(parameters), intent(in) :: params
     integer, intent(in) :: n1, n2, l, j, tz
     integer :: A, Z, N
-    real(8) :: hw, hc, am
+    real(8) :: hw
     character(*), intent(in) :: oprtr
     A = params%mass
     Z = params%pmass
     N = params%nmass
     hw = params%hw
-    hc = params%hc
-    am = params%amnucl
 
     e = 0.d0
     select case(oprtr)
@@ -436,7 +435,7 @@ contains
       if(n1 == n2) e = (dble(2 * n1 + l) + 1.5d0)
       if(n1 == n2 + 1) e = -dsqrt(dble(n1) * (dble(n1 + l) + 0.5d0))
       if(n1 == n2 - 1) e = -dsqrt(dble(n2) * (dble(n2 + l) + 0.5d0))
-      e = e * (1.d0 - 1.d0 / dble(A)) * hc ** 2 / (am * hw * A)
+      e = e * (1.d0 - 1.d0 / dble(A)) * hc ** 2 / (amnucl * hw * A)
     case default
       write(*,'(a)') "In one_body_element, selected operator has not been implemented"
     end select
@@ -475,19 +474,18 @@ contains
   end subroutine calc_bare_2bme
 
   function two_body_element(oprtr, params, sps, i1, i2, i3, i4, j) result(ele)
+    use common_library, only: hc, amnucl
     real(8) :: ele
     type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, j
     character(*), intent(in) :: oprtr
     integer :: A, N, Z
-    real(8) :: hc, hw, am
+    real(8) :: hw
     A = params%mass
     Z = params%pmass
     N = params%nmass
-    hc = params%hc
     hw = params%hw
-    am = params%amnucl
     ele = 0.d0
     select case(oprtr)
     case('H_r_dot_r') ! rirj / A
@@ -495,14 +493,14 @@ contains
     case('H_p_dot_p') ! pipj / A
       ele = p_dot_p(sps, i1, i2, i3, i4, j) * hw / dble(A)
     case('Rm_r_dot_r') ! - 4 * rirj / A**2 mc**2 hw
-      ele = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (am * hw * dble(A) ** 2)
+      ele = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (amnucl * hw * dble(A) ** 2)
     case default
       write(*,'(a)') "In two_body_element, selected operator has not been implemented"
     end select
   end function two_body_element
 
   real(8) function r_dot_r(this, a, b, c, d, j) result(r)
-    use RotationGroup, only:sjs
+    use common_library, only:sjs
     type(spo_pn) :: this
     integer, intent(in) :: a, b, c, d, j
     integer :: ja, jb, jc, jd
@@ -530,7 +528,7 @@ contains
   end function r_dot_r
 
   real(8) function red_r_j(this, a, b) result(rj)
-    use RotationGroup, only: sjs
+    use common_library, only: red_r_l, sjs
     type(spo_pn) :: this
     integer, intent(in) :: a, b
     integer :: na, la, ja, iza
@@ -554,23 +552,8 @@ contains
         &  sjs(ja, 2, jb, 2 * lb, 1, 2 * la) * red_r_l(na, la, nb, lb)
   end function red_r_j
 
-  real(8) function red_r_l(n1, l1, n2, l2) result(rl)
-    integer, intent(in) :: n1, l1, n2, l2
-    if (n1 == n2 .and. l1 == l2-1) then
-      rl = -dsqrt(dble(l2)*(dble(n2 + l2) + 0.5d0))
-    elseif (n1 == n2-1 .and. l1 == l2+1) then
-      rl = -dsqrt(dble(l2 + 1)*dble(n2))
-    elseif (n1 == n2+1 .and. l1 == l2-1) then
-      rl = dsqrt(dble(l2)*(dble(n2  + 1)))
-    elseif (n1 == n2 .and. l1==l2+1) then
-      rl = dsqrt(dble(l2+1)*(dble(n2 +l2)+1.5d0))
-    else
-      rl = 0.d0
-    end if
-  end function red_r_l
-
   real(8) function p_dot_p(this, a, b, c, d, j) result(t)
-    use RotationGroup, only:sjs
+    use common_library, only:sjs
     type(spo_pn) :: this
     integer, intent(in) :: a, b, c, d, j
     integer :: ja, jb, jc, jd
@@ -597,7 +580,7 @@ contains
   end function p_dot_p
 
   real(8) function red_nab_j(this, a, b) result(nj)
-    use RotationGroup, only: sjs
+    use common_library, only: sjs, red_nab_l
     type(spo_pn) :: this
     integer, intent(in) :: a, b
     integer :: na, la, ja, iza
@@ -621,21 +604,6 @@ contains
         &  sjs(ja, 2, jb, 2 * lb, 1, 2 * la) * red_nab_l(na, la, nb, lb)
 
   end function red_nab_j
-
-  real(8) function red_nab_l(n1, l1, n2, l2) result(nl)
-    integer, intent(in) :: n1, l1, n2, l2
-    if(n1 == n2 .and. l1 == l2+1) then
-      nl = -dsqrt(dble(l2 + 1)*(dble(n2 + l2) + 1.5d0))
-    elseif(n1 == n2-1 .and. l1 == l2+1) then
-      nl = -dsqrt(dble(l2 + 1)*dble(n2))
-    elseif(n1 == n2 .and. l1 == l2-1) then
-      nl = -dsqrt(dble(l2)*(dble(n2 + l2) + 0.5d0))
-    elseif(n1 == n2+1 .and. l1==l2-1) then
-      nl = -dsqrt(dble(l2)*dble(n2 + 1))
-    else
-      nl = 0.d0
-    end if
-  end function red_nab_l
 
   subroutine UEmbedded(two, this, one, op1)
     type(DMat), intent(inout) :: this
@@ -663,6 +631,7 @@ contains
   end subroutine UEmbedded
 
   function get_Uelement_twobody(a, b, c, d, phb, one, op1) result(o12)
+    use common_library, only: Del
     real(8) :: o12
     integer, intent(in) :: a, b, c, d, phb
     type(OneBodySpace), intent(in) :: one
@@ -717,6 +686,7 @@ contains
   end subroutine OneBodyScalarEmbedded2
 
   function get_element_twobody(a, b, c, d, phb, phk, one, op1) result(o12)
+    use common_library, only: Del
     real(8) :: o12
     integer, intent(in) :: a, b, c, d, phb, phk
     type(OneBodySpace), intent(in) :: one
@@ -900,6 +870,7 @@ contains
     end do
   contains
     subroutine MatTwoBodyScalar(thr, mat, two, op2, sps, m1s, m1e, m2s, m2e)
+      use common_library, only: Del
       type(DMat), intent(inout) :: mat
       type(spo_pn), intent(in) :: sps
       type(ThreeBodyChannel), intent(in) :: thr
@@ -1145,11 +1116,12 @@ contains
   !--------------------------------------------------
 
   subroutine read_2bme_pn_txt(f2, params, sps, two, tbme)
+    use common_library, only: skip_comment
     type(NBodyScalars), intent(inout) :: tbme
     type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
-    character(*), optional, intent(in) :: f2
+    character(*), intent(in) :: f2
 
     integer :: iunit = 19
     integer :: a, b, c, d
@@ -1159,9 +1131,9 @@ contains
     integer :: itz, ip, bra, ket, phaseab, phasecd
     real(8) :: v12
     open(iunit, file = f2, status = "old")
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
     read(iunit, *) numpot
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
     do num = 1, numpot
       read(iunit, *) iza, ia, izb, ib, izc, ic, izd, id,  &
           & ij, v12
@@ -1196,7 +1168,7 @@ contains
     type(parameters), intent(in) :: params
     type(spo_pn), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
-    character(*), optional, intent(in) :: f2
+    character(*), intent(in) :: f2
     integer :: iunit = 19
     integer :: a, b, c, d
     integer :: ia, ib, ic, id
@@ -1267,10 +1239,11 @@ contains
   end subroutine read_2bme_pn_bin
 
   subroutine read_2bme_snt_txt(f2, sps, two, tbme)
+    use common_library, only: skip_comment
     type(NBodyScalars), intent(inout) :: tbme
     type(spo_pn), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
-    character(*), optional, intent(in) :: f2
+    character(*), intent(in) :: f2
 
     integer :: num_p_orb, num_n_orb, num_p_core, num_n_core
     integer :: i, num, num_orb, method
@@ -1282,24 +1255,23 @@ contains
     integer :: phase
     integer :: iunit = 19
     open(iunit, file = f2, status = "old")
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
     read(iunit,*) num_p_orb,num_n_orb,num_p_core,num_n_core
-    num_orb=num_p_orb+num_n_orb
+    num_orb=num_p_orb + num_n_orb
     do i = 1, num_orb
-      read(iunit,*)num,n,l,j,itz
+      read(iunit,*) num,n,l,j,itz
     end do
-    close(iunit)
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
     read(iunit,*) zerobdy
-    call skip_comment(iunit)
-    read(iunit,*)num, method, hw_read
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
+    read(iunit,*) num
+    call skip_comment(iunit, '#')
     do i = 1, num
       read(iunit,*) a,b,t1
     end do
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
     read(iunit,*) num_tbme
-    call skip_comment(iunit)
+    call skip_comment(iunit, '#')
     do i =1, num_tbme
       read(iunit,*)a,b,c,d,j,v2
       if(a > sps%n) cycle
@@ -1316,6 +1288,7 @@ contains
       tbme%jptz(ich)%m(bra, ket) = v2 *dble(phase)
       tbme%jptz(ich)%m(ket, bra) = v2 *dble(phase)
     end do
+    close(iunit)
   end subroutine read_2bme_snt_txt
 
   subroutine read_2bme_snt_bin(f2, sps, two, tbme)
@@ -1324,7 +1297,7 @@ contains
     type(NBodyScalars), intent(inout) :: tbme
     type(spo_pn), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
-    character(*), optional, intent(in) :: f2
+    character(*), intent(in) :: f2
 
     integer :: iunit = 19
     integer :: num_p_orb, num_n_orb, num_p_core, num_n_core
@@ -1336,11 +1309,11 @@ contains
     integer :: bra,ket
     integer :: phase
     integer, allocatable :: aa(:), bb(:), cc(:), dd(:)
-    real(8), allocatable :: v1save(:), v2save(:)
+    real(8), allocatable :: vsave(:)
     integer, allocatable :: nnum(:), nn(:), ll(:), jj(:), zz(:)
     call start_stopwatch(time_io_read)
 
-    open(iunit, form = "unformatted", file = f2, status = "old")
+    open(iunit, form = "unformatted", file = f2, status = "old", access='stream')
     read(iunit)num_p_orb, num_n_orb, num_p_core, num_n_core
     num_orb = num_p_orb + num_n_orb
     allocate(nnum(num_orb), nn(num_orb), ll(num_orb), jj(num_orb), zz(num_orb))
@@ -1352,23 +1325,22 @@ contains
     deallocate(nnum, nn, ll, jj, zz)
 
     read(iunit) zerobdy
-    read(iunit) num, method, hw_read
-    allocate(aa(num), bb(num), v1save(num), v2save(num))
+    read(iunit) num
+    allocate(aa(num), bb(num), vsave(num))
     read(iunit) aa
     read(iunit) bb
-    read(iunit) v1save
-    read(iunit) v2save
-    deallocate(aa, bb, v1save, v2save)
+    read(iunit) vsave
+    deallocate(aa, bb, vsave)
 
     read(iunit) num_tbme
     allocate(aa(num_tbme), bb(num_tbme), cc(num_tbme), dd(num_tbme), jj(num_tbme))
-    allocate(v1save(num_tbme))
+    allocate(vsave(num_tbme))
     read(iunit) aa
     read(iunit) bb
     read(iunit) cc
     read(iunit) dd
     read(iunit) jj
-    read(iunit) v1save
+    read(iunit) vsave
     close(iunit)
     call stop_stopwatch(time_io_read)
     do i =1, num_tbme
@@ -1377,7 +1349,7 @@ contains
       c = cc(i)
       d = dd(i)
       j = jj(i)
-      v2 = v1save(i)
+      v2 = vsave(i)
       if(a > sps%n) cycle
       if(b > sps%n) cycle
       if(c > sps%n) cycle
@@ -1393,24 +1365,7 @@ contains
       tbme%jptz(ich)%m(ket, bra) = v2 *dble(phase)
     end do
     deallocate(aa, bb, cc, dd, jj)
-    deallocate(v1save)
+    deallocate(vsave)
   end subroutine read_2bme_snt_bin
 
-  subroutine skip_comment(nfile)
-    implicit none
-    integer,intent(in)::nfile
-    character(1),parameter::com1='!', com2='#'
-    character(1)::c1,c2
-    read(nfile,'(2a1)') c1, c2
-    do while  (c1 == com1 .or. c1 == com2 .or. c2 == com1 .or. c2 == com2)
-      read(nfile,'(2a1)') c1, c2
-    end do
-    backspace(nfile)
-  end subroutine skip_comment
-
-  real(8) function Del(i1, i2)
-    integer, intent(in) :: i1, i2
-    Del = 1.d0
-    if(i1 == i2) Del = dsqrt(2.d0)
-  end function Del
 end module ScalarOperator

@@ -318,7 +318,7 @@ contains
   end subroutine InitiThreeBodyChannel
 
   subroutine CalcCoef(this, sps, i1, i2, i3, a, b, c, sort, j, t, idxt)
-    use RotationGroup, only: sjs
+    use common_library, only: sjs
     class(sorting), intent(inout) :: this
     type(spo_isospin), intent(in) :: sps
     type(indices), intent(in) :: idxt

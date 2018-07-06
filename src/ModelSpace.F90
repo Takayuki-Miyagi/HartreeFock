@@ -1,8 +1,9 @@
 module ModelSpace
+  use common_library
   use InputParameters, only: parameters
   use MPIFunction, only: myrank
   implicit none
-  private :: triag, skip_comment, Aop3, A3drct, A3exc1, A3exc2, SingleParticleOrbit, iter3, &
+  private :: Aop3, A3drct, A3exc1, A3exc2, SingleParticleOrbit, iter3, &
       & InitSPOIsospin, FinSPOIsospin, InitSPO, FinSPO, GetReferenceState, GetNOCoef, &
       & InitMSpace, FinMSpace, InitOneBodyChannel, FinOneBodyChannel, InitOneBodySpace, &
       & FinOneBodySpace, InitTwoBodySpace, FinTwoBodySpace, InitTwoBodyChannel, FinTwoBodyChannel, &
@@ -259,7 +260,7 @@ contains
     open(iunit, file = params%reference, status = 'old')
     read(iunit,*) num
     if(num < 1) return
-    call skip_comment(iunit)
+    call skip_comment(iunit, '!')
     do i = 1, num
       read(iunit,*) n, l, j, itz
       this%h_orbits(this%spo2n(n,l,j,itz)) = 1
@@ -287,7 +288,7 @@ contains
     open(iunit, file = params%nocoef, status = 'old')
     read(iunit,*) num
     if(num < 1) return
-    call skip_comment(iunit)
+    call skip_comment(iunit, '!')
     do i = 1, num
       read(iunit,*) n, l, j, itz, f
       this%nocoef(this%spo2n(n,l,j,itz)) = dble(f)
@@ -879,12 +880,6 @@ contains
     deallocate(ite%ii1, ite%ii2, ite%ii3)
   end subroutine CntDim
 
-  logical function triag(i,j,k)
-    implicit none
-    integer,intent(in)::i,j,k
-    triag = ((i-(j+k))*(i-abs(j-k)) > 0)
-  end function triag
-
   subroutine GenIter(ite, i1, i2, i3, num)
     class(iter3), intent(inout) :: ite
     integer, intent(in) :: i1, i2, i3
@@ -971,7 +966,7 @@ contains
   end function A3drct
 
   real(8) function A3exc1(sps, i1, i2, i3, j12, i4, i5, i6, j45, j) result(e)
-    use RotationGroup, only: sjs
+    use common_library, only: sjs
     type(spo_pn), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
@@ -989,7 +984,7 @@ contains
   end function A3exc1
 
   real(8) function A3exc2(sps, i1, i2, i3, j12, i4, i5, i6, j45, j) result(e)
-    use RotationGroup, only: sjs
+    use common_library, only: sjs
     type(spo_pn), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
@@ -1006,15 +1001,4 @@ contains
         & sjs(j1, j2, 2*j12, j3, j, 2*j45)
   end function A3exc2
 
-  subroutine skip_comment(nfile)
-    implicit none
-    integer,intent(in)::nfile
-    character(1),parameter::com1='!', com2='#'
-    character(1)::c1,c2
-    read(nfile,'(2a1)') c1, c2
-    do while  (c1 == com1 .or. c1 == com2 .or. c2 == com1 .or. c2 == com2)
-      read(nfile,'(2a1)') c1, c2
-    end do
-    backspace(nfile)
-  end subroutine skip_comment
 end module ModelSpace

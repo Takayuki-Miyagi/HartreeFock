@@ -4,13 +4,6 @@ module InputParameters
   implicit none
   type(sy) :: sys
   type :: parameters
-    real(8) :: pi = 3.141592741012573d0 ! \pi
-    real(8) :: hc = 197.32705d0         ! \hbar c [MeV fm]
-    real(8) :: amp = 938.27231d0        ! proton mass [MeV] can be changed in LQCD calc.
-    real(8) :: amn = 939.56563d0        ! neutron mass [MeV] can be changed in LQCD calc.
-    real(8) :: alpha = 137.035999d0     ! electric fine structure constant
-    real(8) :: rmass  ! reduced mass
-    real(8) :: amnucl ! averaged nucleon mass
     real(8) :: hw
 
     ! two-body matrix element file
@@ -71,8 +64,6 @@ contains
     if(narg >= 6) call getarg(6, params%scfile2)
     if(narg >= 7) call getarg(7, params%scfile3)
 
-    params%rmass = (params%amp * params%amn) / (params%amp + params%amn)
-    params%amnucl = (params%amp + params%amn) * 0.5d0
     params%pmass = pmass
     params%nmass = nmass
     params%mass  =  mass
