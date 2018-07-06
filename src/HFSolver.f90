@@ -12,32 +12,33 @@ module HFSolver
   use Optimizer, only: FixedPointProblem
   implicit none
   private :: InitHFSol, FinHFSol, HFSolLoop, InverseTransformation, HFOneBodyEquation, &
-      & getVectorDim, getVectorOpt, getUpdate
-  public :: HFSol, TwoBodyScalarHFBasis
+      & getVectorDim, getVectorOpt, getUpdate, ScalarOperatorHFBasis
+  public :: HFSol
   type :: HFSol
-    type(NBodyScalars) :: HFBasis ! Transformation
+    type(NBodyScalars) :: HF_U ! Transformation
     real(8) :: e1hf, e2hf, e3hf, ehf
     real(8) :: e1ho, e2ho, e3ho, eho
   contains
     procedure :: init => InitHFSol
     procedure :: fin => FinHFSol
     procedure :: solve => HFSolLoop
+    procedure :: HFBasis => ScalarOperatorHFBasis
   end type HFSol
 contains
   subroutine InitHFSol(this, ms)
     class(HFSol), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     integer :: ich, n
-    call this%HFBasis%init(ms%one%SpinParityTz)
+    call this%HF_U%init(ms%one%SpinParityTz)
     do ich = 1, ms%one%n
       n = ms%one%jptz(ich)%n
-      call this%HFBasis%jptz(ich)%eye(n)
+      call this%HF_U%jptz(ich)%eye(n)
     end do
   end subroutine InitHFSol
 
   subroutine FinHFSol(this)
     class(HFSol), intent(inout) :: this
-    call this%HFBasis%fin()
+    call this%HF_U%fin()
   end subroutine FinHFSol
 
   subroutine HFSolLoop(this, params, sps, ms, hamil, thbme)
@@ -62,13 +63,12 @@ contains
     do nite = 1, 999
       opt%nite = nite
       h1i = hamil%one + w1i
-      call HFOneBodyEquation(h1i, hamil%one, h1f, t1f, this%HFBasis)
-      v2f = TwoBodyScalarHFBasis(ms%one, ms%two, hamil%two, this%HFBasis)
+      call HFOneBodyEquation(h1i, hamil%one, h1f, t1f, this%HF_U)
+      v2f = TwoBodyScalarHFBasis(ms%one, ms%two, hamil%two, this%HF_U)
       w1f = NormOrd(params, sps, ms%one, ms%two, v2f)
       if(present(thbme)) then
-        w2i = NormOrd(params, sps, this%HFBasis, ms%two, thbme, NO)
-        !stop
-        w2f = TwoBodyScalarHFBasis(ms%one, ms%two, w2i, this%HFBasis)
+        w2i = NormOrd(params, sps, this%HF_U, ms%two, thbme, NO)
+        w2f = TwoBodyScalarHFBasis(ms%one, ms%two, w2i, this%HF_U)
         w12 = NormOrd(params, sps, ms%one, ms%two, w2f)
       end if
       this%e1hf = NormOrd(sps, ms%one, t1f)
@@ -81,7 +81,7 @@ contains
             & '  e3 = ', this%e3hf, '  ehf = ', this%ehf, '  error = ', opt%si
       end if
       w1f = w1f + 0.5d0 * w12
-      w1i = InverseTransformation(w1f, this%HFbasis)
+      w1i = InverseTransformation(w1f, this%HF_U)
       call getVectorOpt(opt, w1i)
       call opt%GetVector()
       if(opt%si < params%conv) exit
@@ -111,7 +111,7 @@ contains
       if(present(thbme)) call NO%init(params, sps, ms%one, ms%two)
       w1i = NormOrd(params, sps, ms%one, ms%two, hamil%two)
       if(present(thbme)) then
-        w2i = NormOrd(params, sps, this%HFBasis, ms%two, thbme, NO)
+        w2i = NormOrd(params, sps, this%HF_U, ms%two, thbme, NO)
         w12 = NormOrd(params, sps, ms%one, ms%two, w2i)
       end if
       this%e1ho = NormOrd(sps, ms%one, hamil%one)
@@ -160,6 +160,17 @@ contains
       call w2i%fin()
     end subroutine FinHFSolLoop
   end subroutine HFSolLoop
+
+  function OneBodyScalarHFBasis(one, a, Trs) result(b)
+    type(NBodyScalars) :: b
+    type(OneBodySpace), intent(in) :: one
+    type(NBodyScalars), intent(in) :: a, Trs
+    integer :: ich
+    b = a
+    do ich = 1, one%n
+      b%jptz(ich) = Trs%jptz(ich)%T() * a%jptz(ich) * Trs%jptz(ich)
+    end do
+  end function OneBodyScalarHFBasis
 
   function TwoBodyScalarHFBasis(one, two, a, Trs) result(b)
     type(NBodyScalars) :: b
@@ -247,4 +258,51 @@ contains
       end do
     end do
   end subroutine getUpdate
+
+  subroutine ScalarOperatorHFBasis(this, params, sps, ms, scalar, thbme)
+    class(HFSol), intent(inout) :: this
+    type(parameters), intent(in) :: params
+    type(spo_pn), intent(in) :: sps
+    type(MSpace), intent(in) :: ms
+    type(iThreeBodyScalar), intent(in), optional :: thbme
+    type(ScalarOperators), intent(inout) :: scalar
+    type(NBodyScalars) :: s1_1, s1_2, s1_3
+    type(NBodyScalars) :: s2_2, s2_3
+    type(NOThree2Two_HFbasis) :: NO
+
+    call s1_1%init(ms%one%SpinParityTz)
+    call s1_2%init(ms%one%SpinParityTz)
+    call s1_3%init(ms%one%SpinParityTz)
+
+    call s2_2%init(ms%two%SpinParityTz)
+    call s2_3%init(ms%two%SpinParityTz)
+
+    s1_1 = OneBodyScalarHFBasis(ms%one, scalar%one, this%HF_U)
+    s2_2 = TwoBodyScalarHFBasis(ms%one, ms%two, scalar%two, this%HF_U)
+    s1_2 = NormOrd(params, sps, ms%one, ms%two, s2_2)
+    if(present(thbme)) then
+      call NO%init(params, sps, ms%one, ms%two)
+      s2_3 = NormOrd(params, sps, this%HF_U, ms%two, thbme, NO)
+      call NO%fin()
+      s2_3 = TwoBodyScalarHFBasis(ms%one, ms%two, s2_3, this%HF_U)
+      s1_3 = NormOrd(params, sps, ms%one, ms%two, s2_3)
+    end if
+
+    this%e1hf = NormOrd(sps, ms%one, s1_1)
+    this%e2hf = NormOrd(sps, ms%one, s1_2) * 0.5d0
+    this%e3hf = NormOrd(sps, ms%one, s1_3) / 6.d0
+    this%ehf = this%e1hf + this%e2hf + this%e3hf
+
+    if(params%vac == 'vacumm') then
+      !-- NO2B w.r.t. vacuum
+      scalar%zero = this%e3hf
+      scalar%one = s1_1 - 0.5d0 * s1_3
+      scalar%two = s2_2 + s2_3
+    elseif(params%vac == 'ref') then
+      !-- NO2B w.r.t. refernce state
+      scalar%zero = this%ehf
+      scalar%one = s1_1 + s1_2 + 0.5d0 * s1_3
+      scalar%two = s2_2 + s2_3
+    end if
+  end subroutine ScalarOperatorHFBasis
 end module HFSolver

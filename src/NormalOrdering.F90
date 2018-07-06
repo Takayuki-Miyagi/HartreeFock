@@ -8,7 +8,7 @@ module NormalOrdering
   use LinAlgLib
   implicit none
   private :: NormOrd_idx, NormOrd_ket, InitNOThree2Two, FinNOThree2Two, &
-      & HFNormOrd_ch, hole, braket, store_idx, InitNOThree2Two_HFbasis, &
+      & hole, braket, store_idx, InitNOThree2Two_HFbasis, &
       & FinNOThree2Two_HFbasis, Del, ScalarNOThree2Two, &
       & ScalarNOThree2Two_HFBasis, ScalarNOTwo2One, ScalarNOOne2Zero
   public :: NOThree2Two, NOThree2Two_HFbasis, NormOrd
@@ -51,12 +51,8 @@ module NormalOrdering
     type(braket), allocatable :: h(:)
   end type  hole
 
-  type :: HFNormOrd_ch
-    type(hole), allocatable :: idx(:)
-  end type HFNormOrd_ch
-
   type :: NOThree2Two_HFbasis
-    type(HFNormOrd_ch), allocatable :: jptz(:)
+    type(hole), allocatable :: jptz(:)
     real(8) :: usedmem
   contains
     procedure :: init => InitNOThree2Two_HFbasis
@@ -165,26 +161,19 @@ contains
       p2 = two%p(ich2)
       tz2 = two%tz(ich2)
       n = two%jptz(ich2)%n
-      allocate(this%jptz(ich2)%idx(n))
-      do bra2 = 1, n
-        a = two%jptz(ich2)%n2label1(bra2)
-        b = two%jptz(ich2)%n2label2(bra2)
-
-        do loop = 1, 2
-          num = 0
-          do c = 1, sps%n
-            if(abs(sps%NOCoef(c)) < 1.d-4) cycle
-            num = num + 1
-            if(loop == 1) cycle
-            call this%jptz(ich2)%idx(bra2)%h(num)%store_idx(params,sps,one,j2,p2,tz2,a,b,c)
-            cnt = cnt + dble(this%jptz(ich2)%idx(bra2)%h(num)%n * 9) * 4.d0
-          end do
-          if(loop == 1) then
-            this%jptz(ich2)%idx(bra2)%n = num
-            allocate(this%jptz(ich2)%idx(bra2)%h(num))
-          end if
+      do loop = 1, 2
+        num = 0
+        do c = 1, sps%n
+          if(abs(sps%NOCoef(c)) < 1.d-4) cycle
+          num = num + 1
+          if(loop == 1) cycle
+          call this%jptz(ich2)%h(num)%store_idx(sps,one,j2,p2,tz2,c)
+          cnt = cnt + dble(this%jptz(ich2)%h(num)%n * 9) * 4.d0
         end do
-
+        if(loop == 1) then
+          this%jptz(ich2)%n = num
+          allocate(this%jptz(ich2)%h(num))
+        end if
       end do
     end do
     this%usedmem = cnt / (1024.d0 ** 3)
@@ -194,13 +183,10 @@ contains
     class(NOThree2Two_HFbasis), intent(inout) :: this
     integer :: ich, bra2, num
     do ich = 1, size(this%jptz)
-      do bra2 = 1, size(this%jptz(ich)%idx)
-        do num = 1, this%jptz(ich)%idx(bra2)%n
-          deallocate(this%jptz(ich)%idx(bra2)%h(num)%num)
-        end do
-        deallocate(this%jptz(ich)%idx(bra2)%h)
+      do num = 1, this%jptz(ich)%n
+        deallocate(this%jptz(ich)%h(num)%num)
       end do
-      deallocate(this%jptz(ich)%idx)
+      deallocate(this%jptz(ich)%h)
     end do
     deallocate(this%jptz)
   end subroutine FinNOThree2Two_HFbasis
@@ -324,19 +310,19 @@ contains
           d = two%jptz(ich2)%n2label2(ket2)
 
           w12 = 0.d0
-          if(no%jptz(ich2)%idx(bra2)%n < 1) cycle
-          do n = 1, no%jptz(ich2)%idx(bra2)%n
-            if(no%jptz(ich2)%idx(bra2)%h(n)%n < 1) cycle
-            do m = 1, no%jptz(ich2)%idx(bra2)%h(n)%n
-              ich1 = no%jptz(ich2)%idx(bra2)%h(n)%num(1, m)
-              j3   = no%jptz(ich2)%idx(bra2)%h(n)%num(2, m)
-              p3   = no%jptz(ich2)%idx(bra2)%h(n)%num(3, m)
-              itz3 = no%jptz(ich2)%idx(bra2)%h(n)%num(4, m)
-              e    = no%jptz(ich2)%idx(bra2)%h(n)%num(5, m)
-              f    = no%jptz(ich2)%idx(bra2)%h(n)%num(6, m)
-              eho  = no%jptz(ich2)%idx(bra2)%h(n)%num(7, m)
-              fho  = no%jptz(ich2)%idx(bra2)%h(n)%num(8, m)
-              ehf  = no%jptz(ich2)%idx(bra2)%h(n)%num(9, m)
+          if(no%jptz(ich2)%n < 1) cycle
+          do n = 1, no%jptz(ich2)%n
+            if(no%jptz(ich2)%h(n)%n < 1) cycle
+            do m = 1, no%jptz(ich2)%h(n)%n
+              ich1 = no%jptz(ich2)%h(n)%num(1, m)
+              j3   = no%jptz(ich2)%h(n)%num(2, m)
+              p3   = no%jptz(ich2)%h(n)%num(3, m)
+              itz3 = no%jptz(ich2)%h(n)%num(4, m)
+              e    = no%jptz(ich2)%h(n)%num(5, m)
+              f    = no%jptz(ich2)%h(n)%num(6, m)
+              eho  = no%jptz(ich2)%h(n)%num(7, m)
+              fho  = no%jptz(ich2)%h(n)%num(8, m)
+              ehf  = no%jptz(ich2)%h(n)%num(9, m)
               v = Get3BMEpn(params, sps,thbme,j3,p3,itz3,a,b,e,j2,c,d,f,j2)
               w12 = w12 + dble(j3 + 1) * v * &
                   & HF%jptz(ich1)%m(eho, ehf) * &
@@ -462,19 +448,15 @@ contains
     end do
   end subroutine sort_descending
 
-  subroutine store_idx(this, params, sps, one, j2, p2, tz2, a,b,c)
+  subroutine store_idx(this, sps, one, j2, p2, tz2, c)
     class(braket), intent(inout) :: this
     type(spo_pn), intent(in) :: sps
     type(OneBodySpace), intent(in) :: one
-    type(parameters), intent(in) :: params
-    integer, intent(in) :: j2, p2, tz2, a, b, c
+    integer, intent(in) :: j2, p2, tz2, c
     integer :: j1, p1, itz1, ich1
     integer :: j3, p3, itz3, num
     integer :: loop, eho1, eho2
-    integer :: e3max, e3cut
 
-    e3max = params%e3max_3nf
-    e3cut = params%e3cut
     j1 = sps%jj(c)
     p1 = (-1) ** sps%ll(c)
     itz1 = sps%itz(c)
@@ -489,7 +471,6 @@ contains
           if(j1 /= sps%jj(eho2)) cycle
           if(p1 /= (-1) ** sps%ll(eho2)) cycle
           if(itz1 /= sps%itz(eho2)) cycle
-
 
           p3 = p1 * p2
           itz3 = 2*tz2 + itz1

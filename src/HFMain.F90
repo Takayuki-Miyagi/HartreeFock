@@ -23,8 +23,8 @@ program HartreeFockMain
   type(spo_isospin) :: isps
   type(MSpace) :: ms
   type(iThreeBodyScalar) :: thbme
-  type(ScalarOperators) :: hamil
-  type(HFSol) :: sol
+  type(ScalarOperators) :: hamil, scalar
+  type(HFSol) :: hf_sol
   integer :: iunite = 118
   call start_stopwatch(time_total)
 #ifdef MPI
@@ -55,18 +55,17 @@ program HartreeFockMain
 
   ! Hartree-Fock calculation
   call start_stopwatch(time_HF)
-  call sol%init(ms)
-  if(params%thbmefile /= 'None') call sol%solve(params, sps, ms, hamil, thbme)
-  if(params%thbmefile == 'None') call sol%solve(params, sps, ms, hamil)
+  call hf_sol%init(ms)
+  if(params%thbmefile /= 'None') call hf_sol%solve(params, sps, ms, hamil, thbme)
+  if(params%thbmefile == 'None') call hf_sol%solve(params, sps, ms, hamil)
   call stop_stopwatch(time_HF)
 
   if(params%thbmefile /= 'None') call thbme%fin(isps)
   if(params%thbmefile /= 'None') call isps%fin()
   open(iunite, file=params%egs, status = 'replace')
   call params%PrtParams(iunite)
-  call params%PrtParams(iunite)
-  if(myrank == 0) write(iunite,'(4f15.6, a)') sol%e1ho, sol%e2ho, sol%e3ho, sol%eho, ' HO'
-  if(myrank == 0) write(iunite,'(4f15.6, a)') sol%e1hf, sol%e2hf, sol%e3hf, sol%ehf, ' HF'
+  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1ho, hf_sol%e2ho, hf_sol%e3ho, hf_sol%eho, ' HO'
+  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
 
   if(params%sv_hf_rslt) then
     call write_hamil(params, sps, ms, hamil)
@@ -75,11 +74,35 @@ program HartreeFockMain
 
   ! --- other scalar operators
 
+  ! --- bare operator
+  call scalar%init(ms)
+  call scalar%set(params, sps, ms, 'rm')
+  call hf_sol%HFBasis(params, sps, ms, scalar)
+  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
+  call scalar%fin()
 
 
+  ! --- two-body effective operator
+  call scalar%init(ms)
+  call scalar%set(params, sps, ms, 'rm', f2 = params%scfile2)
+  call hf_sol%HFBasis(params, sps, ms, scalar)
+  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
+  call scalar%fin()
+
+  ! --- three-body operator
+  if(params%scfile3 /= 'None') call isps%init(params)
+  if(params%scfile3 /= 'None') call thbme%init(isps, params, params%scfile3)
+  call scalar%init(ms)
+  call scalar%set(params, sps, ms, 'rm', f2 = params%scfile2, thbme = thbme)
+  if(params%scfile3 /= 'None') call hf_sol%HFBasis(params, sps, ms, scalar, thbme)
+  if(params%scfile3 == 'None') call hf_sol%HFBasis(params, sps, ms, scalar)
+  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
+  if(params%scfile3 /= 'None') call thbme%fin(isps)
+  if(params%scfile3 /= 'None') call isps%fin()
+  call scalar%fin()
 
   ! --- other scalar operators
-  call sol%fin()
+  call hf_sol%fin()
   call ms%fin()
   call sps%fin()
 

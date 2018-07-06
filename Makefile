@@ -84,7 +84,9 @@ $(OBJDIR)/%.o:$(LINSRCDIR)/%.f90
 #	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $< # for debug
 	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $<
 #	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
-dirs: if test -d $(OBJDIR); then \
+#
+dirs:
+	if test -d $(OBJDIR); then \
 		: ; \
 	else \
 		mkdir $(OBJDIR); \

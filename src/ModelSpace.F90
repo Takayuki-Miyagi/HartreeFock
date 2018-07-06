@@ -2,20 +2,30 @@ module ModelSpace
   use InputParameters, only: parameters
   use MPIFunction, only: myrank
   implicit none
-  private :: triag, skip_comment, Aop3, A3drct, A3exc1, A3exc2
+  private :: triag, skip_comment, Aop3, A3drct, A3exc1, A3exc2, SingleParticleOrbit, iter3, &
+      & InitSPOIsospin, FinSPOIsospin, InitSPO, FinSPO, GetReferenceState, GetNOCoef, &
+      & InitMSpace, FinMSpace, InitOneBodyChannel, FinOneBodyChannel, InitOneBodySpace, &
+      & FinOneBodySpace, InitTwoBodySpace, FinTwoBodySpace, InitTwoBodyChannel, FinTwoBodyChannel, &
+      & InitThreeBodySpace, FinThreeBodySpace, InitThreeBodyChannel, FinThreeBodyChannel, &
+      & InitAdditionalQN, FinAdditionalQN, CntDim, GenIter
+  public :: spo_isospin, spo_pn, SpinParityTz, OneBodyChannel, OneBodySpace, TwoBodyChannel, &
+      & TwoBodySpace, ThreeBodyChannel, ThreeBodySpace, AdditionalQN, MSpace
 
-  ! single particle state (isospin symmetry)
-  type :: spo_isospin
+  type :: SingleParticleOrbit
     integer :: n
     integer, allocatable :: nn(:), ll(:), jj(:), nshell(:)
-    integer, allocatable :: ispo2n(:,:,:)
+  end type SingleParticleOrbit
+
+  ! single particle state (isospin symmetry)
+  type, extends(SingleParticleOrbit) :: spo_isospin
+    integer, allocatable :: spo2n(:,:,:)
   contains
     procedure :: init => InitSPOIsospin
     procedure :: fin => FinSPOIsospin
   end type spo_isospin
 
   ! single particle state (proton neutron)
-  type, extends(spo_isospin) :: spo_pn
+  type, extends(SingleParticleOrbit) :: spo_pn
     integer, allocatable :: itz(:)
     integer, allocatable :: spo2n(:,:,:,:)
     integer, allocatable :: h_orbits(:)
@@ -107,7 +117,7 @@ module ModelSpace
     procedure :: fin => FinMSpace
   end type MSpace
 
-  type, private :: iter3
+  type :: iter3
     integer, allocatable :: ii1(:), ii2(:), ii3(:)
   contains
     procedure :: GenIter
@@ -119,8 +129,8 @@ contains
     type(parameters), intent(in) :: params
     integer :: emax, n, nl, nn, ll, is, j
     emax = params%emax_3nf
-    allocate(this%ispo2n(0:emax/2, 0:emax, 1:2*emax+1))
-    this%ispo2n = 0
+    allocate(this%spo2n(0:emax/2, 0:emax, 1:2*emax+1))
+    this%spo2n = 0
     this%n = (emax + 1) * (emax + 2) / 2
     n = this%n
     allocate(this%nn(n))
@@ -148,7 +158,7 @@ contains
           this%ll(n) = ll
           this%jj(n) = j
           this%nshell(n) = 2 * nn + ll
-          this%ispo2n(nn, ll, j) = n
+          this%spo2n(nn, ll, j) = n
 #ifdef debug
           write(*,'(5i7)') n, nn, ll, j, 2 * nn + ll
 #endif
@@ -166,7 +176,7 @@ contains
     deallocate(this%ll)
     deallocate(this%jj)
     deallocate(this%nshell)
-    deallocate(this%ispo2n)
+    deallocate(this%spo2n)
   end subroutine FinSPOIsospin
 
   subroutine InitSPO(this, params)

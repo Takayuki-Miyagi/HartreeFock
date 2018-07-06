@@ -108,7 +108,7 @@ contains
     basis = 'HO'
     if(params%HFbasis) basis = 'HF'
     params%no2bhfile = 'Hamil.snt.txt'
-    params%egs = 'Energy.out'
+    params%egs = 'Summary.out'
   end subroutine GetFileName
 
   subroutine PrtParams(params, iunit)

@@ -332,7 +332,11 @@ contains
     else
 
       if(.not. present(f2)) then
-        call calc_bare_2bme(oprtr, params, sps, two, this)
+        if(oprtr == 'rm' .or. oprtr == 'Rm') then
+          call calc_bare_2bme('Rm_r_dot_r', params, sps, two, this)
+        else
+          write(*,'(a)') "In SetTwoBodyScalars, selected operator has not been implemented"
+        end if
         return
       end if
 
@@ -433,6 +437,8 @@ contains
       if(n1 == n2 + 1) e = -dsqrt(dble(n1) * (dble(n1 + l) + 0.5d0))
       if(n1 == n2 - 1) e = -dsqrt(dble(n2) * (dble(n2 + l) + 0.5d0))
       e = e * (1.d0 - 1.d0 / dble(A)) * hc ** 2 / (am * hw * A)
+    case default
+      write(*,'(a)') "In one_body_element, selected operator has not been implemented"
     end select
   end function one_body_element
 
@@ -488,8 +494,10 @@ contains
       ele = r_dot_r(sps, i1, i2, i3, i4, j) * hw / dble(A)
     case('H_p_dot_p') ! pipj / A
       ele = p_dot_p(sps, i1, i2, i3, i4, j) * hw / dble(A)
-    case('R_r_dot_r') ! - 4 * rirj / A**2 mc**2 hw
-      ele = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (dble(A) * am * hw)
+    case('Rm_r_dot_r') ! - 4 * rirj / A**2 mc**2 hw
+      ele = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (am * hw * dble(A) ** 2)
+    case default
+      write(*,'(a)') "In two_body_element, selected operator has not been implemented"
     end select
   end function two_body_element
 
