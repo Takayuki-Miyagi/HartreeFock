@@ -8,6 +8,7 @@ program HartreeFockMain
   use NormalOrdering
   use HFSolver, only: HFSol
   use WriteOperator
+  use MBPT3, only: MBPT
 #ifdef MPI
   use mpi
   use MPIFunction, only: myrank, nprocs, ierr
@@ -26,6 +27,7 @@ program HartreeFockMain
   type(iThreeBodyScalar) :: thbme
   type(ScalarOperators) :: hamil, scalar
   type(HFSol) :: hf_sol
+  type(MBPT) :: mbpt_sol
   integer :: iunite = 118
   call start_stopwatch(time_total)
 #ifdef MPI
@@ -65,13 +67,21 @@ program HartreeFockMain
   if(params%thbmefile /= 'None') call thbme%fin(isps)
   if(params%thbmefile /= 'None') call isps%fin()
   open(iunite, file=params%egs, status = 'replace')
-  call params%PrtParams(iunite)
+  !call params%PrtParams(iunite)
   if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1ho, hf_sol%e2ho, hf_sol%e3ho, hf_sol%eho, ' HO'
   if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
+
 
   if(params%sv_hf_rslt) then
     call write_hamil(params, sps, ms, hamil)
   end if
+
+  if(params%vac == 'ref' .and. params%MBPT) then
+    call mbpt_sol%calc(params, sps, ms, hamil)
+    if(myrank == 0) write(iunite,'(4f15.6, a)') mbpt_sol%e_0, mbpt_sol%e_2, mbpt_sol%e_3, &
+      & mbpt_sol%e_0 + mbpt_sol%e_2 + mbpt_sol%e_3, ' MBPT'
+  end if
+
   call hamil%fin()
 
   ! --- other scalar operators

@@ -10,12 +10,12 @@ INSTLDIR=~/Desktop/HFtest/
 FDEP=makedepf90
 CC=gcc
 FC=gfortran
-LDFLAGS=-llapack -lblas
+LDFLAGS=-lblas -llapack
 OMP = -fopenmp
 FFLAGS=-O3
 CFLAGS=-O3
-FDFLAGS=-Ddebug
-FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+#FDFLAGS=-Ddebug
+#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 
 #--------------------------------------------------
 # Source Files
@@ -73,17 +73,11 @@ $(OBJDIR)/%.o:$(SRCDIR)/%.c
 $(OBJDIR)/%.o:$(SRCDIR)/%.f
 	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR)/%.f90
-#	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $<  # for debug
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $<
-#	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
+	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR)/%.F90
-#	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS)  -o $@ -c $< # for debug
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $<
-#	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
+	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:$(LINSRCDIR)/%.f90
-#	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $< # for debug
-	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(SRCDIR) -o $@ -c $<
-#	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
+	$(FC) -ff2c $(FFLAGS) $(OMP) $(FDFLAGS) -J$(MODDIR) -o $@ -c $<
 #
 dirs:
 	if test -d $(OBJDIR); then \
@@ -103,7 +97,7 @@ dep:
 
 clean:
 	rm -f $(TARGET).exe
-	rm -f mod/*.mod
+	rm -f $(MODDIR)/*.mod
 	rm -f $(OBJS)
 
 #--------------------------------------------------
