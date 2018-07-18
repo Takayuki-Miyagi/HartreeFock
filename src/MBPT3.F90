@@ -83,7 +83,7 @@ contains
               if(itz /= (zh1 + zh2)/2) cycle
               jmax = min(jp1 + jp2, jh1 + jh2)
               jmin = max(iabs(jp1 - jp2), iabs(jh1 - jh2))
-              d = 1.d0 / (eh1 + eh2 - ep1 - ep2)
+              d = 0.25d0 / (eh1 + eh2 - ep1 - ep2)
 
               v = 0.d0
               do j = jmin, jmax
@@ -98,7 +98,7 @@ contains
                 v = v + dble(2 * j + 1) * hamil%two%jptz(ich)%m(bra,ket) ** 2
               end do
 
-              this%e_2 = this%e_2 + 0.25d0 * v * d * (Del(p1,p2) * Del(h1,h2)) ** 2
+              this%e_2 = this%e_2 + v * d * (Del(p1,p2) * Del(h1,h2)) ** 2
 
             end do
           end do
