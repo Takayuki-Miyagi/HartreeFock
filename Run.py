@@ -112,25 +112,26 @@ class Orbit:
         return no
 params = {}
 exe = './HartreeFock.exe'
-hw = 35
+hw = 25
 renorm = 'srg'
 cut = 2.0
 
 f2path = './'
-emax_2nf = 6
-e2max_2nf = 12
+emax_2nf = 14
+e2max_2nf = 28
 pot = 'N3LO_EM500'
 txtbin_2n = 'txt'
 fom_2n = 'myg'
 twbmefile = HOME + '/HF/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw35_emax6_e2max12.txt.myg'
 twbmefile = 'None'
+twbmefile = HOME + '/MtxElmnt/2BME/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax14_e2max28.bin.myg'
 scfile2 = 'None'
 
 f3path = './'
-emax_3nf = 6
-e2max_3nf = 6
-e3max_3nf = 6
-e3cut = 6
+emax_3nf = 14
+e2max_3nf = 14
+e3max_3nf = 14
+e3cut = 10
 genuine_3bf = True
 # params for genuine n2lo 3BF
 ### R. Roth choice ##
@@ -140,6 +141,7 @@ lambda_local = 400
 txtbin_3n = 'txt'
 thbmefile = HOME + '/HF/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max6_hw35_NNN-full.txt'
 thbmefile = 'None'
+thbmefile = HOME + '/MtxElmnt/2BME/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max14_hw25_NNN-full.txt'
 scfile3 = 'None'
 
 pmass = 8
