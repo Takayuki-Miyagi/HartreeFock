@@ -140,7 +140,7 @@ contains
 
     this%fj = (this%fj - this%xj)
     this%si = maxval(abs(this%fj%v))
-    if(this%m == 0 .or. this%nite == 0) then
+    if(this%m == 0 .or. this%nite <= 1) then
       this%xj = this%xj + this%fj * this%alpha
       return
     end if
