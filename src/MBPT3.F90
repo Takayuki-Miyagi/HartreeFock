@@ -81,8 +81,8 @@ contains
               if(pari /= (-1) ** (lh1 + lh2)) cycle
               itz = (zp1 + zp2)/2
               if(itz /= (zh1 + zh2)/2) cycle
-              jmax = min(jp1 + jp2, jh1 + jh2)
-              jmin = max(iabs(jp1 - jp2), iabs(jh1 - jh2))
+              jmax = min(jp1 + jp2, jh1 + jh2)/2
+              jmin = max(iabs(jp1 - jp2), iabs(jh1 - jh2))/2
               d = 0.25d0 / (eh1 + eh2 - ep1 - ep2)
 
               v = 0.d0
