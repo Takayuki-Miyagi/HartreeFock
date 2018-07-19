@@ -93,8 +93,6 @@ contains
                 bra = ms%two%jptz(ich)%labels2n(p1, p2)
                 ket = ms%two%jptz(ich)%labels2n(h1, h2)
                 if(bra * ket == 0) cycle
-                iphase = ms%two%jptz(ich)%iphase(p1, p2) * &
-                  &      ms%two%jptz(ich)%iphase(h1, h2)
                 v = v + dble(2 * j + 1) * hamil%two%jptz(ich)%m(bra,ket) ** 2
               end do
 
