@@ -66,7 +66,7 @@ $(TARGET): $(OBJS)
 		mkdir $(INSTLDIR); \
 	fi
 	cp $(TARGET).exe $(INSTLDIR)
-	cp Run.py $(INSTLDIR)
+	cp *.py $(INSTLDIR)
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
