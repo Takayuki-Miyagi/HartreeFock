@@ -112,7 +112,6 @@ dep:
 	$(FDEP) $(SRCS) -b $(OBJDIR)/ > $(DEPDIR)/makefile.d
 
 clean:
-	rm -f $(TARGET).exe
 	rm -f $(MODDIR)/*.mod
 	rm -f $(OBJS)
 
