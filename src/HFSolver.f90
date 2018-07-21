@@ -104,9 +104,9 @@ contains
       call w2i%init(ms%two%SpinParityTz)
 
       n = GetVectorDim(w1i)
-      !call opt%init(n, alpha = 0.7d0, method = 'direct', m = 10)
+      call opt%init(n, alpha = 0.7d0, method = 'direct', m = 10)
       !call opt%init(n, alpha = 0.7d0, method = 'broyden', m = 10)
-      call opt%init(n, alpha = 0.9d0, method = 'mbroyden', m = 9)
+      !call opt%init(n, alpha = 0.9d0, method = 'mbroyden', m = 9)
 
       if(present(thbme)) call NO%init(params, sps, ms%one, ms%two)
       w1i = NormOrd(params, sps, ms%one, ms%two, hamil%two)

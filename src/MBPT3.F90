@@ -92,11 +92,10 @@ contains
                 ich = ms%two%jptz2n(j, pari, itz)
                 bra = ms%two%jptz(ich)%labels2n(p1, p2)
                 ket = ms%two%jptz(ich)%labels2n(h1, h2)
-                if(bra * ket == 0) cycle
                 v = v + dble(2 * j + 1) * hamil%two%jptz(ich)%m(bra,ket) ** 2
               end do
 
-              this%e_2 = this%e_2 + v * d * (Del(p1,p2) * Del(h1,h2)) ** 2
+              this%e_2 = this%e_2 + v * d! * (Del(p1,p2) * Del(h1,h2)) ** 2
 
             end do
           end do
@@ -334,9 +333,9 @@ contains
       integer :: j, jmax, jmin, pha, ich
       integer :: bra, ket
       integer :: itzh3p2, iparh3p2
-      integer :: itzh1h3, iparh1h3
+      integer :: itzh2h3, iparh2h3
       integer :: itzh1h2, iparh1h2
-      real(8) :: delh1h3, delp1p2, delp1p3, delh1h2
+      real(8) :: delh2h3, delp1p2, delp1p3, delh1h2
       real(8) :: crv1, crv2, crv3, vsum, deno
 
       eph = 0.d0
@@ -352,10 +351,10 @@ contains
 
           do h3 = 1, sps%n
             if(sps%h_orbits(h3) /= 1) cycle
-            itzh1h3 = (sps%itz(h1) + sps%itz(h3)) / 2
-            iparh1h3 = (-1) ** (sps%ll(h1) + sps%ll(h3))
-            delh1h3 = 1.d0
-            if(h1 == h3) delh1h3 = dsqrt(2.d0)
+            itzh2h3 = (sps%itz(h2) + sps%itz(h3)) / 2
+            iparh2h3 = (-1) ** (sps%ll(h2) + sps%ll(h3))
+            delh2h3 = 1.d0
+            if(h2 == h3) delh2h3 = dsqrt(2.d0)
 
             do p1 = 1, sps%n
               if(sps%h_orbits(p1) == 1) cycle
@@ -371,10 +370,10 @@ contains
 
                 do p3 = 1, sps%n
                   if(sps%h_orbits(p3) == 1) cycle
-                  if((sps%itz(p1) + sps%itz(p3)) / 2 /= itzh1h3) cycle
-                  if((-1) ** (sps%ll(p1) + sps%ll(p3)) /= iparh1h3) cycle
-                  if((sps%itz(h2) + sps%itz(p3)) / 2 /= itzh3p2) cycle
-                  if((-1) ** (sps%ll(h2) + sps%ll(p3)) /= iparh3p2) cycle
+                  if((sps%itz(p1) + sps%itz(p3)) / 2 /= itzh2h3) cycle
+                  if((-1) ** (sps%ll(p1) + sps%ll(p3)) /= iparh2h3) cycle
+                  if((sps%itz(h1) + sps%itz(p3)) / 2 /= itzh3p2) cycle
+                  if((-1) ** (sps%ll(h1) + sps%ll(p3)) /= iparh3p2) cycle
                   delp1p3 = 1.d0
                   if(p1 == p3) delp1p3 = dsqrt(2.d0)
                   if(sps%nshell(p1) + sps%nshell(p2) > params%e2max) cycle
@@ -388,52 +387,56 @@ contains
                     &            sps%jj(p1) + sps%jj(p2)) / 2
                   jh1h2min = max(abs(sps%jj(h1) - sps%jj(h2)), &
                     &            abs(sps%jj(p1) - sps%jj(p2))) / 2
-                  jh1h3max = min(sps%jj(h1) + sps%jj(h3), &
+                  jh1h3max = min(sps%jj(h2) + sps%jj(h3), &
                     &           sps%jj(p1) + sps%jj(p3)) / 2
-                  jh1h3min = max(abs(sps%jj(h1) - sps%jj(h3)), &
+                  jh1h3min = max(abs(sps%jj(h2) - sps%jj(h3)), &
                     &            abs(sps%jj(p1) - sps%jj(p3))) / 2
                   jh3p2max = min(sps%jj(h3) + sps%jj(p2), &
-                    &            sps%jj(h2) + sps%jj(p3)) / 2
+                    &            sps%jj(h1) + sps%jj(p3)) / 2
                   jh3p2min = max(abs(sps%jj(h3) - sps%jj(p2)), &
-                    &            abs(sps%jj(h2) - sps%jj(p3))) / 2
+                    &            abs(sps%jj(h1) - sps%jj(p3))) / 2
 
-                  jmax = min(sps%jj(p1) + sps%jj(h1), &
-                    &        sps%jj(p2) + sps%jj(h2), &
+                  jmax = min(sps%jj(p1) + sps%jj(h2), &
+                    &        sps%jj(p2) + sps%jj(h1), &
                     &        sps%jj(p3) + sps%jj(h3)) / 2
-                  jmin = max(abs(sps%jj(p1) + sps%jj(h1)), &
-                    &        abs(sps%jj(p2) + sps%jj(h2)), &
-                    &        abs(sps%jj(p2) + sps%jj(h3))) / 2
+                  jmin = max(abs(sps%jj(p1) + sps%jj(h2)), &
+                    &        abs(sps%jj(p2) + sps%jj(h1)), &
+                    &        abs(sps%jj(p3) + sps%jj(h3))) / 2
 
                   vsum = 0.d0
                   do j = jmin, jmax
                     crv1 = 0.d0; crv2 = 0.d0; crv3 = 0.d0
                     do jh3p2 = jh3p2min, jh3p2max
                       ich = ms%two%jptz2n(jh3p2, iparh3p2, itzh3p2)
-                      bra = ms%two%jptz(ich)%labels2n(p3,h2)
-                      ket = ms%two%jptz(ich)%labels2n(h3,p2)
-                      pha = ms%two%jptz(ich)%iphase(p3,h2) * &
-                        &   ms%two%jptz(ich)%iphase(h3,p2)
+                      bra = ms%two%jptz(ich)%labels2n(h3,p2)
+                      ket = ms%two%jptz(ich)%labels2n(h1,p3)
+                      pha = ms%two%jptz(ich)%iphase(h3,p2) * &
+                        &   ms%two%jptz(ich)%iphase(h1,p3)
                       if(bra * ket == 0) cycle
                       crv1 = crv1 + dble(2 * jh3p2 + 1) * &
-                        &    sjs(sps%jj(p3), sps%jj(h2), 2 * jh3p2, &
-                        &        sps%jj(p2), sps%jj(h3), 2 * j) * &
-                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha) * (-1.d0) ** (jh3p2 - j)
+                        &    sjs(sps%jj(h3), sps%jj(p2), 2 * jh3p2, &
+                        &        sps%jj(h1), sps%jj(p3), 2 * j) * &
+                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha) 
                     end do
 
                     do jh1h3 = jh1h3min, jh1h3max
-                      ich = ms%two%jptz2n(jh1h3, iparh1h3, itzh1h3)
-                      bra = ms%two%jptz(ich)%labels2n(h1,h3)
+                      ich = ms%two%jptz2n(jh1h3, iparh2h3, itzh2h3)
+                      if(h2 == h3 .and. mod(jh1h3, 2) == 1) cycle
+                      if(p1 == p3 .and. mod(jh1h3, 2) == 1) cycle
+                      bra = ms%two%jptz(ich)%labels2n(h3,h2)
                       ket = ms%two%jptz(ich)%labels2n(p1,p3)
-                      pha = ms%two%jptz(ich)%iphase(h1,h3) * &
+                      pha = ms%two%jptz(ich)%iphase(h3,h2) * &
                         &   ms%two%jptz(ich)%iphase(p1,p3)
                       if(bra * ket == 0) cycle
                       crv2 = crv2 + dble(2 * jh1h3 + 1) * &
-                        &    sjs(sps%jj(h1), sps%jj(h3), 2 * jh1h3, &
-                        &        sps%jj(p3), sps%jj(p1), 2 * j) * &
-                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha) * (-1.d0) ** (jh1h3 - j)
+                        &    sjs(sps%jj(p1), sps%jj(p3), 2 * jh1h3, &
+                        &        sps%jj(h3), sps%jj(h2), 2 * j) * &
+                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha)
                     end do
 
                     do jh1h2 = jh1h2min, jh1h2max
+                      if(p1 == p2 .and. mod(jh1h2, 2) == 1) cycle
+                      if(h1 == h2 .and. mod(jh1h2, 2) == 1) cycle
                       ich = ms%two%jptz2n(jh1h2, iparh1h2, itzh1h2)
                       bra = ms%two%jptz(ich)%labels2n(p1,p2)
                       ket = ms%two%jptz(ich)%labels2n(h1,h2)
@@ -441,9 +444,9 @@ contains
                         &   ms%two%jptz(ich)%iphase(h1,h2)
                       if(bra * ket == 0) cycle
                       crv3 = crv3 + dble(2 * jh1h2 + 1) * &
-                        &    sjs(sps%jj(p1), sps%jj(p3), 2 * jh1h2, &
-                        &        sps%jj(h1), sps%jj(h2), 2 * j) * &
-                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha) * (-1.d0) ** (jh1h2 - j)
+                        &    sjs(sps%jj(h1), sps%jj(h2), 2 * jh1h2, &
+                        &        sps%jj(p1), sps%jj(p2), 2 * j) * &
+                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha)
                     end do
                     vsum = vsum + dble(2 * j + 1) * crv1 * crv2 * crv3
 
@@ -469,7 +472,7 @@ contains
                     &     hamil%one%jptz(ichp1)%m(pp1,pp1) - &
                     &     hamil%one%jptz(ichp3)%m(pp3,pp3))
 
-                  eph = eph - vsum * delh1h2 * delh1h3 * delp1p2 * delp1p3 / deno
+                  eph = eph + vsum * delh1h2 * delh2h3 * delp1p2 * delp1p3 / deno
 
                 end do
               end do
