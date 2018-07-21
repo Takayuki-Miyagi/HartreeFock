@@ -23,7 +23,7 @@ module InputParameters
     logical :: MBPT
     integer :: emax, e2max, e3max ! model space
     real(8) :: conv ! tolerance
-    character(256) :: vac = 'ref', fmt_hf_snt = 'txt'
+    character(256) :: vac = 'ref'
     character(256) :: egs = 'None', no2bhfile = 'None', fmt_hf_snt = 'None'
     character(256) :: reference = 'None', nocoef = 'None'
 
@@ -40,7 +40,7 @@ contains
     real(8) :: hw, conv
     integer :: emax_2nf, e2max_2nf
     integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
-    character(256) :: inputfile, fmt_hf_snt, vac, fmt_hf_snt
+    character(256) :: inputfile, fmt_hf_snt, vac
 
     logical :: sv_hf_rslt, HFloop, NO2B, HFbasis, MBPT
     integer :: emax, e2max, e3max

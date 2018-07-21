@@ -112,6 +112,9 @@ contains
       vph = third_ph()
 
       this%e_3 = vhh + vpp + vph
+      write(*,*) '# MBPT third order contributions:'
+      write(*,*) '# hh ladder, pp ladder, ph '
+      write(*,'(3f15.6)') vhh, vpp, vph
 
     end subroutine energy_third
 
@@ -203,7 +206,7 @@ contains
                     &  hamil%one%jptz(ichp1)%m(np1,np1) - &
                     &  hamil%one%jptz(ichp2)%m(np2,np2)))
 
-                  ehh = ehh * v * d * &
+                  ehh = ehh + v * d * &
                     & (Del(p1,p2) * Del(h1,h2) * Del(h3,h4)) ** 2 / 8.d0
 
 

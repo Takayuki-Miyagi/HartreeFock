@@ -2,20 +2,36 @@
 # Make file for TTFcalc code
 #--------------------------------------------------
 TARGET=HartreeFock
-INSTLDIR=~/Desktop/HFtest/
+INSTLDIR=.
+#COMPILER=GNU
+COMPILER=INTEL
 
 #--------------------------------------------------
 # Default Parameters
 #--------------------------------------------------
-FDEP=makedepf90
-CC=gcc
-FC=gfortran
-LDFLAGS=-llapack -lblas
-OMP = -fopenmp
-FFLAGS=-O3 -Dsingle_precision
-CFLAGS=-O3
-#FDFLAGS=-Ddebug
-#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+ifeq ($(COMPILER),GNU)
+	FDEP=makedepf90
+	CC=gcc
+	FC=gfortran
+	LDFLAGS=-llapack -lblas
+	OMP = -fopenmp
+	FFLAGS=-O3 -Dsingle_precision
+	CFLAGS=-O3
+	#FDFLAGS=-Ddebug
+	#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+endif
+
+ifeq ($(COMPILER),INTEL)
+	FDEP=
+	CC=gcc
+	FC=ifort
+	LDFLAGS=-mkl
+	OMP = -openmp
+	FFLAGS=-O3 -Dsingle_precision -no-ipo -static
+	CFLAGS=-O3
+	#FDFLAGS=-Ddebug
+	#FDFLAGS+=-check-all
+endif
 
 #--------------------------------------------------
 # Source Files
@@ -33,7 +49,7 @@ OBJF77 = $(SRCF77:$(SRCDIR)/%.f=$(OBJDIR)/%.o)
 OBJF90 = $(SRCF90:$(SRCDIR)/%.f90=$(OBJDIR)/%.o)
 OBJF95 = $(SRCF95:$(SRCDIR)/%.F90=$(OBJDIR)/%.o)
 
-MODDIR = mod
+MODDIR = .
 MODF90 = $(SRCF90:$(SRCDIR)/%.f90=$(MODDIR)/%.mod)
 MODF95 = $(SRCF95:$(SRCDIR)/%.F90=$(MODDIR)/%.mod)
 
