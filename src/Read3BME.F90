@@ -537,6 +537,7 @@ contains
     character(len=*), intent(in) :: filename
     type(sy) :: sys
     integer :: iunit = 20
+    integer :: i
     integer(8) :: num
     real(8) :: st
     logical :: ex
@@ -557,11 +558,14 @@ contains
     if(sys%find(filename, '.txt')) then
       !call read_3bme_linebyline_txt(sps, params, filename)
       open(iunit, file = filename, status = 'old', access='stream', form='formatted')
+      !read(iunit, *)  i ! old version
       read(iunit, *) vtemp
       close(iunit)
     elseif(sys%find(filename, '.bin')) then
       !call read_3bme_linebyline(sps, params, filename)
       open(iunit, form = 'unformatted', file = filename, status = 'old', access='stream')
+      !open(iunit, form = 'unformatted', file = filename, status = 'old') ! old version
+      !read(iunit)  i ! old version
       read(iunit) vtemp
       close(iunit)
     else

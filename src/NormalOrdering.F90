@@ -368,7 +368,7 @@ contains
           b = one%jptz(ich1)%n2label(ket1)
           w1 = 0.d0
           do c = 1, sps%n
-            if(abs(sps%NoCoef(c)) < 1.d-4) cycle
+            if(abs(sps%NoCoef(c)) < 1.d-8) cycle
             if(sps%nshell(a) + sps%nshell(c) > params%e2max) cycle
             if(sps%nshell(b) + sps%nshell(c) > params%e2max) cycle
             p2 = p1 * (-1) ** (sps%ll(c))

@@ -27,7 +27,7 @@ ifeq ($(COMPILER),INTEL)
 	FC=ifort
 	LDFLAGS=-mkl
 	OMP = -openmp
-	FFLAGS=-O3 -no-ipo -static #-Dsingle_precision
+	FFLAGS=-O3 -no-ipo -static -Dsingle_precision
 	CFLAGS=-O3
 	#FDFLAGS=-Ddebug
 	#FDFLAGS+=-check-all
