@@ -2,38 +2,39 @@
 import sys
 import os.path
 import subprocess
-import get_filename
-import Conf
+from get_filename import get_nnfile, get_nnnfile, get_summary_file,\
+        get_hamil_file
+from Conf import Orbit
 HOME = os.path.expanduser('~')
 params = {}
 exe = './HartreeFock.exe'
 hw = 25
 renorm = 'srg'
 cut = '2.00'
-f2path = './'
+f2path = HOME + '/MtxElmnt/2BME/'
 emax_2nf = 14
 e2max_2nf = 28
 pot = 'N3LO_EM500'
-txtbin_2n = 'txt'
+txtbin_2n = 'bin'
 fom_2n = 'myg'
 twbmefile = get_nnfile(f2path, 'TwBME', pot, renorm, cut, hw, \
                        emax_2nf, e2max_2nf, txtbin_2n, fom_2n)
 scfile2 = 'None'
 
-f3path = './'
+f3path = HOME + '/MtxElmnt/3BME'
 emax_3nf = 14
 e2max_3nf = 14
 e3max_3nf = 14
-e3cut = 10
+e3cut = 14
 genuine_3bf = True
 # params for genuine n2lo 3BF
 ### R. Roth choice ##
-cd = -0.2
-ce = 0.098
-lambda_local = 400
-txtbin_3n = 'txt'
+cd = '-0.20'
+ce = '0.098'
+lambda_local = '400'
+txtbin_3n = 'bin'
 genuine_3bf = True
-thbmefile = get_nnnfile(f3path, 'ThBME', renorm, cut, cd, ce, lam, \
+thbmefile = get_nnnfile(f3path, 'ThBME', renorm, cut, cd, ce, lambda_local, \
                         e3max_3nf, hw, genuine_3bf, txtbin_3n)
 scfile3 = 'None'
 
@@ -49,11 +50,14 @@ thbme = True
 sv_hf_rslt = True
 vac = 'ref'
 MBPT = True
-fmt_hf_snt = 'bin'
+fmt_hf_snt = 'txt'
 emax = 6
 e2max = 12
 conv = 1.e-8
 params['hw'] = hw
+params['emax_3nf'] = emax_3nf
+params['e2max_3nf'] = e2max_3nf
+params['e3max_3nf'] = e3max_3nf
 params['e3cut'] = e3cut
 params['pmass'] = pmass
 params['nmass'] = nmass
@@ -98,7 +102,15 @@ for o, fr in no.items():
 f.close()
 cmd = str(exe) + ' ' + name + ' ' + name1 + ' ' + name2 + ' ' + \
         twbmefile + ' ' + thbmefile + ' ' + scfile2 + ' ' + scfile3
+print(cmd)
 subprocess.call(cmd, shell=True)
-
+f = get_summary_file(pot, renorm, cut, genuine_3bf, hw, emax, e2max)
+print(f)
+cmd = 'mv Summary.out ' + f
+subprocess.call(cmd, shell=True)
+f = get_hamil_file(pot, renorm, cut, genuine_3bf, \
+        hw, emax, e2max, fmt_hf_snt)
+cmd = 'mv Hamil.snt.' + str(fmt_hf_snt) + ' '  + f
+subprocess.call(cmd, shell=True)
 
 

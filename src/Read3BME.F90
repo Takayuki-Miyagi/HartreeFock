@@ -547,17 +547,12 @@ contains
     end if
 
     call Cnt3BME(sps, params, num)
-    allocate(vtemp(num))
 #ifdef single_precision
     st = dble(num) * 4.d0 / (1024.d0 ** 3)
 #else
     st = dble(num) * 8.d0 / (1024.d0 ** 3)
 #endif
-    if(myrank == 0) then
-      write(*,'(a, f9.4, a)') &
-          & 'Estimated Memory for temporal 3N file: ', &
-          &  st, " GB"
-    end if
+    allocate(vtemp(num))
 
     if(sys%find(filename, '.txt')) then
       !call read_3bme_linebyline_txt(sps, params, filename)
@@ -573,6 +568,13 @@ contains
       write(*,'(2a)') 'The file format cannot be detected: ', trim(filename)
       stop
     end if
+
+    if(myrank == 0) then
+      write(*,'(a, f9.4, a)') &
+          & 'Estimated Memory for temporal 3N file: ', &
+          &  st, " GB"
+    end if
+
     call this%Store3bme(sps, params)
     deallocate(vtemp)
   end subroutine InitiReadScalar

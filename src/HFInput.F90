@@ -7,7 +7,6 @@ module InputParameters
     real(8) :: hw
 
     ! two-body matrix element file
-    integer :: emax_2nf, e2max_2nf
     character(256) :: twbmefile = 'None', scfile2 = 'None'
 
     ! three-body matrix element file
@@ -24,7 +23,7 @@ module InputParameters
     logical :: MBPT
     integer :: emax, e2max, e3max ! model space
     real(8) :: conv ! tolerance
-    character(256) :: vac = 'ref'
+    character(256) :: vac = 'ref', fmt_hf_snt = 'txt'
     character(256) :: egs = 'None', no2bhfile = 'None', fmt_hf_snt = 'None'
     character(256) :: reference = 'None', nocoef = 'None'
 
@@ -41,7 +40,7 @@ contains
     real(8) :: hw, conv
     integer :: emax_2nf, e2max_2nf
     integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
-    character(256) :: inputfile, fmt_hf_snt, vac
+    character(256) :: inputfile, fmt_hf_snt, vac, fmt_hf_snt
 
     logical :: sv_hf_rslt, HFloop, NO2B, HFbasis, MBPT
     integer :: emax, e2max, e3max
@@ -51,7 +50,7 @@ contains
       & emax_3nf, e2max_3nf, e3max_3nf, &
       & sv_hf_rslt, HFbasis, &
       & HFloop, NO2B, emax, e2max, &
-      & e3cut, fmt_hf_snt, vac, MBPT
+      & e3cut, fmt_hf_snt, vac, MBPT, fmt_hf_snt
 
     narg = command_argument_count()
     call getarg(1, inputfile)
@@ -71,8 +70,6 @@ contains
     params%hw = hw
     params%conv = conv
     params%fmt_hf_snt = fmt_hf_snt
-    params%emax_2nf = emax_2nf
-    params%e2max_2nf = e2max_2nf
     params%emax_3nf = emax_3nf
     params%e2max_3nf = e2max_3nf
     params%e3max_3nf = e3max_3nf
@@ -85,6 +82,7 @@ contains
     params%sv_hf_rslt = sv_hf_rslt
     params%vac = vac
     params%MBPT = MBPT
+    params%fmt_hf_snt = fmt_hf_snt
     if(present(emax_in)) then
       params%emax = emax_in
       params%e2max = 2 * emax_in
@@ -96,11 +94,8 @@ contains
 
   subroutine GetFileName(params)
   class(parameters), intent(inout) :: params
-    character(20) :: basis
     params%no2bhfile = 'None'
-    basis = 'HO'
-    if(params%HFbasis) basis = 'HF'
-    params%no2bhfile = 'Hamil.snt.txt'
+    params%no2bhfile = 'Hamil.snt.' // trim(params%fmt_hf_snt)
     params%egs = 'Summary.out'
   end subroutine GetFileName
 

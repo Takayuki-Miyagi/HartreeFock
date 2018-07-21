@@ -5,7 +5,7 @@ def get_nnfile(path, opr, pot, renorm, cut, hw, emax, e2max, txb, fom):
     f = path + '/' + opr + '-HO_NN-only_' + pot + '_' + renorm
     if(renorm != 'bare'):
         f += cut
-    f += '_hw' + hw + '_emax' + str(emax) + '_e2max' + str(e2max)
+    f += '_hw' + str(hw) + '_emax' + str(emax) + '_e2max' + str(e2max)
     f += '.' + txb + '.' + fom
     return f
 
@@ -31,6 +31,7 @@ def get_summary_file(pot, renorm, cut, gen, hw, emax, e2max):
         f += '_NN'
     f += '_hw' + str(hw) + '_emax' + str(emax) + '_e2max' + str(e2max)
     f += '.dat'
+    return f
 
 def get_hamil_file(pot, renorm, cut, gen, hw, emax, e2max, txb):
     f = 'Hamil-' + pot + '_' + renorm
@@ -42,3 +43,4 @@ def get_hamil_file(pot, renorm, cut, gen, hw, emax, e2max, txb):
         f += '_NN'
     f += '_hw' + str(hw) + '_emax' + str(emax) + '_e2max' + str(e2max)
     f += '.snt.' + txb
+    return f

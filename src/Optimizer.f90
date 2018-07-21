@@ -140,22 +140,23 @@ contains
 
     this%fj = (this%fj - this%xj)
     this%si = maxval(abs(this%fj%v))
-    if(this%m == 0 .or. this%nite <= 1) then
-      this%xj = this%xj + this%fj * this%alpha
-      return
-    end if
 
     iused = min(this%nite - 1, this%m)
     icurr = this%nite - 1 - ((this%nite - 2) / this%m) * this%m
     inext = this%nite - ((this%nite - 1) / this%m) * this%m
-    w0 = 1.d-2
-    if(this%nite > 1) then
-      this%df(icurr) = this%fj - this%df(icurr)
-      this%dx(icurr) = this%xj - this%dx(icurr)
-      a = 1.d0 / dsqrt((this%df(icurr) * this%df(icurr)))
-      this%df(icurr) = this%df(icurr) * a
-      this%dx(icurr) = this%dx(icurr) * a
+    if(this%m == 0 .or. iused < 1) then
+      this%xj = this%xj + this%fj * this%alpha
+      this%df(inext) = this%fj
+      this%dx(inext) = this%xj
+      return
     end if
+    w0 = 1.d-2
+    this%df(icurr) = this%fj - this%df(icurr)
+    this%dx(icurr) = this%xj - this%dx(icurr)
+    a = 1.d0 / dsqrt((this%df(icurr) * this%df(icurr)))
+    this%df(icurr) = this%df(icurr) * a
+    this%dx(icurr) = this%dx(icurr) * a
+
     call mat%ini(iused, iused)
     call beta%ini(iused, iused)
     do i = 1, iused
