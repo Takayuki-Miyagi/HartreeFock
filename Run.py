@@ -45,8 +45,8 @@ ENO = False
 HFloop = True
 HFbasis = True
 NO2B = True
-thbme = True
-#thbme = False
+thbme = False
+if(thbmefile != 'None'): thbme = True
 sv_hf_rslt = True
 vac = 'ref'
 MBPT = True
@@ -104,12 +104,11 @@ cmd = str(exe) + ' ' + name + ' ' + name1 + ' ' + name2 + ' ' + \
         twbmefile + ' ' + thbmefile + ' ' + scfile2 + ' ' + scfile3
 print(cmd)
 subprocess.call(cmd, shell=True)
-f = get_summary_file(pot, renorm, cut, genuine_3bf, hw, emax, e2max)
-print(f)
+f = get_summary_file(pmass, nmass, mass, pot, renorm, cut, genuine_3bf, hw, emax, e2max, thbme)
 cmd = 'mv Summary.out ' + f
 subprocess.call(cmd, shell=True)
-f = get_hamil_file(pot, renorm, cut, genuine_3bf, \
-        hw, emax, e2max, fmt_hf_snt)
+f = get_hamil_file(pmass, nmass, mass, pot, renorm, cut, genuine_3bf, \
+        hw, emax, e2max, fmt_hf_snt, thbme)
 cmd = 'mv Hamil.snt.' + str(fmt_hf_snt) + ' '  + f
 subprocess.call(cmd, shell=True)
 

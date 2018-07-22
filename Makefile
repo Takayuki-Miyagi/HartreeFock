@@ -2,9 +2,9 @@
 # Make file for TTFcalc code
 #--------------------------------------------------
 TARGET=HartreeFock
-INSTLDIR=.
-#COMPILER=GNU
-COMPILER=INTEL
+INSTLDIR=~/Desktop/HFtest/
+COMPILER=GNU
+#COMPILER=INTEL
 
 #--------------------------------------------------
 # Default Parameters

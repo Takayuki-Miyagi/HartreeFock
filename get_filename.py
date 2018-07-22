@@ -21,26 +21,32 @@ def get_nnnfile(path, opr, renorm, cut, cd, ce, lam, e3max, hw, gen, txb):
     f += '.' + txb
     return f
 
-def get_summary_file(pot, renorm, cut, gen, hw, emax, e2max):
-    f = 'Summary-' + pot + '_' + renorm
+def get_summary_file(Z, N, A, pot, renorm, cut, gen, hw, emax, e2max, thbme):
+    f = 'Summary-' + 'Z' + str(Z) + 'N' + str(N) + 'A' + str(A) + '_' + pot + '_' + renorm
     if(renorm != 'bare'):
         f += cut
-    if(gen):
-        f += '_NN+3N'
-    if(gen):
-        f += '_NN'
+    if(thbme):
+        if(gen):
+            f += '_NN+3N'
+        else:
+            f += '_NN'
+    else:
+        f += '_NN-only'
     f += '_hw' + str(hw) + '_emax' + str(emax) + '_e2max' + str(e2max)
     f += '.dat'
     return f
 
-def get_hamil_file(pot, renorm, cut, gen, hw, emax, e2max, txb):
-    f = 'Hamil-' + pot + '_' + renorm
+def get_hamil_file(Z, N, A, pot, renorm, cut, gen, hw, emax, e2max, txb, thbme):
+    f = 'Hamil-' + 'Z' + str(Z) + 'N' + str(N) + 'A' + str(A) + '_' + pot + '_' + renorm
     if(renorm != 'bare'):
         f += cut
-    if(gen):
-        f += '_NN+3N'
-    if(gen):
-        f += '_NN'
+    if(thbme):
+        if(gen):
+            f += '_NN+3N'
+        else:
+            f += '_NN'
+    else:
+        f += '_NN-only'
     f += '_hw' + str(hw) + '_emax' + str(emax) + '_e2max' + str(e2max)
     f += '.snt.' + txb
     return f

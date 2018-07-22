@@ -87,15 +87,15 @@ contains
 
               v = 0.d0
               do j = jmin, jmax
-                if(p1 == p2 .and. mod(j, 2) /= 0) cycle
-                if(h1 == h2 .and. mod(j, 2) /= 0) cycle
+                if(p1 == p2 .and. mod(j, 2) == 1) cycle
+                if(h1 == h2 .and. mod(j, 2) == 1) cycle
                 ich = ms%two%jptz2n(j, pari, itz)
-                bra = ms%two%jptz(ich)%labels2n(p1, p2)
-                ket = ms%two%jptz(ich)%labels2n(h1, h2)
+                bra = ms%two%jptz(ich)%labels2n(p1,p2)
+                ket = ms%two%jptz(ich)%labels2n(h1,h2)
                 v = v + dble(2 * j + 1) * hamil%two%jptz(ich)%m(bra,ket) ** 2
               end do
 
-              this%e_2 = this%e_2 + v * d! * (Del(p1,p2) * Del(h1,h2)) ** 2
+              this%e_2 = this%e_2 + v * d * (Del(p1,p2) * Del(h1,h2)) ** 2
 
             end do
           end do
@@ -416,7 +416,7 @@ contains
                       crv1 = crv1 + dble(2 * jh3p2 + 1) * &
                         &    sjs(sps%jj(h3), sps%jj(p2), 2 * jh3p2, &
                         &        sps%jj(h1), sps%jj(p3), 2 * j) * &
-                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha) 
+                        &    hamil%two%jptz(ich)%m(bra, ket) * dble(pha)
                     end do
 
                     do jh1h3 = jh1h3min, jh1h3max
