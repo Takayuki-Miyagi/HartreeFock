@@ -21,8 +21,12 @@ def get_nnnfile(path, opr, renorm, cut, cd, ce, lam, e3max, hw, gen, txb):
     f += '.' + txb
     return f
 
-def get_summary_file(Z, N, A, pot, renorm, cut, gen, hw, emax, e2max, thbme):
-    f = 'Summary-' + 'Z' + str(Z) + 'N' + str(N) + 'A' + str(A) + '_' + pot + '_' + renorm
+def get_summary_file(Z, N, A, HFloop, pot, renorm, cut, gen, hw, emax, e2max, thbme):
+    if(HFloop):
+        f = 'Summary-HF-'
+    else:
+        f = 'Summary-HO-'
+    f += 'Z' + str(Z) + 'N' + str(N) + 'A' + str(A) + '_' + pot + '_' + renorm
     if(renorm != 'bare'):
         f += cut
     if(thbme):
@@ -36,8 +40,12 @@ def get_summary_file(Z, N, A, pot, renorm, cut, gen, hw, emax, e2max, thbme):
     f += '.dat'
     return f
 
-def get_hamil_file(Z, N, A, pot, renorm, cut, gen, hw, emax, e2max, txb, thbme):
-    f = 'Hamil-' + 'Z' + str(Z) + 'N' + str(N) + 'A' + str(A) + '_' + pot + '_' + renorm
+def get_hamil_file(Z, N, A, HFloop, pot, renorm, cut, gen, hw, emax, e2max, txb, thbme):
+    if(HFloop):
+        f = 'Hamil-HF-'
+    else:
+        f = 'Hamil-HO-'
+    f += 'Z' + str(Z) + 'N' + str(N) + 'A' + str(A) + '_' + pot + '_' + renorm
     if(renorm != 'bare'):
         f += cut
     if(thbme):

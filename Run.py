@@ -8,12 +8,12 @@ from Conf import Orbit
 HOME = os.path.expanduser('~')
 params = {}
 exe = './HartreeFock.exe'
-hw = 25
+hw = 35
 renorm = 'srg'
 cut = '2.00'
-f2path = HOME + '/MtxElmnt/2BME/'
-emax_2nf = 14
-e2max_2nf = 28
+f2path = HOME + '/Desktop/TTFtest'
+emax_2nf = 6
+e2max_2nf = 12
 pot = 'N3LO_EM500'
 txtbin_2n = 'bin'
 fom_2n = 'myg'
@@ -36,15 +36,14 @@ txtbin_3n = 'bin'
 genuine_3bf = True
 thbmefile = get_nnnfile(f3path, 'ThBME', renorm, cut, cd, ce, lambda_local, \
                         e3max_3nf, hw, genuine_3bf, txtbin_3n)
+thbmefile = 'None'
 scfile3 = 'None'
 
 pmass = 8
 nmass = 8
 mass = 16
 ENO = False
-HFloop = True
-HFbasis = True
-NO2B = True
+HFloop = False
 thbme = False
 if(thbmefile != 'None'): thbme = True
 sv_hf_rslt = True
@@ -66,8 +65,6 @@ params['sv_hf_rslt'] = sv_hf_rslt
 params['vac'] = vac
 params['fmt_hf_snt'] = fmt_hf_snt
 params['HFloop'] = HFloop
-params['HFbasis'] = HFbasis
-params['NO2B'] = NO2B
 params['emax'] = emax
 params['e2max'] = e2max
 params['conv'] = conv
@@ -84,8 +81,9 @@ f.write('&end' + '\n')
 f.close()
 ob = Orbit()
 core = ob.get_core(nmass, pmass)
-no = ob.get_no(nmass, pmass)        # 'TNO'
-no = ob.get_no(nmass, pmass, 'ENO') # 'ENO'
+no = ob.get_no(nmass, pmass)
+if(ENO):
+    no = ob.get_no(nmass, pmass, 'ENO')
 name1 = 'core.in'
 f = open(name1, 'w')
 f.write(str(len(core)) + '\n')
@@ -104,10 +102,10 @@ cmd = str(exe) + ' ' + name + ' ' + name1 + ' ' + name2 + ' ' + \
         twbmefile + ' ' + thbmefile + ' ' + scfile2 + ' ' + scfile3
 print(cmd)
 subprocess.call(cmd, shell=True)
-f = get_summary_file(pmass, nmass, mass, pot, renorm, cut, genuine_3bf, hw, emax, e2max, thbme)
+f = get_summary_file(pmass, nmass, mass, HFloop, pot, renorm, cut, genuine_3bf, hw, emax, e2max, thbme)
 cmd = 'mv Summary.out ' + f
 subprocess.call(cmd, shell=True)
-f = get_hamil_file(pmass, nmass, mass, pot, renorm, cut, genuine_3bf, \
+f = get_hamil_file(pmass, nmass, mass, HFloop, pot, renorm, cut, genuine_3bf, \
         hw, emax, e2max, fmt_hf_snt, thbme)
 cmd = 'mv Hamil.snt.' + str(fmt_hf_snt) + ' '  + f
 subprocess.call(cmd, shell=True)

@@ -19,7 +19,6 @@ module InputParameters
     integer :: mass  ! A
     logical :: HFloop ! Hartree-Fock calculation
     logical :: sv_hf_rslt
-    logical :: HFbasis
     logical :: MBPT
     integer :: emax, e2max, e3max ! model space
     real(8) :: conv ! tolerance
@@ -42,13 +41,13 @@ contains
     integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
     character(256) :: inputfile, fmt_hf_snt, vac
 
-    logical :: sv_hf_rslt, HFloop, NO2B, HFbasis, MBPT
+    logical :: sv_hf_rslt, HFloop, NO2B, MBPT
     integer :: emax, e2max, e3max
     integer :: narg
     namelist /input/ pmass, nmass, mass, &
       & hw, conv, emax_2nf, e2max_2nf, &
       & emax_3nf, e2max_3nf, e3max_3nf, &
-      & sv_hf_rslt, HFbasis, &
+      & sv_hf_rslt, &
       & HFloop, NO2B, emax, e2max, &
       & e3cut, fmt_hf_snt, vac, MBPT, fmt_hf_snt
 
@@ -75,7 +74,6 @@ contains
     params%e3max_3nf = e3max_3nf
     params%e3cut = e3cut
     params%HFloop = HFloop
-    params%HFbasis = HFbasis
     params%emax = emax
     params%e2max = e2max
     params%e3max = 18

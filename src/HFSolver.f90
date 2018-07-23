@@ -60,33 +60,35 @@ contains
 
     call InitHFSolLoop()
 
-    do nite = 1, 999
-      opt%nite = nite
-      h1i = hamil%one + w1i
-      call HFOneBodyEquation(h1i, hamil%one, h1f, t1f, this%HF_U)
-      v2f = TwoBodyScalarHFBasis(ms%one, ms%two, hamil%two, this%HF_U)
-      w1f = NormOrd(params, sps, ms%one, ms%two, v2f)
-      if(present(thbme)) then
-        w2i = NormOrd(params, sps, this%HF_U, ms%two, thbme, NO)
-        w2f = TwoBodyScalarHFBasis(ms%one, ms%two, w2i, this%HF_U)
-        w12 = NormOrd(params, sps, ms%one, ms%two, w2f)
-      end if
-      this%e1hf = NormOrd(sps, ms%one, t1f)
-      this%e2hf = NormOrd(sps, ms%one, w1f) * 0.5d0
-      this%e3hf = NormOrd(sps, ms%one, w12) / 6.d0
-      this%ehf = this%e1hf + this%e2hf + this%e3hf
-      if(myrank == 0) then
-        write(*,'(a, i4, a, f15.6, a, f15.6, a, f15.6, a, f15.6, a, es10.3)') &
-            & 'nite = ', nite, '  e1 = ', this%e1hf, '  e2 = ', this%e2hf, &
-            & '  e3 = ', this%e3hf, '  ehf = ', this%ehf, '  error = ', opt%si
-      end if
-      w1f = w1f + 0.5d0 * w12
-      w1i = InverseTransformation(w1f, this%HF_U)
-      call getVectorOpt(opt, w1i)
-      call opt%GetVector()
-      if(opt%si < params%conv) exit
-      call getUpdate(opt, w1i)
-    end do
+    if(params%HFloop) then
+      do nite = 1, 999
+        opt%nite = nite
+        h1i = hamil%one + w1i
+        call HFOneBodyEquation(h1i, hamil%one, h1f, t1f, this%HF_U)
+        v2f = TwoBodyScalarHFBasis(ms%one, ms%two, hamil%two, this%HF_U)
+        w1f = NormOrd(params, sps, ms%one, ms%two, v2f)
+        if(present(thbme)) then
+          w2i = NormOrd(params, sps, this%HF_U, ms%two, thbme, NO)
+          w2f = TwoBodyScalarHFBasis(ms%one, ms%two, w2i, this%HF_U)
+          w12 = NormOrd(params, sps, ms%one, ms%two, w2f)
+        end if
+        this%e1hf = NormOrd(sps, ms%one, t1f)
+        this%e2hf = NormOrd(sps, ms%one, w1f) * 0.5d0
+        this%e3hf = NormOrd(sps, ms%one, w12) / 6.d0
+        this%ehf = this%e1hf + this%e2hf + this%e3hf
+        if(myrank == 0) then
+          write(*,'(a, i4, a, f15.6, a, f15.6, a, f15.6, a, f15.6, a, es10.3)') &
+              & 'nite = ', nite, '  e1 = ', this%e1hf, '  e2 = ', this%e2hf, &
+              & '  e3 = ', this%e3hf, '  ehf = ', this%ehf, '  error = ', opt%si
+        end if
+        w1f = w1f + 0.5d0 * w12
+        w1i = InverseTransformation(w1f, this%HF_U)
+        call getVectorOpt(opt, w1i)
+        call opt%GetVector()
+        if(opt%si < params%conv) exit
+        call getUpdate(opt, w1i)
+      end do
+    end if
 
     call FinHFSolLoop()
   contains
@@ -98,10 +100,12 @@ contains
       call w1f%init(ms%one%SpinParityTz)
       call w12%init(ms%one%SpinParityTz)
       call t1f%init(ms%one%SpinParityTz)
+      t1f = hamil%one
 
       call v2f%init(ms%two%SpinParityTz)
       call w2f%init(ms%two%SpinParityTz)
       call w2i%init(ms%two%SpinParityTz)
+      v2f = hamil%two
 
       n = GetVectorDim(w1i)
       call opt%init(n, alpha = 0.7d0, method = 'direct', m = 10)
@@ -110,15 +114,19 @@ contains
 
       if(present(thbme)) call NO%init(params, sps, ms%one, ms%two)
       w1i = NormOrd(params, sps, ms%one, ms%two, hamil%two)
+      w1f = w1i
       if(present(thbme)) then
         w2i = NormOrd(params, sps, this%HF_U, ms%two, thbme, NO)
+        w2f = w2i
         w12 = NormOrd(params, sps, ms%one, ms%two, w2i)
       end if
-      this%e1ho = NormOrd(sps, ms%one, hamil%one)
-      this%e2ho = NormOrd(sps, ms%one, w1i) * 0.5d0
-      this%e3ho = NormOrd(sps, ms%one, w12) / 6.d0
-      this%eho = this%e1ho + this%e2ho + this%e3ho
+      this%e1hf = NormOrd(sps, ms%one, hamil%one)
+      this%e2hf = NormOrd(sps, ms%one, w1i) * 0.5d0
+      this%e3hf = NormOrd(sps, ms%one, w12) / 6.d0
+      this%ehf = this%e1hf + this%e2hf + this%e3hf
       w1i = w1i + 0.5d0 * w12
+      w1f = w1f + 0.5d0 * w12
+      h1f = t1f + w1f
       if(myrank == 0) then
         write(*,'(a, f9.4, a)') &
             & 'Memory around : ', &
@@ -128,9 +136,13 @@ contains
       if(myrank == 0) then
         write(*,'(a)') 'initial normal ordering'
         write(*,'(a, f15.6, a, f15.6, a, f15.6, a, f15.6)') &
-            & '  e1 = ', this%e1ho, '  e2 = ', this%e2ho, &
-            & '  e3 = ', this%e3ho, '  ehf = ', this%eho
+            & '  e1 = ', this%e1hf, '  e2 = ', this%e2hf, &
+            & '  e3 = ', this%e3hf, '  ehf = ', this%ehf
       end if
+      this%e1ho = this%e1hf
+      this%e2ho = this%e2hf
+      this%e3ho = this%e3hf
+      this%eho = this%ehf
     end subroutine InitHFSolLoop
 
     subroutine FinHFSolLoop()
