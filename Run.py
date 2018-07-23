@@ -8,42 +8,44 @@ from Conf import Orbit
 HOME = os.path.expanduser('~')
 params = {}
 exe = './HartreeFock.exe'
-hw = 35
+hw = 25
 renorm = 'srg'
 cut = '2.00'
 f2path = HOME + '/Desktop/TTFtest'
+f2path = '.'
 emax_2nf = 6
 e2max_2nf = 12
 pot = 'N3LO_EM500'
-txtbin_2n = 'bin'
+txtbin_2n = 'txt'
 fom_2n = 'myg'
 twbmefile = get_nnfile(f2path, 'TwBME', pot, renorm, cut, hw, \
                        emax_2nf, e2max_2nf, txtbin_2n, fom_2n)
 scfile2 = 'None'
 
 f3path = HOME + '/MtxElmnt/3BME'
-emax_3nf = 14
-e2max_3nf = 14
-e3max_3nf = 14
-e3cut = 14
+f3path = '.'
+emax_3nf = 6
+e2max_3nf = 6
+e3max_3nf = 6
+e3cut = 6
 genuine_3bf = True
 # params for genuine n2lo 3BF
 ### R. Roth choice ##
 cd = '-0.20'
 ce = '0.098'
 lambda_local = '400'
-txtbin_3n = 'bin'
+txtbin_3n = 'txt'
 genuine_3bf = True
 thbmefile = get_nnnfile(f3path, 'ThBME', renorm, cut, cd, ce, lambda_local, \
                         e3max_3nf, hw, genuine_3bf, txtbin_3n)
-thbmefile = 'None'
+##thbmefile = 'None'
 scfile3 = 'None'
 
 pmass = 8
 nmass = 8
 mass = 16
 ENO = False
-HFloop = False
+HFloop = True
 thbme = False
 if(thbmefile != 'None'): thbme = True
 sv_hf_rslt = True
