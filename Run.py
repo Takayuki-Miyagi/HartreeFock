@@ -65,6 +65,7 @@ params['nmass'] = nmass
 params['mass'] = mass
 params['sv_hf_rslt'] = sv_hf_rslt
 params['vac'] = vac
+params['MBPT'] = MBPT
 params['fmt_hf_snt'] = fmt_hf_snt
 params['HFloop'] = HFloop
 params['emax'] = emax

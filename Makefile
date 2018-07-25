@@ -17,8 +17,8 @@ ifeq ($(COMPILER),GNU)
 	OMP = -fopenmp
 	FFLAGS=-O3 -Dsingle_precision
 	CFLAGS=-O3
-	#FDFLAGS=-Ddebug
-	#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+	FDFLAGS=-Ddebug
+	FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 endif
 
 ifeq ($(COMPILER),INTEL)
