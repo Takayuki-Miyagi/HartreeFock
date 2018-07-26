@@ -262,8 +262,8 @@ contains
     type(iThreeBodyScalar), optional, intent(in) :: thbme
     type(NBodyScalars) :: two
 
-    !call this%one%SetOneBodyScalars(params, sps, ms%one, oprtr)
-    call this%one%SetOneBodyScalars(params, sps, ms%one, 'hamil_ho')
+    call this%one%SetOneBodyScalars(params, sps, ms%one, oprtr)
+    !call this%one%SetOneBodyScalars(params, sps, ms%one, 'hamil_ho')
     call this%two%SetTwoBodyScalars(params, sps, ms%two, oprtr, f2)
     if( allocated (ms%thr%jptz)) then
       call this%thr%SetThreeBodyScalars(params, sps, ms%thr, thbme)
@@ -350,8 +350,7 @@ contains
     elseif(sys%find(f2, '.txt') .and. sys%find(f2, '.snt')) then
       call read_2bme_snt_txt(f2, sps, two, this)
     elseif(sys%find(f2, '.bin') .and. sys%find(f2, '.snt')) then
-      !call read_2bme_snt_bin(f2, sps, two, this)
-      call read_2bme_snt_bin2(f2, sps, two, this)
+      call read_2bme_snt_bin(f2, sps, two, this)
     end if
   end subroutine SetTwoBodyScalars
 
@@ -1372,91 +1371,5 @@ contains
     deallocate(aa, bb, cc, dd, jj)
     deallocate(vsave)
   end subroutine read_2bme_snt_bin
-
-  subroutine read_2bme_snt_bin2(f2, sps, two, tbme)
-    use class_stopwatch, only: start_stopwatch, stop_stopwatch, &
-        & time_io_read
-    type(NBodyScalars), intent(inout) :: tbme
-    type(spo_pn), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: two
-    character(*), intent(in) :: f2
-
-    integer :: iunit = 19
-    integer :: num_p_orb, num_n_orb, num_p_core, num_n_core
-    integer :: i, num, num_orb, method
-    integer :: j, itz
-    real(8) :: hw_read, v2, zerobdy
-    integer :: num_tbme, ich
-    integer :: a, b, c, d, ipar
-    integer :: bra,ket
-    integer :: phase
-    integer, allocatable :: aa(:), bb(:), cc(:), dd(:)
-    integer, allocatable :: abcdj(:,:)
-    character(1), allocatable :: c1(:), c2(:)
-    real(8), allocatable :: vsave(:)
-    integer, allocatable :: nnum(:), nn(:), ll(:), jj(:), zz(:)
-    call start_stopwatch(time_io_read)
-
-    open(iunit, form = "unformatted", file = f2, status = "old", access='stream')
-    read(iunit)num_p_orb, num_n_orb, num_p_core, num_n_core
-    num_orb = num_p_orb + num_n_orb
-    allocate(nnum(num_orb), nn(num_orb), ll(num_orb), jj(num_orb), zz(num_orb))
-    allocate(c1(num_orb), c2(num_orb))
-    read(iunit) nnum
-    read(iunit) nn
-    read(iunit) ll
-    read(iunit) jj
-    read(iunit) zz
-    read(iunit) c1
-    read(iunit) c2
-    deallocate(nnum, nn, ll, jj, zz, c1, c2)
-
-    read(iunit) num, a
-    allocate(aa(num), bb(num), vsave(num))
-    read(iunit) aa
-    read(iunit) bb
-    read(iunit) vsave
-    deallocate(aa, bb, vsave)
-
-
-    read(iunit) num_tbme, a, b, v2
-    write(*,*) num_tbme, a, b, v2
-    allocate(aa(num_tbme), bb(num_tbme), cc(num_tbme), dd(num_tbme), jj(num_tbme))
-    allocate(abcdj(5,num_tbme))
-    allocate(vsave(num_tbme))
-    !read(iunit) aa
-    !read(iunit) bb
-    !read(iunit) cc
-    !read(iunit) dd
-    !read(iunit) jj
-    read(iunit) abcdj
-    read(iunit) vsave
-    close(iunit)
-    do i =1, num_tbme
-      a = abcdj(1,i)
-      b = abcdj(2,i)
-      c = abcdj(3,i)
-      d = abcdj(4,i)
-      j = abcdj(5,i)
-      v2 = vsave(i)
-      if(a > sps%n) cycle
-      if(b > sps%n) cycle
-      if(c > sps%n) cycle
-      if(d > sps%n) cycle
-      write(*,*) a, b, c, d, j, v2
-      ipar = (-1) ** (sps%ll(a)+sps%ll(b))
-      itz  = (sps%itz(a) + sps%itz(b))/2
-      ich = two%jptz2n(j, ipar, itz)
-      bra = two%jptz(ich)%labels2n(a,b)
-      ket = two%jptz(ich)%labels2n(c,d)
-      if(bra*ket==0) cycle
-      phase = two%jptz(ich)%iphase(a,b)*two%jptz(ich)%iphase(c,d)
-      tbme%jptz(ich)%m(bra, ket) = v2 *dble(phase)
-      tbme%jptz(ich)%m(ket, bra) = v2 *dble(phase)
-    end do
-    deallocate(aa, bb, cc, dd, jj, abcdj)
-    deallocate(vsave)
-    call stop_stopwatch(time_io_read)
-  end subroutine read_2bme_snt_bin2
 
 end module ScalarOperator
