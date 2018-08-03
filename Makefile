@@ -78,7 +78,7 @@ ifeq ($(HOST),other)
 endif
 
 ifeq ($(HOST),apt)
-	MODOUT=-module$(MODDIR)
+	MODOUT=-module $(MODDIR)
 endif
 
 #--------------------------------------------------
