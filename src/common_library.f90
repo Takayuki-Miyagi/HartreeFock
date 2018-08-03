@@ -13,12 +13,17 @@ module common_library
   real(8) :: amnucl   ! averaged nucleon mass
 
 contains
-  subroutine set_physics_constant
+  subroutine set_physics_constant()
     amp = 938.27231d0        ! proton mass [MeV] can be changed in LQCD calc.
     amn = 939.56563d0        ! neutron mass [MeV] can be changed in LQCD calc.
     rmass = (amp * amn) / (amp + amn)
     amnucl = (amp + amn) * 0.5d0
   end subroutine set_physics_constant
+
+  real(8) function hat(i)
+    integer, intent(in) :: i
+    hat = dsqrt(dble(i + 1))
+  end function hat
 
   subroutine skip_comment(nfile, comment)
     implicit none

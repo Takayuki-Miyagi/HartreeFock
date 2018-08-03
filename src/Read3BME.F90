@@ -2,6 +2,7 @@ module read_3BME
   use InputParameters, only: parameters
   use MPIFunction, only: myrank
   use ModelSpace, only: spo_isospin
+  use common_library, only: triag, hat
   implicit none
   private :: hat, triag
   type :: coef
@@ -557,9 +558,11 @@ contains
 
     if(sys%find(filename, '.txt')) then
       !call read_3bme_linebyline_txt(sps, params, filename)
-      open(iunit, file = filename, status = 'old', access='stream', form='formatted')
+      open(iunit, file = filename, status = 'old', form='formatted')
       !read(iunit, *)  i ! old version
-      read(iunit, *) vtemp
+      do i = 1, num
+        read(iunit, *) vtemp(i)
+      end do
       close(iunit)
     elseif(sys%find(filename, '.bin')) then
       !call read_3bme_linebyline(sps, params, filename)
@@ -739,174 +742,6 @@ contains
     numtot = total_num
   end subroutine Cnt3BME
 
-  subroutine read_3bme_linebyline_txt(sps, params, f)
-    type(spo_isospin), intent(in) :: sps
-    type(parameters), intent(in) :: params
-    character(len=*), intent(in) :: f
-    integer :: i1, i2, i3, i4, i5, i6
-    integer :: l1, l2, l3, l4, l5, l6
-    integer :: j1, j2, j3, j4, j5, j6
-    integer :: i5max, i6max
-    integer :: p123, p456
-    integer :: j12, j45, t12, t45
-    integer :: j, t
-    integer :: total_num
-    integer :: emax, e2max, e3max
-    integer :: iunit = 20
-    emax = params%emax_3nf
-    e2max = params%e2max_3nf
-    e3max = params%e3max_3nf
-    open(iunit, file=f, form = 'formatted')
-    total_num = 0
-    do i1 = 1, sps%n
-      l1 = sps%ll(i1); j1 = sps%jj(i1)
-      if(sps%nshell(i1) > emax) cycle
-      do i2 = 1, i1
-        l2 = sps%ll(i2); j2 = sps%jj(i2)
-        if(sps%nshell(i2) > emax) cycle
-        if(sps%nshell(i1) + sps%nshell(i2) > e2max) cycle
-        do i3 = 1, i2
-          l3 = sps%ll(i3); j3 = sps%jj(i3)
-          if(sps%nshell(i3) > e3max) cycle
-          if(sps%nshell(i2) + sps%nshell(i3) > e2max) cycle
-          if(sps%nshell(i1) + sps%nshell(i3) > e2max) cycle
-          if(sps%nshell(i1) + sps%nshell(i2) + sps%nshell(i3) > e3max) cycle
-          p123 = (-1) ** (l1 + l2 + l3)
-
-          do i4 = 1, i1
-            l4 = sps%ll(i4); j4 = sps%jj(i4)
-            if(sps%nshell(i4) > emax) cycle
-            if(i1 == i4) then
-              i5max = i2
-            else
-              i5max = i4
-            end if
-            do i5 = 1, i5max
-              l5 = sps%ll(i5); j5 = sps%jj(i5)
-              if(sps%nshell(i5) > emax) cycle
-              if(sps%nshell(i4) + sps%nshell(i5) > e2max) cycle
-              if(i1 == i4 .and. i2 == i5) then
-                i6max = i3
-              else
-                i6max = i5
-              end if
-              do i6 = 1, i6max
-                l6 = sps%ll(i6); j6 = sps%jj(i6)
-                if(sps%nshell(i6) > emax) cycle
-                if(sps%nshell(i5) + sps%nshell(i6) > e2max) cycle
-                if(sps%nshell(i4) + sps%nshell(i6) > e2max) cycle
-                if(sps%nshell(i4) + sps%nshell(i5) + sps%nshell(i6) > e3max) cycle
-                p456 = (-1) ** (l4 + l5 +l6)
-                if(p123 /= p456) cycle
-
-                do j12 = iabs(j1 - j2)/2, (j1 + j2)/2
-                  do j45 = iabs(j4 - j5)/2, (j4 + j5)/2
-                    do j = max(iabs(2*j12 - j3), iabs(2*j45 - j6)), &
-                          & min(2*j12 + j3, 2*j45 + j6), 2
-                      do t12 = 0, 1
-                        do t45 = 0, 1
-                          do t = 1, min(2*t12 + 1, 2*t45 + 1), 2
-                            total_num = total_num + 1
-                            read(iunit,*) vtemp(total_num)
-                          end do
-                        end do
-                      end do
-                    end do
-                  end do
-                end do
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-    close(iunit)
-  end subroutine read_3bme_linebyline_txt
-
-  subroutine read_3bme_linebyline(sps, params, f)
-    type(spo_isospin), intent(in) :: sps
-    type(parameters), intent(in) :: params
-    character(len=*), intent(in) :: f
-    integer :: i1, i2, i3, i4, i5, i6
-    integer :: l1, l2, l3, l4, l5, l6
-    integer :: j1, j2, j3, j4, j5, j6
-    integer :: i5max, i6max
-    integer :: p123, p456
-    integer :: j12, j45, t12, t45
-    integer :: j, t
-    integer :: total_num
-    integer :: emax, e2max, e3max
-    integer :: iunit = 20
-    emax = params%emax_3nf
-    e2max = params%e2max_3nf
-    e3max = params%e3max_3nf
-    open(iunit, file=f, form = 'unformatted')
-    total_num = 0
-    do i1 = 1, sps%n
-      l1 = sps%ll(i1); j1 = sps%jj(i1)
-      if(sps%nshell(i1) > emax) cycle
-      do i2 = 1, i1
-        l2 = sps%ll(i2); j2 = sps%jj(i2)
-        if(sps%nshell(i2) > emax) cycle
-        if(sps%nshell(i1) + sps%nshell(i2) > e2max) cycle
-        do i3 = 1, i2
-          l3 = sps%ll(i3); j3 = sps%jj(i3)
-          if(sps%nshell(i3) > e3max) cycle
-          if(sps%nshell(i2) + sps%nshell(i3) > e2max) cycle
-          if(sps%nshell(i1) + sps%nshell(i3) > e2max) cycle
-          if(sps%nshell(i1) + sps%nshell(i2) + sps%nshell(i3) > e3max) cycle
-          p123 = (-1) ** (l1 + l2 + l3)
-
-          do i4 = 1, i1
-            l4 = sps%ll(i4); j4 = sps%jj(i4)
-            if(sps%nshell(i4) > emax) cycle
-            if(i1 == i4) then
-              i5max = i2
-            else
-              i5max = i4
-            end if
-            do i5 = 1, i5max
-              l5 = sps%ll(i5); j5 = sps%jj(i5)
-              if(sps%nshell(i5) > emax) cycle
-              if(sps%nshell(i4) + sps%nshell(i5) > e2max) cycle
-              if(i1 == i4 .and. i2 == i5) then
-                i6max = i3
-              else
-                i6max = i5
-              end if
-              do i6 = 1, i6max
-                l6 = sps%ll(i6); j6 = sps%jj(i6)
-                if(sps%nshell(i6) > emax) cycle
-                if(sps%nshell(i5) + sps%nshell(i6) > e2max) cycle
-                if(sps%nshell(i4) + sps%nshell(i6) > e2max) cycle
-                if(sps%nshell(i4) + sps%nshell(i5) + sps%nshell(i6) > e3max) cycle
-                p456 = (-1) ** (l4 + l5 +l6)
-                if(p123 /= p456) cycle
-
-                do j12 = iabs(j1 - j2)/2, (j1 + j2)/2
-                  do j45 = iabs(j4 - j5)/2, (j4 + j5)/2
-                    do j = max(iabs(2*j12 - j3), iabs(2*j45 - j6)), &
-                          & min(2*j12 + j3, 2*j45 + j6), 2
-                      do t12 = 0, 1
-                        do t45 = 0, 1
-                          do t = 1, min(2*t12 + 1, 2*t45 + 1), 2
-                            total_num = total_num + 1
-                            read(iunit) vtemp(total_num)
-                          end do
-                        end do
-                      end do
-                    end do
-                  end do
-                end do
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-    close(iunit)
-  end subroutine read_3bme_linebyline
-
   subroutine Store3BME(this, sps, params)
     class(iThreeBodyScalar), intent(inout) :: this
     type(spo_isospin), intent(in) :: sps
@@ -1002,14 +837,172 @@ contains
     end do
   end subroutine Store3BME
 
-  real(8) function hat(i)
-    integer, intent(in) :: i
-    hat = dsqrt(dble(i + 1))
-  end function hat
+!  subroutine read_3bme_linebyline_txt(sps, params, f)
+!    type(spo_isospin), intent(in) :: sps
+!    type(parameters), intent(in) :: params
+!    character(len=*), intent(in) :: f
+!    integer :: i1, i2, i3, i4, i5, i6
+!    integer :: l1, l2, l3, l4, l5, l6
+!    integer :: j1, j2, j3, j4, j5, j6
+!    integer :: i5max, i6max
+!    integer :: p123, p456
+!    integer :: j12, j45, t12, t45
+!    integer :: j, t
+!    integer :: total_num
+!    integer :: emax, e2max, e3max
+!    integer :: iunit = 20
+!    emax = params%emax_3nf
+!    e2max = params%e2max_3nf
+!    e3max = params%e3max_3nf
+!    open(iunit, file=f, form = 'formatted')
+!    total_num = 0
+!    do i1 = 1, sps%n
+!      l1 = sps%ll(i1); j1 = sps%jj(i1)
+!      if(sps%nshell(i1) > emax) cycle
+!      do i2 = 1, i1
+!        l2 = sps%ll(i2); j2 = sps%jj(i2)
+!        if(sps%nshell(i2) > emax) cycle
+!        if(sps%nshell(i1) + sps%nshell(i2) > e2max) cycle
+!        do i3 = 1, i2
+!          l3 = sps%ll(i3); j3 = sps%jj(i3)
+!          if(sps%nshell(i3) > e3max) cycle
+!          if(sps%nshell(i2) + sps%nshell(i3) > e2max) cycle
+!          if(sps%nshell(i1) + sps%nshell(i3) > e2max) cycle
+!          if(sps%nshell(i1) + sps%nshell(i2) + sps%nshell(i3) > e3max) cycle
+!          p123 = (-1) ** (l1 + l2 + l3)
+!
+!          do i4 = 1, i1
+!            l4 = sps%ll(i4); j4 = sps%jj(i4)
+!            if(sps%nshell(i4) > emax) cycle
+!            if(i1 == i4) then
+!              i5max = i2
+!            else
+!              i5max = i4
+!            end if
+!            do i5 = 1, i5max
+!              l5 = sps%ll(i5); j5 = sps%jj(i5)
+!              if(sps%nshell(i5) > emax) cycle
+!              if(sps%nshell(i4) + sps%nshell(i5) > e2max) cycle
+!              if(i1 == i4 .and. i2 == i5) then
+!                i6max = i3
+!              else
+!                i6max = i5
+!              end if
+!              do i6 = 1, i6max
+!                l6 = sps%ll(i6); j6 = sps%jj(i6)
+!                if(sps%nshell(i6) > emax) cycle
+!                if(sps%nshell(i5) + sps%nshell(i6) > e2max) cycle
+!                if(sps%nshell(i4) + sps%nshell(i6) > e2max) cycle
+!                if(sps%nshell(i4) + sps%nshell(i5) + sps%nshell(i6) > e3max) cycle
+!                p456 = (-1) ** (l4 + l5 +l6)
+!                if(p123 /= p456) cycle
+!
+!                do j12 = iabs(j1 - j2)/2, (j1 + j2)/2
+!                  do j45 = iabs(j4 - j5)/2, (j4 + j5)/2
+!                    do j = max(iabs(2*j12 - j3), iabs(2*j45 - j6)), &
+!                          & min(2*j12 + j3, 2*j45 + j6), 2
+!                      do t12 = 0, 1
+!                        do t45 = 0, 1
+!                          do t = 1, min(2*t12 + 1, 2*t45 + 1), 2
+!                            total_num = total_num + 1
+!                            read(iunit,*) vtemp(total_num)
+!                          end do
+!                        end do
+!                      end do
+!                    end do
+!                  end do
+!                end do
+!              end do
+!            end do
+!          end do
+!        end do
+!      end do
+!    end do
+!    close(iunit)
+!  end subroutine read_3bme_linebyline_txt
+!
+!  subroutine read_3bme_linebyline(sps, params, f)
+!    type(spo_isospin), intent(in) :: sps
+!    type(parameters), intent(in) :: params
+!    character(len=*), intent(in) :: f
+!    integer :: i1, i2, i3, i4, i5, i6
+!    integer :: l1, l2, l3, l4, l5, l6
+!    integer :: j1, j2, j3, j4, j5, j6
+!    integer :: i5max, i6max
+!    integer :: p123, p456
+!    integer :: j12, j45, t12, t45
+!    integer :: j, t
+!    integer :: total_num
+!    integer :: emax, e2max, e3max
+!    integer :: iunit = 20
+!    emax = params%emax_3nf
+!    e2max = params%e2max_3nf
+!    e3max = params%e3max_3nf
+!    open(iunit, file=f, form = 'unformatted')
+!    total_num = 0
+!    do i1 = 1, sps%n
+!      l1 = sps%ll(i1); j1 = sps%jj(i1)
+!      if(sps%nshell(i1) > emax) cycle
+!      do i2 = 1, i1
+!        l2 = sps%ll(i2); j2 = sps%jj(i2)
+!        if(sps%nshell(i2) > emax) cycle
+!        if(sps%nshell(i1) + sps%nshell(i2) > e2max) cycle
+!        do i3 = 1, i2
+!          l3 = sps%ll(i3); j3 = sps%jj(i3)
+!          if(sps%nshell(i3) > e3max) cycle
+!          if(sps%nshell(i2) + sps%nshell(i3) > e2max) cycle
+!          if(sps%nshell(i1) + sps%nshell(i3) > e2max) cycle
+!          if(sps%nshell(i1) + sps%nshell(i2) + sps%nshell(i3) > e3max) cycle
+!          p123 = (-1) ** (l1 + l2 + l3)
+!
+!          do i4 = 1, i1
+!            l4 = sps%ll(i4); j4 = sps%jj(i4)
+!            if(sps%nshell(i4) > emax) cycle
+!            if(i1 == i4) then
+!              i5max = i2
+!            else
+!              i5max = i4
+!            end if
+!            do i5 = 1, i5max
+!              l5 = sps%ll(i5); j5 = sps%jj(i5)
+!              if(sps%nshell(i5) > emax) cycle
+!              if(sps%nshell(i4) + sps%nshell(i5) > e2max) cycle
+!              if(i1 == i4 .and. i2 == i5) then
+!                i6max = i3
+!              else
+!                i6max = i5
+!              end if
+!              do i6 = 1, i6max
+!                l6 = sps%ll(i6); j6 = sps%jj(i6)
+!                if(sps%nshell(i6) > emax) cycle
+!                if(sps%nshell(i5) + sps%nshell(i6) > e2max) cycle
+!                if(sps%nshell(i4) + sps%nshell(i6) > e2max) cycle
+!                if(sps%nshell(i4) + sps%nshell(i5) + sps%nshell(i6) > e3max) cycle
+!                p456 = (-1) ** (l4 + l5 +l6)
+!                if(p123 /= p456) cycle
+!
+!                do j12 = iabs(j1 - j2)/2, (j1 + j2)/2
+!                  do j45 = iabs(j4 - j5)/2, (j4 + j5)/2
+!                    do j = max(iabs(2*j12 - j3), iabs(2*j45 - j6)), &
+!                          & min(2*j12 + j3, 2*j45 + j6), 2
+!                      do t12 = 0, 1
+!                        do t45 = 0, 1
+!                          do t = 1, min(2*t12 + 1, 2*t45 + 1), 2
+!                            total_num = total_num + 1
+!                            read(iunit) vtemp(total_num)
+!                          end do
+!                        end do
+!                      end do
+!                    end do
+!                  end do
+!                end do
+!              end do
+!            end do
+!          end do
+!        end do
+!      end do
+!    end do
+!    close(iunit)
+!  end subroutine read_3bme_linebyline
 
-  logical function triag(i,j,k)
-    implicit none
-    integer,intent(in)::i,j,k
-    triag = ((i-(j+k))*(i-abs(j-k)) > 0)
-  end function triag
 end module read_3BME
