@@ -148,6 +148,7 @@ contains
 #endif
     n = 0
     do nl = 0, emax
+
       do ll = 0, nl
         if(mod(nl - ll, 2) == 1) cycle
         nn = (nl - ll) / 2

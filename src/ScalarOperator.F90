@@ -263,6 +263,7 @@ contains
     type(NBodyScalars) :: two
 
     call this%one%SetOneBodyScalars(params, sps, ms%one, oprtr)
+    !call this%one%SetOneBodyScalars(params, sps, ms%one, 'hamil_ho')
     call this%two%SetTwoBodyScalars(params, sps, ms%two, oprtr, f2)
     if( allocated (ms%thr%jptz)) then
       call this%thr%SetThreeBodyScalars(params, sps, ms%thr, thbme)
@@ -431,6 +432,9 @@ contains
       if(n1 == n2 + 1) e = dsqrt(dble(n1) * (dble(n1 + l) + 0.5d0))
       if(n1 == n2 - 1) e = dsqrt(dble(n2) * (dble(n2 + l) + 0.5d0))
       e = e * (1.d0 - 1.d0 / dble(A)) * 0.5d0 * hw
+    case('Hamil_ho','hamil_ho')
+      if(n1 == n2) e = dble(2 * n1 + l) + 1.5d0
+      e = e * hw
     case('Rm','rm')
       if(n1 == n2) e = (dble(2 * n1 + l) + 1.5d0)
       if(n1 == n2 + 1) e = -dsqrt(dble(n1) * (dble(n1 + l) + 0.5d0))

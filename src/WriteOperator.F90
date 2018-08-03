@@ -123,6 +123,8 @@ contains
     call start_stopwatch(time_io_write)
     open(iunit, file = params%no2bhfile, status = "replace")
     call params%PrtParams(iunit)
+    write(iunit, '(a)') '! n_proton, n_neutron, core_proton, core_neutron'
+    write(iunit, '(a)') '! num, n, l, j, tz'
     write(iunit, '(4i4)') sps%n/2, sps%n/2, 0, 0
     allocate(nnum(sps%n))
     do i = 1, sps%n
@@ -134,12 +136,16 @@ contains
     end do
     deallocate(nnum)
 
+    write(iunit, '(a)') '! Zero-body piece (MeV)'
     write(iunit, '(f15.8)') hamil%zero
     num = 0
     do ich = 1, ms%one%n
       num = num + ms%one%jptz(ich)%n * (ms%one%jptz(ich)%n + 1) / 2
     end do
-    write(iunit, '(2i5, f8.4)') num, 10, params%hw
+    write(iunit, '(a)') '! One-body term'
+    write(iunit, '(a)') '! num, method1, hw'
+    write(iunit, '(a)') '! i, j, <i|f|j>'
+    write(iunit, '(2i5, f8.4)') num, 0, params%hw
     do ich = 1, ms%one%n
       n = ms%one%jptz(ich)%n
       do bra = 1, n

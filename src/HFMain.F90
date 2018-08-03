@@ -67,7 +67,7 @@ program HartreeFockMain
   if(params%thbmefile /= 'None') call thbme%fin(isps)
   if(params%thbmefile /= 'None') call isps%fin()
   open(iunite, file=params%egs, status = 'replace')
-  !call params%PrtParams(iunite)
+  call params%PrtParams(iunite)
   if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1ho, hf_sol%e2ho, hf_sol%e3ho, hf_sol%eho, ' HO'
   if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
 

@@ -94,7 +94,6 @@ contains
                 ket = ms%two%jptz(ich)%labels2n(h1,h2)
                 v = v + dble(2 * j + 1) * hamil%two%jptz(ich)%m(bra,ket) ** 2
               end do
-
               this%e_2 = this%e_2 + v * d * (Del(p1,p2) * Del(h1,h2)) ** 2
 
             end do
