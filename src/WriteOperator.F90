@@ -136,14 +136,14 @@ contains
     end do
     deallocate(nnum)
 
-    write(iunit, '(a)') '! Zero-body piece (MeV)'
+    write(iunit, '(a)') '! Zero-body term (MeV)'
     write(iunit, '(f15.8)') hamil%zero
     num = 0
     do ich = 1, ms%one%n
       num = num + ms%one%jptz(ich)%n * (ms%one%jptz(ich)%n + 1) / 2
     end do
     write(iunit, '(a)') '! One-body term'
-    write(iunit, '(a)') '! num, method1, hw'
+    write(iunit, '(a)') '! num, method1 = 0, hw'
     write(iunit, '(a)') '! i, j, <i|f|j>'
     write(iunit, '(2i5, f8.4)') num, 0, params%hw
     do ich = 1, ms%one%n
@@ -161,7 +161,10 @@ contains
       n = ms%two%jptz(ich)%n
       num = num + n * (n + 1) / 2
     end do
-    write(iunit, '(1i10)') num
+    write(iunit, '(a)') '! Two-body term'
+    write(iunit, '(a)') '! num, method2 = 0, hw'
+    write(iunit, '(a)') '! i, j, k, l, JJ, <ij:JJ|v|kl:JJ>'
+    write(iunit, '(1i10, i5, f8.4)') num, 0, params%hw
     num = 0
     do ich = 1, ms%two%n
       n = ms%two%jptz(ich)%n
