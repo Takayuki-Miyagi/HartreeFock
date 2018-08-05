@@ -558,11 +558,8 @@ contains
 
     if(sys%find(filename, '.txt')) then
       !call read_3bme_linebyline_txt(sps, params, filename)
-      open(iunit, file = filename, status = 'old', form='formatted')
-      !read(iunit, *)  i ! old version
-      do i = 1, num
-        read(iunit, *) vtemp(i)
-      end do
+      open(iunit, file = filename, status = 'old', access = 'stream', form='formatted')
+      read(iunit, *) vtemp
       close(iunit)
     elseif(sys%find(filename, '.bin')) then
       !call read_3bme_linebyline(sps, params, filename)

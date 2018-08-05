@@ -93,7 +93,7 @@ $(TARGET): $(OBJS)
 		mkdir $(INSTLDIR); \
 	fi
 	cp $(TARGET).exe $(INSTLDIR)
-	cp *.py $(INSTLDIR)
+	cp python_scripts/*.py $(INSTLDIR)
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
