@@ -13,7 +13,7 @@ ifeq ($(HOST),other)
 #	FDEP=makedepf90
 	CC=gcc
 	FC=gfortran
-	LDFLAGS=-llapack -lblas
+	LDFLAGS= -llapack -lblas -lgsl
 	OMP = -fopenmp
 	FFLAGS=-O3 -Dsingle_precision
 	CFLAGS=-O3
@@ -128,7 +128,9 @@ clean:
 
 #--------------------------------------------------
 $(OBJDIR)/wallclock.o : $(SRCDIR)/wallclock.c
-$(OBJDIR)/common_library.o : $(SRCDIR)/common_library.f90 $(OBJDIR)/class_sys.o
+$(OBJDIR)/RotationGroup.o : $(SRCDIR)/RotationGroup.c
+#$(OBJDIR)/common_library.o : $(SRCDIR)/common_library.f90 $(OBJDIR)/class_sys.o
+$(OBJDIR)/common_library.o : $(SRCDIR)/common_library.f90 $(OBJDIR)/class_sys.o $(OBJDIR)/RotationGroup.o
 $(OBJDIR)/HFSolver.o : $(SRCDIR)/HFSolver.f90 $(OBJDIR)/Optimizer.o $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/NormalOrdering.o $(OBJDIR)/ScalarOperator.o $(OBJDIR)/Read3BME.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/MPIFunction.o
 $(OBJDIR)/class_sys.o : $(SRCDIR)/class_sys.f90
 $(OBJDIR)/Optimizer.o : $(SRCDIR)/Optimizer.f90 $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o

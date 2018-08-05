@@ -2,8 +2,8 @@ module common_library
   use class_sys, only: sy
   implicit none
   type(sy), private :: sys
-  integer, private, parameter :: n_dbinomial = 200, n_triag = 100
-  real(8), private, allocatable  :: dbinomial(:,:), triangle_c(:,:,:)
+  integer, private, parameter :: n_trinomial = 100
+  real(8), private, allocatable  :: dtrinomial(:,:,:)
   real(8), parameter :: pi = 3.141592741012573d0 ! \pi
   real(8), parameter:: hc = 197.32705d0         ! \hbar c [MeV fm]
   real(8), parameter :: alpha = 137.035999d0     ! electric fine structure constant
@@ -13,17 +13,12 @@ module common_library
   real(8) :: amnucl   ! averaged nucleon mass
 
 contains
-  subroutine set_physics_constant()
+  subroutine set_physics_constant
     amp = 938.27231d0        ! proton mass [MeV] can be changed in LQCD calc.
     amn = 939.56563d0        ! neutron mass [MeV] can be changed in LQCD calc.
     rmass = (amp * amn) / (amp + amn)
     amnucl = (amp + amn) * 0.5d0
   end subroutine set_physics_constant
-
-  real(8) function hat(i)
-    integer, intent(in) :: i
-    hat = dsqrt(dble(i + 1))
-  end function hat
 
   subroutine skip_comment(nfile, comment)
     implicit none
@@ -42,6 +37,11 @@ contains
     Del = 1.d0
     if(i1 == i2) Del = dsqrt(2.d0)
   end function Del
+
+  real(8) function hat(j)
+    integer, intent(in) :: j
+    hat = sqrt(dble(j+1))
+  end function hat
 
   real(8) function red_nab_l(n1, l1, n2, l2) result(nl)
     integer, intent(in) :: n1, l1, n2, l2
@@ -84,37 +84,29 @@ contains
     integer :: n, m, i, j, k, info
     real(8) :: d
 
-    allocate( dbinomial(0:n_dbinomial, 0:n_dbinomial) )
-
-    dbinomial(:,:) = 0.d0
-
-    !$omp parallel do private(n, m) schedule(dynamic)
-    do n = 0, n_dbinomial
-      do m = 0, n
-        dbinomial(n, m) = dbinomial_func(n, m)
-      end do
-    end do
-
-    allocate(triangle_c(0:n_triag, 0:n_triag, 0:n_triag))
-    triangle_c(:,:,:) = 0.d0
-    !$omp parallel do private( i, j, k, d, info ) schedule (dynamic)
-    do k = 0, n_triag
-      do j = 0, n_triag
-        do i = 0, n_triag
-          call triangle(i, j, k, d, info)
-          if (info == 1) then
-            triangle_c(i, j, k) = 0.d0
-            cycle
-          end if
-          triangle_c(i, j, k) = d
+    allocate(dtrinomial(0:n_trinomial, 0:n_trinomial, 0:n_trinomial))
+    dtrinomial(:,:,:) = 0.d0
+    dtrinomial(0,0,0) = 1.d0
+    dtrinomial(1,1,1) = 1.d0
+    do i = 2, n_trinomial
+      m = i - i/2 * 2
+      dtrinomial(i,i,m) = 1.d0
+      dtrinomial(i,m,i) = 1.d0
+      n = m + 2
+      do j = i, n, -2
+        do k = n, j, 2
+          dtrinomial(i, j, k) = dtrinomial(i, j, k-2) / dble(k)
+          dtrinomial(i, k, j) = dtrinomial(i, j, k)
         end do
+        dtrinomial(i, j-2, m) = dtrinomial(i, j, m) * dble(j)
+        dtrinomial(i, m, j-2) = dtrinomial(i, j-2, m)
       end do
     end do
 
   end subroutine init_dbinomial_triangle
 
   subroutine fin_dbinomial_triangle()
-    deallocate(dbinomial, triangle_c)
+    deallocate(dtrinomial)
   end subroutine fin_dbinomial_triangle
 
   !
@@ -131,68 +123,11 @@ contains
     !
     !  dcg(j1, m1, j2, m2, j3, m3)
     !  = ((j1)/2, (m1)/2, (j2)/2, (m2)/2 | (j3)/2, (m3)/2)
-    !
-    !  using the formula by Racah (1942)
-    !
     implicit none
     integer, intent(in) :: j1, j2, j3, m1, m2, m3
-    integer :: js, jm1, jm2, jm3, k1, k2, k3
-    integer :: iz, izmin, izmax, isign
-    double precision :: s
-    double precision :: tmp, delta
+    real(8) :: cg, s
 
-    s = 0.0d0
-    jm1 = j1 - m1
-    jm2 = j2 - m2
-    jm3 = j3 - m3
-
-    ! error and trivial-value check
-    if (abs(m1) > j1 .or. abs(m2) > j2 .or. abs(m3) > j3 .or. &
-        & mod(jm1, 2) /= 0 .or. mod(jm2, 2) /= 0 .or. mod(jm3, 2) /= 0) then
-      write(*,*) 'error [dcg]: invalid j or m'
-      write(*,'(1a, 1i4, 2x, 1a, 1i4)') 'j1 =', j1, 'm1 =', m1
-      write(*,'(1a, 1i4, 2x, 1a, 1i4)') 'j2 =', j2, 'm2 =', m2
-      write(*,'(1a, 1i4, 2x, 1a, 1i4)') 'j3 =', j3, 'm3 =', m3
-      stop
-    end if
-
-    ! call triangle(j1, j2, j3, delta, info)
-    ! if (info == 1) return
-    if (max(j1, j2, j3) > n_triag) stop 'increase n_triag'
-    delta = triangle_c( j1, j2, j3 )
-    if (delta == 0.d0) return
-
-    if (m3 /= m1+m2) return
-
-    jm1 = jm1 / 2
-    jm2 = jm2 / 2
-    jm3 = jm3 / 2
-    js = (j1 + j2 + j3)/2
-    k1 = (j2 + j3 - j1)/2
-    k2 = (j3 + j1 - j2)/2
-    k3 = (j1 + j2 - j3)/2
-
-    if (max(j1, j2, j3) > n_dbinomial) stop 'increase n_dbinomial'
-
-    tmp = sqrt(dbinomial(j1, k2)/dbinomial(j1, jm1)) &
-        & * sqrt(dbinomial(j2, k3)/dbinomial(j2, jm2)) &
-        & * sqrt(dbinomial(j3, k1)/dbinomial(j3, jm3)) &
-        & * sqrt((j3+1.0d0)) * delta
-
-    izmin = max(0, jm1-k2, k3-jm2)
-    izmax = min(k3, jm1, j2-jm2)
-
-    if (izmax > n_dbinomial) stop 'increase n_dbinomial'
-
-    isign = (-1)**izmin
-    do iz = izmin, izmax
-      s = s + isign * dbinomial(k3,iz) * dbinomial(k2,jm1-iz) &
-          & * dbinomial(k1,j2-jm2-iz)
-      isign = isign * (-1)
-    end do
-
-    s = s * tmp
-
+    s = cg(j1, j2, j3, m1, m2, m3)
   end function dcg
 
   function sjs(j1, j2, j3, l1, l2, l3) result(s)
@@ -201,55 +136,11 @@ contains
     !
     !  d6j(j1, j2, j3, l1, l2, l3) = {(j1)/2 (j2)/2 (j3)/2}
     !                                {(l1)/2 (l2)/3 (l3)/2}
-    !
-    !  see I. Talmi, Simple Models of Complex Nuclei, p. 158
-    !
     implicit none
     integer, intent(in) :: j1, j2, j3, l1, l2, l3
-    double precision :: s
-    double precision :: d
-    integer :: izmin, izmax, iz, isign
-    integer :: js, k1, k2, k3, jl1, jl2, jl3
+    real(8) :: s, sixj
 
-    s = 0.0d0
-
-    if (max(j1, j2, j3, l1, l2, l3) > n_triag) stop 'increase n_triag'
-
-    d = triangle_c(j1, j2, j3)
-    if (d == 0.d0) return
-
-    d =    triangle_c(j1, l2, l3) * triangle_c(l1, j2, l3) &
-        * triangle_c(l1, l2, j3) / d
-    if ( d == 0.d0 ) return
-
-    ! call triangle(j1, j2, j3, deltas, infos)
-    ! call triangle(j1, l2, l3, delta1, info1)
-    ! call triangle(l1, j2, l3, delta2, info2)
-    ! call triangle(l1, l2, j3, delta3, info3)
-    ! if (infos == 1 .or. info1 == 1 .or. info2 == 1 .or. info3 == 1) return
-
-    js = (j1 + j2 + j3)/2
-    k1 = (j2 + j3 - j1)/2
-    k2 = (j3 + j1 - j2)/2
-    k3 = (j1 + j2 - j3)/2
-    jl1 = (j1 + l2 + l3)/2
-    jl2 = (l1 + j2 + l3)/2
-    jl3 = (l1 + l2 + j3)/2
-
-    izmin = max(0, js, jl1, jl2, jl3)
-    izmax = min(k1+jl1, k2+jl2, k3+jl3)
-
-    if (izmax+1 > n_dbinomial) stop 'increase n_dbinomial'
-
-    isign = (-1)**izmin
-    do iz = izmin, izmax
-      s = s + isign * dbinomial(iz+1, iz-js) &
-          & * dbinomial(k1, iz-jl1) * dbinomial(k2, iz-jl2) &
-          & * dbinomial(k3, iz-jl3)
-      isign = isign * (-1)
-    end do
-    ! s = s * delta1 * delta2 * delta3 / deltas
-    s = s * d
+    s = sixj(j1, j2, j3, l1, l2, l3)
 
   end function sjs
 
@@ -263,103 +154,68 @@ contains
     !  = {(j21)/2 (j22)/2 (j23)/2}
     !    {(j31)/2 (j32)/2 (j33)/2}
     !
-    !  see I. Talmi, Simple Models of Complex Nuclei, p. 968
-    !
     implicit none
     integer, intent(in) :: j11, j12, j13, j21, j22, j23, j31, j32, j33
-    double precision :: s
-    integer :: k, kmin, kmax
+    real(8) :: s, ninej
 
-    kmin = max(abs(j11-j33), abs(j12-j23), abs(j21-j32))
-    kmax = min(j11+j33, j12+j23, j21+j32)
-
-    s = 0.0d0
-    do k = kmin, kmax, 2
-      s = s + (k+1.0d0) &
-          & * sjs(j11, j12, j13, j23, j33, k) &
-          & * sjs(j21, j22, j23, j12, k, j32) &
-          & * sjs(j31, j32, j33, k, j11, j21)
-    end do
-    s = s * (-1)**kmin
+    s = ninej(j11, j12, j13, j21, j22, j23, j31, j32, j33)
 
   end function snj
 
-  function dbinomial_func(n, m) result(s)
-    !
-    !  binomial coefficient: n_C_m
-    !  s: double precision
-    !
-    integer, intent(in) :: n, m
-    double precision :: s, s1, s2
-    integer :: i, m1
+  function gmosh(nl, ll, nr, lr, n1, l1, n2, l2, lm, d) result(r)
+    real(8) :: r
+    integer, intent(in) :: nl, ll, nr, lr, n1, l1, n2, l2, lm
+    real(8), intent(in) :: d
+    integer :: ee, er, e1, e2, m, ed, eb, ec, ea, ld, lb, lc, la
+    real(8) :: t, s
 
-    s = 1.0d0
-    m1 = min(m, n-m)
-    if (m1 == 0) return
-    if (n > 1000) then
-      write(*,'(1a, 1i6, 1a)') '[dbinomial]: n =', n, ' is too large'
-      stop
-    end if
+    r = 0.d0
+    ee = 2*nl + ll
+    er = 2*nr + lr
+    e1 = 2*n1 + l1
+    e2 = 2*n2 + l2
+    if(ee + er /= e1 + e2) return
+    if(triag(ll, lr, lm)) return
+    if(triag(l1, l2, lm)) return
+    t = dsqrt((d ** (e1 - er)) / ((1.d0 + d) ** (e1 + e2)))
+    m = min(er, e2)
+    s = 1.d0
+    do ed = 0, m
+      eb = er - ed
+      ec = e2 - ed
+      ea = e1 - er + ed
 
-    if (n < 250) then
-      s1 = 1.0d0
-      s2 = 1.0d0
-      do i = 1, m1
-        s1 = s1 * (n-i+1)
-        s2 = s2 * (m1-i+1)
+      do ld = ed, 0, -2
+        do lb = eb, 0, -2
+          if(triag(ld,lb,lr)) cycle
+          do lc = ec, 0, -2
+            if(triag(ld,lc,l2)) cycle
+            do la = ea, 0, -2
+              if(triag(la,lb,l1)) cycle
+              if(triag(la,ll,lc)) cycle
+
+              r = r + s * t * &
+                  & snj(2*la, 2*lb, 2*l1, 2*lc, 2*ld, 2*l2, 2*ll, 2*lr, 2*lm) * &
+                  & g(e1, l1, ea, la, eb, lb) * g(e2, l2, ec, lc, ed, ld) * &
+                  & g(ee, ll, ea, la, ec, lc) * g(er, lr, eb, lb, ed, ld)
+
+            end do
+          end do
+        end do
       end do
-      s = s1 / s2
-    else
-      do i = 1, m1
-        s = (s * (n-i+1)) / (m1-i+1)
-      end do
-    endif
+      s = s * (-d)
+    end do
+    r = r * (-1.d0) ** (n1 + n2 + nr + nl)
+  contains
+    function g(e1, l1, ea, la, eb, lb) result(r)
+      real(8) :: r
+      integer, intent(in) :: e1, l1, ea, la, eb, lb
 
-  end function dbinomial_func
+      r = dcg(2*la, 0, 2*lb, 0, 2*l1, 0) * dsqrt((2*la + 1) * (2*lb + 1) * &
+          & dtrinomial(e1 - l1, ea - la, eb - lb) * &
+          & dtrinomial(e1 + l1 + 1, ea + la + 1, eb + lb + 1))
 
-  subroutine triangle(j1, j2, j3, delta, info)
-    !
-    !  triangle often used in calculation of 3j, 6j etc.
-    !  delta
-    !  = sqrt(((j1+j2-j3)/2)!((j1-j2+j3)/2)!((-j1+j2+j3)/2)!/(1+(j1+j2+j3)/2)!)
-    !
-    implicit none
-    integer, intent(in) :: j1, j2, j3
-    double precision, intent(out) :: delta
-    integer, intent(out) :: info
-    integer :: js, k1, k2, k3
-
-    info = 0
-    js = j1 + j2 + j3
-    k1 = j2 + j3 - j1
-    k2 = j3 + j1 - j2
-    k3 = j1 + j2 - j3
-
-    if (j1 < 0 .or. j2 < 0 .or. j3 < 0) then
-      write(*,*) 'error [triangle]: invalid j'
-      write(*,'(1a, 1i4, 2x, 1a, 1i4, 2x, 1a, 1i4)') &
-          & 'j1 =', j1, 'j2 =', j2, 'j3 =', j3
-      stop
-    end if
-    if (k1 < 0 .or. k2 < 0 .or. k3 <0 .or. mod(js, 2) /=0) then
-      info = 1
-      return
-    endif
-
-    ! exclude too large arguments to prevent from round-off error
-    if (js > 300) then
-      write(*,'(1a, 1i5, 1a)') '[triangle]: j1+j2+j3 =', js, ' is too large'
-      stop
-    end if
-
-    js = js / 2
-    k1 = k1 / 2
-
-    if (js > n_dbinomial) stop 'increase n_dbinomial'
-
-    delta = 1.0d0 / &
-        & (sqrt(dbinomial(js, j3)) * sqrt(dbinomial(j3, k1)) * sqrt(js+1.0d0))
-
-  end subroutine triangle
+    end function g
+  end function gmosh
 
 end module common_library
