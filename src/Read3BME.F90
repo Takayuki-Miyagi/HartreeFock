@@ -88,6 +88,7 @@ contains
     deallocate(this%p)
     deallocate(this%t)
     deallocate(this%jpt2n)
+    deallocate(this%jpt)
   end subroutine FiniThreeBodyScalar
 
   subroutine InitiThreeBodySpace(this, sps, params)
