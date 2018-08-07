@@ -149,7 +149,7 @@ contains
     do ich = 1, ms%one%n
       n = ms%one%jptz(ich)%n
       do bra = 1, n
-        do ket = 1, n
+        do ket = 1, bra
           write(iunit, '(2i4, f15.8)') ms%one%jptz(ich)%n2label(bra), &
               & ms%one%jptz(ich)%n2label(ket), hamil%one%jptz(ich)%m(bra,ket)
         end do
