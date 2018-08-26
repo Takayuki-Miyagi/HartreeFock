@@ -18,7 +18,7 @@ module ScalarOperator
       & two_body_element, r_dot_r, red_r_j, p_dot_p, red_nab_j, &
       & OneBodyScalarEmbedded3, OneBodyScalarEmbedded2, &
       & TwoBodyScalarEmbedded3, TransOrthoNormalThree, &
-      & get_element_twobody, get_Uelement_twobody
+      & get_element_twobody, get_Uelement_twobody, read_2bme_nv_txt
   public :: assignment(=), operator(+), operator(-), &
       & operator(*), operator(/), NBodyScalars, ScalarOperators, &
       & ScalarEmbedded, UEmbedded
@@ -263,7 +263,7 @@ contains
     type(NBodyScalars) :: two
 
     call this%one%SetOneBodyScalars(params, sps, ms%one, oprtr)
-    !call this%one%SetOneBodyScalars(params, sps, ms%one, 'hamil_ho')
+    !call this%one%SetOneBodyScalars(params, sps, ms%one, 'hamil_ho') s.p.h.o. hamiltonian
     call this%two%SetTwoBodyScalars(params, sps, ms%two, oprtr, f2)
     if( allocated (ms%thr%jptz)) then
       call this%thr%SetThreeBodyScalars(params, sps, ms%thr, thbme)
@@ -351,6 +351,13 @@ contains
       call read_2bme_snt_txt(f2, sps, two, this)
     elseif(sys%find(f2, '.bin') .and. sys%find(f2, '.snt')) then
       call read_2bme_snt_bin(f2, sps, two, this)
+    elseif(sys%find(f2, '.txt') .and. sys%find(f2, '.nv')) then
+      !call read_2bme_nv_txt_(f2, params, sps, two, this)
+      call read_2bme_nv_txt(f2, params, sps, two, this)
+    elseif(f2 == 'None' .or. f2 == 'none') then
+
+    else ! default
+      call read_2bme_pn_txt(f2, params, sps, two, this)
     end if
   end subroutine SetTwoBodyScalars
 
@@ -1293,6 +1300,15 @@ contains
       tbme%jptz(ich)%m(ket, bra) = v2 *dble(phase)
     end do
     close(iunit)
+
+    ! ---- print 2bme for check
+#ifdef debug
+    do ich = 1, two%n
+      call tbme%jptz(ich)%prt()
+      write(*,*)
+    end do
+#endif
+    ! ------------
   end subroutine read_2bme_snt_txt
 
   subroutine read_2bme_snt_bin(f2, sps, two, tbme)
@@ -1371,5 +1387,418 @@ contains
     deallocate(aa, bb, cc, dd, jj)
     deallocate(vsave)
   end subroutine read_2bme_snt_bin
+
+  subroutine read_2bme_nv_txt(f2, params, sps, two, tbme)
+    use common_library, only: skip_comment
+    type(NBodyScalars), intent(inout) :: tbme
+    type(parameters), intent(in) :: params
+    type(spo_pn), intent(in) :: sps
+    type(TwoBodySpace), intent(in) :: two
+    character(*), intent(in) :: f2
+
+    integer :: iunit = 19
+    integer :: ia, ib, ic, id
+    integer :: iza, izb, izc, izd
+    integer :: it, ij, numpot, num
+    integer :: ichpp, ichpn, ichnn
+    integer :: brapp, ketpp, brapn, ketpn, brann, ketnn
+    integer :: ip, phasepp, phasenn, phasepn_bra, phasepn_ket, phasepn
+    integer :: idummy1, idummy2
+    real(8) :: dummy1, dummy2, vtemp
+    real(8) :: trel, hrel, vcoul, vpn, vpp, vnn, dnorm
+    integer :: a, b, c, d
+
+    open(iunit, file = f2, status = "old")
+    read(iunit, *) numpot, idummy1, idummy2, dummy1, dummy2
+    do num = 1, numpot
+      read(iunit, *) ia, ib, ic, id, ij, it, trel, hrel, vcoul, vpn, vpp, vnn
+      if(2*ia > sps%n) cycle
+      if(2*ib > sps%n) cycle
+      if(2*ic > sps%n) cycle
+      if(2*id > sps%n) cycle
+      if(sps%nshell(2*ia) + sps%nshell(2*ib) > params%e2max) cycle
+      if(sps%nshell(2*ic) + sps%nshell(2*id) > params%e2max) cycle
+
+      ip = (-1) ** (sps%ll(2*ia) + sps%ll(2*ib))
+      ichpn = two%jptz2n(ij, ip, 0)
+      dnorm = 1.d0
+      if(ia == ib) dnorm = dnorm * dsqrt(2.d0)
+      if(ic == id) dnorm = dnorm * dsqrt(2.d0)
+      vtemp = vpn * dnorm * 0.5d0
+      phasepn_bra = (-1) ** ((sps%jj(2*ia) + sps%jj(2*ib)) / 2 + ij + it)
+      phasepn_ket = (-1) ** ((sps%jj(2*ic) + sps%jj(2*id)) / 2 + ij + it)
+
+      brapn = two%jptz(ichpn)%labels2n(2*ia-1,2*ib)
+      ketpn = two%jptz(ichpn)%labels2n(2*ic-1,2*id)
+      phasepn = two%jptz(ichpn)%iphase(2*ia-1,2*ib) * &
+          &     two%jptz(ichpn)%iphase(2*ic-1,2*id)
+      tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+      tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+
+      if(ia /= ib) then
+        brapn = two%jptz(ichpn)%labels2n(2*ib-1,2*ia)
+        ketpn = two%jptz(ichpn)%labels2n(2*ic-1,2*id)
+        phasepn = phasepn_bra * &
+            &     two%jptz(ichpn)%iphase(2*ib-1,2*ia) * &
+            &     two%jptz(ichpn)%iphase(2*ic-1,2*id)
+        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+      end if
+
+      if(ic /= id .and. (ia /= ic .or. ib /= id)) then
+        brapn = two%jptz(ichpn)%labels2n(2*ia-1,2*ib)
+        ketpn = two%jptz(ichpn)%labels2n(2*id-1,2*ic)
+        phasepn = phasepn_ket * &
+            &     two%jptz(ichpn)%iphase(2*ia-1,2*ib) * &
+            &     two%jptz(ichpn)%iphase(2*id-1,2*ic)
+        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+      end if
+
+      if(ia /= ib .and. ic /= id) then
+        brapn = two%jptz(ichpn)%labels2n(2*ib-1,2*ia)
+        ketpn = two%jptz(ichpn)%labels2n(2*id-1,2*ic)
+        phasepn = phasepn_bra * phasepn_ket * &
+            &     two%jptz(ichpn)%iphase(2*ib-1,2*ia) * &
+            &     two%jptz(ichpn)%iphase(2*id-1,2*ic)
+        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+      end if
+
+      ichpp = two%jptz2n(ij, ip,-1)
+      if(ichpp /= 0) then
+        brapp = two%jptz(ichpp)%labels2n(2*ia-1, 2*ib-1)
+        ketpp = two%jptz(ichpp)%labels2n(2*ic-1, 2*id-1)
+        phasepp = two%jptz(ichpp)%iphase(2*ia-1, 2*ib-1) * &
+            &     two%jptz(ichpp)%iphase(2*ic-1, 2*id-1)
+        if(brapp * ketpp /= 0) then
+          tbme%jptz(ichpp)%m(brapp, ketpp) = tbme%jptz(ichpp)%m(brapp, ketpp) + &
+              &   vpp * dble(phasepp)
+          tbme%jptz(ichpp)%m(ketpp, brapp) = tbme%jptz(ichpp)%m(brapp, ketpp)
+        end if
+      end if
+
+      ichnn = two%jptz2n(ij, ip, 1)
+      if(ichnn /= 0) then
+        brann = two%jptz(ichnn)%labels2n(2*ia, 2*ib)
+        ketnn = two%jptz(ichnn)%labels2n(2*ic, 2*id)
+        phasenn = two%jptz(ichnn)%iphase(2*ia, 2*ib) * &
+            &     two%jptz(ichnn)%iphase(2*ic, 2*id)
+        if(brann * ketnn /= 0) then
+          tbme%jptz(ichnn)%m(brann, ketnn) = tbme%jptz(ichnn)%m(brann, ketnn) + &
+              &   vnn * dble(phasenn)
+          tbme%jptz(ichnn)%m(ketnn, brann) = tbme%jptz(ichnn)%m(brann, ketnn)
+        end if
+      end if
+
+    end do
+    close(iunit)
+    ! ---- print 2bme for check
+#ifdef debug
+    do ichpp = 1, two%n
+      write(*,*) two%j(ichpp), two%p(ichpp), two%tz(ichpp)
+      call tbme%jptz(ichpp)%prt()
+    end do
+#endif
+    ! ------------
+  end subroutine read_2bme_nv_txt
+
+  subroutine read_2bme_nv_txt_(f2, params, sps, two, tbme)
+    use common_library, only: skip_comment
+    use ModelSpace, only: spo_isospin
+    type(NBodyScalars), intent(inout) :: tbme
+    type(parameters), intent(in) :: params
+    type(spo_pn), intent(in) :: sps
+    type(TwoBodySpace), intent(in) :: two
+    character(*), intent(in) :: f2
+    integer :: iunit = 19
+    integer :: ia, ib, ic, id
+    integer :: a, b, c, d
+    integer :: iza, izb, izc, izd
+    integer :: ich, n, bra, ket, phase
+    integer :: it, ij, numpot, num
+    integer :: ichpp, ichpn, ichnn
+    integer :: brapp, ketpp, brapn, ketpn, brann, ketnn
+    integer :: ip, phasepp, phasenn, phasepn_bra, phasepn_ket, phasepn
+    integer :: ichpn0, ichpn1, brapn0, ketpn0, brapn1, ketpn1
+    integer :: phasepn0, phasepn1
+    integer :: idummy1, idummy2
+    real(8) :: dummy1, dummy2, vtemp
+    real(8) :: trel, hrel, vcoul, vpn, vpp, vnn, dnorm
+    type(spo_isospin) :: sp_
+
+    type :: TwoBodyChan_
+      integer :: n
+      integer, allocatable :: n2label1(:), n2label2(:)
+      integer, allocatable :: labels2n(:,:)
+      integer, allocatable :: iphase(:,:)
+      real(8), allocatable :: v(:,:)
+    end type TwoBodyChan_
+
+    type :: TwoBodySpace_
+      integer :: n
+      integer, allocatable :: j(:), p(:), t(:)
+      integer, allocatable :: jpt2n(:,:,:)
+      type(TwoBodyChan_), allocatable :: jpt(:)
+    end type TwoBodySpace_
+
+    type(TwoBodySpace_) :: vpp_temp, vnn_temp, vpn_temp
+
+    call sp_%init(params%emax)
+    call init_two_body_space(params, vpp_temp)
+    call init_two_body_space(params, vnn_temp)
+    call init_two_body_space(params, vpn_temp)
+
+    open(iunit, file = f2, status = "old")
+    read(iunit, *) numpot, idummy1, idummy2, dummy1, dummy2
+    do num = 1, numpot
+      read(iunit, *) ia, ib, ic, id, ij, it, trel, hrel, vcoul, vpn, vpp, vnn
+      if(ia > sp_%n) cycle
+      if(ib > sp_%n) cycle
+      if(ic > sp_%n) cycle
+      if(id > sp_%n) cycle
+      if(sp_%nshell(ia) + sp_%nshell(ib) > params%e2max) cycle
+      if(sp_%nshell(ic) + sp_%nshell(id) > params%e2max) cycle
+
+      dnorm = 0.5d0
+      if(ia == ib) dnorm = dnorm * dsqrt(2.d0)
+      if(ic == id) dnorm = dnorm * dsqrt(2.d0)
+      ip = (-1) ** (sp_%ll(ia) + sp_%ll(ib))
+      ich = vpp_temp%jpt2n(ij, ip, it)
+      bra = vpp_temp%jpt(ich)%labels2n(ia,ib)
+      ket = vpp_temp%jpt(ich)%labels2n(ic,id)
+      phase = vpp_temp%jpt(ich)%iphase(ia,ib) * &
+          &   vpp_temp%jpt(ich)%iphase(ic,id)
+      vpp_temp%jpt(ich)%v(bra, ket) = vpp * dble(phase)
+      vpp_temp%jpt(ich)%v(ket, bra) = vpp * dble(phase)
+
+      vnn_temp%jpt(ich)%v(bra, ket) = vnn * dble(phase)
+      vnn_temp%jpt(ich)%v(ket, bra) = vnn * dble(phase)
+
+      vpn_temp%jpt(ich)%v(bra, ket) = vpn * dble(phase) * dnorm
+      vpn_temp%jpt(ich)%v(ket, bra) = vpn * dble(phase) * dnorm
+
+    end do
+    close(iunit)
+
+    do ich = 1, two%n
+      n = two%jptz(ich)%n
+      ij = two%j(ich)
+      ip = two%p(ich)
+      select case(two%tz(ich))
+      case(-1) ! pp
+        ichpp = vpp_temp%jpt2n(ij,ip,1)
+        do bra = 1, n
+          a = two%jptz(ich)%n2label1(bra)
+          b = two%jptz(ich)%n2label2(bra)
+          ia = (a + 1) / 2
+          ib = (b + 1) / 2
+          do ket = 1, bra
+            c = two%jptz(ich)%n2label1(ket)
+            d = two%jptz(ich)%n2label2(ket)
+            ic = (c + 1) / 2
+            id = (d + 1) / 2
+            brapp = vpp_temp%jpt(ichpp)%labels2n(ia,ib)
+            ketpp = vpp_temp%jpt(ichpp)%labels2n(ic,id)
+            tbme%jptz(ich)%m(bra,ket) = vpp_temp%jpt(ichpp)%v(brapp, ketpp)
+            tbme%jptz(ich)%m(ket, bra) = tbme%jptz(ich)%m(bra,ket)
+
+          end do
+        end do
+      case( 1) ! nn
+        ichnn = vnn_temp%jpt2n(ij,ip,1)
+        do bra = 1, n
+          a = two%jptz(ich)%n2label1(bra)
+          b = two%jptz(ich)%n2label2(bra)
+          ia = a / 2
+          ib = b / 2
+          do ket = 1, bra
+            c = two%jptz(ich)%n2label1(ket)
+            d = two%jptz(ich)%n2label2(ket)
+            ic = c / 2
+            id = d / 2
+            brann = vnn_temp%jpt(ichnn)%labels2n(ia,ib)
+            ketnn = vnn_temp%jpt(ichnn)%labels2n(ic,id)
+            tbme%jptz(ich)%m(bra,ket) = vnn_temp%jpt(ichnn)%v(brann, ketnn)
+            tbme%jptz(ich)%m(ket, bra) = tbme%jptz(ich)%m(bra,ket)
+
+          end do
+        end do
+
+      case( 0) ! pn
+        ichpn0 = vnn_temp%jpt2n(ij,ip,0)
+        ichpn1 = vnn_temp%jpt2n(ij,ip,1)
+        do bra = 1, n
+          a = two%jptz(ich)%n2label1(bra)
+          b = two%jptz(ich)%n2label2(bra)
+          iza = sps%itz(a)
+          izb = sps%itz(b)
+          ia = (a + (1 - iza)/2) / 2
+          ib = (b + (1 - izb)/2) / 2
+          do ket = 1, bra
+            c = two%jptz(ich)%n2label1(ket)
+            d = two%jptz(ich)%n2label2(ket)
+            izc = sps%itz(c)
+            izd = sps%itz(d)
+            ic = (c + (1 - izc)/2) / 2
+            id = (d + (1 - izd)/2) / 2
+
+            if(ichpn0 /= 0) then
+              brapn0 = vpn_temp%jpt(ichpn0)%labels2n(ia,ib)
+              ketpn0 = vpn_temp%jpt(ichpn0)%labels2n(ic,id)
+              phase = 1
+              if(iza == 1 .and. izb == -1) phase = phase * (-1)
+              if(izc == 1 .and. izd == -1) phase = phase * (-1)
+              if(brapn0 * ketpn0 > 0) then
+                tbme%jptz(ich)%m(bra,ket) = vpn_temp%jpt(ichpn0)%v(brapn0, ketpn0) * dble(phase)
+              end if
+            end if
+
+            if(ichpn1 /= 0) then
+              brapn1 = vpn_temp%jpt(ichpn1)%labels2n(ia,ib)
+              ketpn1 = vpn_temp%jpt(ichpn1)%labels2n(ic,id)
+              if(brapn1 * ketpn1 > 0) then
+                tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + vpn_temp%jpt(ichpn1)%v(brapn1, ketpn1)
+              end if
+            end if
+
+            tbme%jptz(ich)%m(ket, bra) = tbme%jptz(ich)%m(bra, ket)
+          end do
+        end do
+      end select
+    end do
+
+    ! ---- print 2bme for check
+#ifdef debug
+    do ichpp = 1, two%n
+      write(*,*) two%j(ichpp), two%p(ichpp), two%tz(ichpp)
+      call tbme%jptz(ichpp)%prt()
+    end do
+#endif
+    ! ------------
+    call fin_two_body_space(vpp_temp)
+    call fin_two_body_space(vnn_temp)
+    call fin_two_body_space(vpn_temp)
+    contains
+      subroutine init_two_body_space(params, this)
+        use common_library, only: triag
+        type(parameters), intent(in) :: params
+        type(TwoBodySpace_), intent(inout) :: this
+        integer :: e2max, ich, n, i1, i2
+        integer :: j1, l1, j2, l2
+        integer :: j, p, t, loop
+        e2max = params%e2max
+        do loop = 1, 2
+          ich = 0
+          do j = 0, e2max + 1
+            do p = 1, -1, -2
+              do t = 0, 1
+                n = 0
+                do i1 = 1, sp_%n
+                  j1 = sp_%jj(i1)
+                  l1 = sp_%ll(i1)
+
+                  do i2 = 1, i1
+                    j2 = sp_%jj(i2)
+                    l2 = sp_%ll(i2)
+                    if(sp_%nshell(i1) + sp_%nshell(i2) > e2max) cycle
+                    if(triag(j1, j2, 2*j)) cycle
+                    if((-1) ** (l1 + l2) /= p) cycle
+                    if(i1 == i2 .and. mod(j+t, 2) == 0) cycle
+                    n = n + 1
+                  end do
+                end do
+                if(n /= 0) ich = ich + 1
+                if(loop == 2 .and. n /= 0) then
+                  this%j(ich) = j
+                  this%p(ich) = p
+                  this%t(ich) = t
+                  this%jpt(ich)%n = n
+                  this%jpt2n(j, p, t) = ich
+                end if
+              end do
+            end do
+          end do
+          if(loop == 1) then
+            this%n = ich
+            allocate(this%jpt(ich))
+            allocate(this%j(ich))
+            allocate(this%p(ich))
+            allocate(this%t(ich))
+            allocate(this%jpt2n(0:e2max+1,-1:1,-1:1))
+            this%j(:) = 0
+            this%p(:) = 0
+            this%t(:) = 0
+            this%jpt2n(:,:,:) = 0
+          end if
+        end do
+
+        do ich = 1, this%n
+          j = this%j(ich)
+          p = this%p(ich)
+          t = this%t(ich)
+          call init_two_body_chan(params, j, p, t, this%jpt(ich))
+        end do
+
+      end subroutine init_two_body_space
+
+      subroutine fin_two_body_space(this)
+        type(TwoBodySpace_), intent(inout) :: this
+        integer :: ich
+        do ich = 1, this%n
+          deallocate(this%jpt(ich)%n2label1)
+          deallocate(this%jpt(ich)%n2label2)
+          deallocate(this%jpt(ich)%labels2n)
+          deallocate(this%jpt(ich)%iphase)
+          deallocate(this%jpt(ich)%v)
+        end do
+        deallocate(this%jpt)
+        deallocate(this%j)
+        deallocate(this%p)
+        deallocate(this%t)
+        deallocate(this%jpt2n)
+      end subroutine fin_two_body_space
+
+      subroutine init_two_body_chan(params, j, p, t, this)
+        use common_library, only: triag
+        type(parameters), intent(in) :: params
+        integer, intent(in) :: j, p, t
+        type(TwoBodyChan_), intent(inout) :: this
+        integer :: n, m, i1, i2
+        integer :: j1, l1, j2, l2
+        n = this%n
+        m = sp_%n
+        allocate(this%n2label1(n))
+        allocate(this%n2label2(n))
+        allocate(this%labels2n(m,m))
+        allocate(this%iphase(m,m))
+        allocate(this%v(n,n))
+        this%n2label1 = 0
+        this%n2label2 = 0
+        this%labels2n = 0
+        this%iphase = 0
+        this%v = 0.d0
+        n = 0
+        do i1 = 1, m
+          j1 = sp_%jj(i1)
+          l1 = sp_%ll(i1)
+          do i2 = 1, i1
+            j2 = sp_%jj(i2)
+            l2 = sp_%ll(i2)
+            if(sp_%nshell(i1) + sp_%nshell(i2) > params%e2max) cycle
+            if(triag(j1, j2, 2*j)) cycle
+            if((-1) ** (l1 + l2) /= p) cycle
+            if(i1 == i2 .and. mod(j+t, 2) == 0) cycle
+            n = n + 1
+            this%n2label1(n) = i1
+            this%n2label2(n) = i2
+            this%labels2n(i1,i2) = n
+            this%labels2n(i2,i1) = n
+            this%iphase(i1,i2) = 1
+            this%iphase(i2,i1) = (-1) ** ((j1 + j2) / 2 - t - j)
+          end do
+        end do
+      end subroutine init_two_body_chan
+    end subroutine read_2bme_nv_txt_
 
 end module ScalarOperator

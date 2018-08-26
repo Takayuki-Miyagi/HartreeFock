@@ -49,7 +49,7 @@ program HartreeFockMain
 
   call start_stopwatch(time_set_hamil)
   ! Three-Body Force
-  if(params%thbmefile /= 'None') call isps%init(params)
+  if(params%thbmefile /= 'None') call isps%init(params%emax_3nf)
   if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
   ! Hamiltonian
   call hamil%init(ms)
@@ -102,7 +102,7 @@ program HartreeFockMain
   call scalar%fin()
 
   ! --- three-body operator
-  if(params%scfile3 /= 'None') call isps%init(params)
+  if(params%scfile3 /= 'None') call isps%init(params%emax_3nf)
   if(params%scfile3 /= 'None') call thbme%init(isps, params, params%scfile3)
   call scalar%init(ms)
   call scalar%set(params, sps, ms, 'rm', f2 = params%scfile2, thbme = thbme)

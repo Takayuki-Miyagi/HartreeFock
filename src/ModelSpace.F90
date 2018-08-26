@@ -125,11 +125,10 @@ module ModelSpace
   end type iter3
 
 contains
-  subroutine InitSPOIsospin(this, params)
+  subroutine InitSPOIsospin(this, emax)
     class(spo_isospin), intent(inout) :: this
-    type(parameters), intent(in) :: params
-    integer :: emax, n, nl, nn, ll, is, j
-    emax = params%emax_3nf
+    integer, intent(in) :: emax
+    integer :: n, nl, nn, ll, is, j
     allocate(this%spo2n(0:emax/2, 0:emax, 1:2*emax+1))
     this%spo2n = 0
     this%n = (emax + 1) * (emax + 2) / 2
@@ -403,6 +402,7 @@ contains
     deallocate(this%tz)
     deallocate(this%jptz2n)
     deallocate(this%label2jptz)
+    deallocate(this%ndim)
   end subroutine FinOneBodySpace
 
   subroutine InitOneBodyChannel(this, j, p, tz, sps)
@@ -517,6 +517,7 @@ contains
     deallocate(this%p)
     deallocate(this%tz)
     deallocate(this%jptz2n)
+    deallocate(this%ndim)
   end subroutine FinTwoBodySpace
 
   subroutine InitTwoBodyChannel(this, params, sps, j, p, tz)
@@ -667,10 +668,12 @@ contains
     do ich = 1, this%n
       call this%jptz(ich)%fin()
     end do
+    deallocate(this%jptz)
     deallocate(this%jptz2n)
     deallocate(this%j)
     deallocate(this%p)
     deallocate(this%tz)
+    deallocate(this%ndim)
   end subroutine FinThreeBodySpace
 
   subroutine InitThreeBodyChannel(this, sps, params, j, p, tz)

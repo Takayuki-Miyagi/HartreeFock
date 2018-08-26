@@ -9,7 +9,7 @@ module WriteOperator
   use ScalarOperator
   implicit none
   type(sy) :: sys
-  private :: write_snt_bin, write_snt_txt
+  private :: write_snt_bin, write_snt_txt, write_kshell_txt
   public :: write_hamil
 contains
   subroutine write_hamil(params, sps, ms, hamil)
@@ -19,6 +19,7 @@ contains
     type(ScalarOperators), intent(in) :: hamil
     if(sys%find(params%no2bhfile, '.bin')) call write_snt_bin(params, sps, ms, hamil)
     if(sys%find(params%no2bhfile, '.txt')) call write_snt_txt(params, sps, ms, hamil)
+    if(sys%find(params%no2bhfile, '.ksh')) call write_kshell_txt(params, sps, ms, hamil)
   end subroutine write_hamil
 
   subroutine write_snt_bin(params, sps, ms, hamil)
@@ -184,4 +185,100 @@ contains
     call stop_stopwatch(time_io_write)
 
   end subroutine write_snt_txt
+
+  subroutine write_kshell_txt(params, sps, ms, hamil)
+    type(parameters), intent(in) :: params
+    type(spo_pn), intent(in) :: sps
+    type(MSpace), intent(in) :: ms
+    type(ScalarOperators), intent(in) :: hamil
+    integer :: iunit = 19
+    integer :: i, num, tz, j
+    integer :: ich
+    integer :: n
+    integer :: bra, ket
+    integer, allocatable :: nnum(:)
+    integer, allocatable :: n2kshl(:), kshl2n(:)
+
+    allocate(n2kshl(sps%n))
+    allocate(kshl2n(sps%n))
+
+    n = 0
+    do tz = -1, 1, 2
+      do i = 1, sps%n
+        if(sps%itz(i) /= tz) cycle
+        n = n + 1
+        n2kshl(i) = n
+        kshl2n(n) = i
+      end do
+    end do
+
+    call start_stopwatch(time_io_write)
+    open(iunit, file = params%no2bhfile, status = "replace")
+    call params%PrtParams(iunit)
+    write(iunit, '(a)') '! n_proton, n_neutron, core_proton, core_neutron'
+    write(iunit, '(a)') '! num, n, l, j, tz'
+    write(iunit, '(4i4)') sps%n/2, sps%n/2, 0, 0
+    allocate(nnum(sps%n))
+    do i = 1, sps%n
+      nnum(i) = i
+    end do
+    do i = 1, sps%n
+      j = kshl2n(i)
+      write(iunit, '(5i4)') nnum(i), sps%nn(j), sps%ll(j), &
+          & sps%jj(j), sps%itz(j)
+    end do
+    deallocate(nnum)
+
+    write(iunit, '(a)') '! Zero-body term (MeV)'
+    write(iunit, '(a, f15.8)') '! ', hamil%zero
+    num = 0
+    do ich = 1, ms%one%n
+      num = num + ms%one%jptz(ich)%n * (ms%one%jptz(ich)%n + 1) / 2
+    end do
+    write(iunit, '(a)') '! One-body term'
+    write(iunit, '(a)') '! num, method1 = 0, hw'
+    write(iunit, '(a)') '! i, j, <i|f|j>'
+    write(iunit, '(2i5, f8.4)') num, 0, params%hw
+    do ich = 1, ms%one%n
+      n = ms%one%jptz(ich)%n
+      do bra = 1, n
+        do ket = 1, bra
+          write(iunit, '(2i4, f15.8)') n2kshl(ms%one%jptz(ich)%n2label(bra)), &
+              & n2kshl(ms%one%jptz(ich)%n2label(ket)), hamil%one%jptz(ich)%m(bra,ket)
+        end do
+      end do
+    end do
+
+    num = 0
+    do ich = 1, ms%two%n
+      n = ms%two%jptz(ich)%n
+      num = num + n * (n + 1) / 2
+    end do
+    write(iunit, '(a)') '! Two-body term'
+    write(iunit, '(a)') '! num, method2 = 0, hw'
+    write(iunit, '(a)') '! i, j, k, l, JJ, <ij:JJ|v|kl:JJ>'
+    write(iunit, '(1i10, i5, f8.4)') num, 0, params%hw
+    num = 0
+    do ich = 1, ms%two%n
+      n = ms%two%jptz(ich)%n
+      do bra = 1, n
+        do ket = 1, bra
+          num = num + 1
+          write(iunit, '(5i4, f15.8)') &
+              & n2kshl(ms%two%jptz(ich)%n2label1(bra)), &
+              & n2kshl(ms%two%jptz(ich)%n2label2(bra)), &
+              & n2kshl(ms%two%jptz(ich)%n2label1(ket)), &
+              & n2kshl(ms%two%jptz(ich)%n2label2(ket)), &
+              & ms%two%j(ich), &
+              & hamil%two%jptz(ich)%m(bra,ket)
+        end do
+      end do
+    end do
+    close(iunit)
+    call stop_stopwatch(time_io_write)
+
+    deallocate(n2kshl)
+    deallocate(kshl2n)
+
+  end subroutine write_kshell_txt
 end module WriteOperator
