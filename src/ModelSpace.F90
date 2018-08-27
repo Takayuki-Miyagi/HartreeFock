@@ -260,6 +260,7 @@ contains
     open(iunit, file = params%reference, status = 'old')
     read(iunit,*) num
     if(num < 1) return
+    if(num > this%n) stop 'enlarge emax'
     call skip_comment(iunit, '!')
     do i = 1, num
       read(iunit,*) n, l, j, itz
@@ -288,6 +289,7 @@ contains
     open(iunit, file = params%nocoef, status = 'old')
     read(iunit,*) num
     if(num < 1) return
+    if(num > this%n) stop 'enlarge emax'
     call skip_comment(iunit, '!')
     do i = 1, num
       read(iunit,*) n, l, j, itz, f
