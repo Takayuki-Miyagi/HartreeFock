@@ -26,7 +26,7 @@ ifeq ($(HOST),apt)
 #	FDEP=
 	CC=gcc
 	FC=ifort
-	LDFLAGS=-mkl
+	LDFLAGS=-mkl -lgsl
 	OMP = -openmp
 	FFLAGS=-O3 -no-ipo -static -Dsingle_precision
 	CFLAGS=-O3
