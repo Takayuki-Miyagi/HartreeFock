@@ -49,9 +49,9 @@ HFloop = True
 thbme = False
 if(thbmefile != 'None'): thbme = True
 sv_hf_rslt = True
-vac = 'ref'
+vac = 'ref' # vacuum / ref
 MBPT = True
-fmt_hf_snt = 'txt'
+fmt_hf_snt = 'ksh' # bin / txt / ksh
 emax = 6
 e2max = 12
 conv = 1.e-8

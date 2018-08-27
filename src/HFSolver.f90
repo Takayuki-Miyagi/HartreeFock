@@ -148,7 +148,7 @@ contains
     subroutine FinHFSolLoop()
       if(present(thbme)) call NO%fin()
 
-      if(params%vac == 'vacumm') then
+      if(params%vac == 'vacuum') then
         !-- NO2B w.r.t. vacuum
         hamil%zero = this%e3hf
         hamil%one = t1f - 0.5d0 * w12
@@ -305,7 +305,7 @@ contains
     this%e3hf = NormOrd(sps, ms%one, s1_3) / 6.d0
     this%ehf = this%e1hf + this%e2hf + this%e3hf
 
-    if(params%vac == 'vacumm') then
+    if(params%vac == 'vacuum') then
       !-- NO2B w.r.t. vacuum
       scalar%zero = this%e3hf
       scalar%one = s1_1 - 0.5d0 * s1_3

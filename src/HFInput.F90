@@ -121,6 +121,12 @@ contains
     if(params%sv_hf_rslt) then
       write(iunit,'(2a)') '! NO2B file: ', trim(params%no2bhfile)
     end if
+
+    if(params%vac /= 'ref' .and. params%vac /= 'vacuum') then
+      write(*,*) 'value of vac has to be ref or vacuum: vac = ', trim(params%vac)
+      stop
+    end if
+
   end subroutine PrtParams
 end module InputParameters
 
