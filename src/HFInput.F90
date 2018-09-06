@@ -120,6 +120,7 @@ contains
     write(iunit,'(2a)') '! Ground-state energy: ', trim(params%egs)
     if(params%sv_hf_rslt) then
       write(iunit,'(2a)') '! NO2B file: ', trim(params%no2bhfile)
+      write(iunit,'(3a)') '! Normal ordered w.r.t. ', trim(params%vac), ' state'
     end if
 
     if(params%vac /= 'ref' .and. params%vac /= 'vacuum') then

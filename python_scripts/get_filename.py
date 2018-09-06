@@ -10,14 +10,17 @@ def get_nnfile(path, opr, pot, renorm, cut, hw, emax, e2max, txb, fom):
     return f
 
 def get_nnnfile(path, opr, renorm, cut, cd, ce, lam, e3max, hw, gen, txb):
-    f = path + '/' + opr + '-' + renorm + cut
+    f = path + '/' + opr + '-' + renorm
+    if(renorm != 'bare'):
+        f += cut
     if(gen):
         f += '_cD' + cd + 'cE' + ce + '_lam' + lam
     f += '_e3max' + str(e3max) + '_hw' + str(hw)
-    if(gen):
-        f += '_NNN-full'
-    else:
-        f += '_NNN-ind'
+    if(renorm != 'bare'):
+        if(gen):
+            f += '_NNN-full'
+        else:
+            f += '_NNN-ind'
     f += '.' + txb
     return f
 

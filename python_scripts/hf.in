@@ -1,0 +1,18 @@
+&input
+hw=25
+emax_3nf=6
+e2max_3nf=6
+e3max_3nf=6
+e3cut=6
+pmass=8
+nmass=8
+mass=16
+sv_hf_rslt=True
+vac= "ref" 
+MBPT=True
+fmt_hf_snt= "ksh" 
+HFloop=True
+emax=6
+e2max=12
+conv=1e-08
+&end
