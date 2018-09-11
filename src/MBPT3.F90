@@ -398,9 +398,9 @@ contains
                   jmax = min(sps%jj(p1) + sps%jj(h2), &
                     &        sps%jj(p2) + sps%jj(h1), &
                     &        sps%jj(p3) + sps%jj(h3)) / 2
-                  jmin = max(abs(sps%jj(p1) + sps%jj(h2)), &
-                    &        abs(sps%jj(p2) + sps%jj(h1)), &
-                    &        abs(sps%jj(p3) + sps%jj(h3))) / 2
+                  jmin = max(abs(sps%jj(p1) - sps%jj(h2)), &
+                    &        abs(sps%jj(p2) - sps%jj(h1)), &
+                    &        abs(sps%jj(p3) - sps%jj(h3))) / 2
 
                   vsum = 0.d0
                   do j = jmin, jmax
@@ -471,7 +471,7 @@ contains
                     &     hamil%one%jptz(ichp1)%m(pp1,pp1) - &
                     &     hamil%one%jptz(ichp3)%m(pp3,pp3))
 
-                  eph = eph + vsum * delh1h2 * delh2h3 * delp1p2 * delp1p3 / deno
+                  eph = eph - vsum * delh1h2 * delh2h3 * delp1p2 * delp1p3 / deno
 
                 end do
               end do
