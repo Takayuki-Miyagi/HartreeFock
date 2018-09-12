@@ -450,8 +450,7 @@ contains
                           &      sps%jj(k), sps%jj(j), 2*jtot) * &
                           &  hamil%two%jptz(ich)%m(bra,ket) * dble(pha)
                     end do
-                    !vsum = vsum + dble(2*jtot+1) * crv1 * crv2 * crv3
-                    vsum = vsum + dble(2*jtot+1) ** 2 * crv1 * crv2 * crv3
+                    vsum = vsum + dble(2*jtot+1) * crv1 * crv2 * crv3
                   end do
 
                   icha = ms%one%label2jptz(a)
