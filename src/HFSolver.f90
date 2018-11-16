@@ -75,7 +75,7 @@ contains
         this%e1hf = NormOrd(sps, ms%one, t1f)
         this%e2hf = NormOrd(sps, ms%one, w1f) * 0.5d0
         this%e3hf = NormOrd(sps, ms%one, w12) / 6.d0
-        this%ehf = this%e1hf + this%e2hf + this%e3hf
+        this%ehf = this%e1hf + this%e2hf + this%e3hf - params%betaCM * 1.5d0 * params%hw
         if(myrank == 0) then
           write(*,'(a, i4, a, f15.6, a, f15.6, a, f15.6, a, f15.6, a, es10.3)') &
               & 'nite = ', nite, '  e1 = ', this%e1hf, '  e2 = ', this%e2hf, &
@@ -123,7 +123,7 @@ contains
       this%e1hf = NormOrd(sps, ms%one, hamil%one)
       this%e2hf = NormOrd(sps, ms%one, w1i) * 0.5d0
       this%e3hf = NormOrd(sps, ms%one, w12) / 6.d0
-      this%ehf = this%e1hf + this%e2hf + this%e3hf
+      this%ehf = this%e1hf + this%e2hf + this%e3hf - 1.5d0 * params%betaCM * params%hw
       w1i = w1i + 0.5d0 * w12
       w1f = w1f + 0.5d0 * w12
       h1f = t1f + w1f
@@ -150,7 +150,7 @@ contains
 
       if(params%vac == 'vacuum') then
         !-- NO2B w.r.t. vacuum
-        hamil%zero = this%e3hf
+        hamil%zero = this%e3hf - 1.5d0 * params%betaCM * params%hw
         hamil%one = t1f - 0.5d0 * w12
         hamil%two = v2f + w2f
       elseif(params%vac == 'ref') then

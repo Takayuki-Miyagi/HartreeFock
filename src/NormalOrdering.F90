@@ -18,7 +18,7 @@ module NormalOrdering
           & ScalarNOTwo2One, ScalarNOOne2Zero
   end interface NormOrd
 
-  !------------------------------
+  !--- General case () ---------
   type :: NormOrd_idx
     integer :: n
     integer, allocatable :: num(:,:)
@@ -36,7 +36,6 @@ module NormalOrdering
     procedure :: fin => FinNOThree2Two
   end type NOThree2Two
   !------------------------------
-
 
   !------------------------------
   type :: braket

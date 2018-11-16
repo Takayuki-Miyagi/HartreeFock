@@ -260,7 +260,7 @@ contains
     character(*), intent(in) :: oprtr
     character(*), optional, intent(in) :: f2
     type(iThreeBodyScalar), optional, intent(in) :: thbme
-    type(NBodyScalars) :: two
+    type(NBodyScalars) :: one, two
 
     call this%one%SetOneBodyScalars(params, sps, ms%one, oprtr)
     !call this%one%SetOneBodyScalars(params, sps, ms%one, 'hamil_ho') s.p.h.o. hamiltonian
@@ -274,6 +274,16 @@ contains
       call calc_bare_2bme('H_p_dot_p', params, sps, ms%two, two)
       call CopyNBodyScalars(this%two, SubtractNBodyScalars(this%two, two))
       call two%fin()
+      if(params%betaCM > 1.d-3) then
+        call one%init(ms%one%SpinParityTz)
+        call two%init(ms%two%SpinParityTz)
+        call one%SetOneBodyScalars(params, sps, ms%one, 'hamil_cm')
+        call two%SetTwoBodyScalars(params, sps, ms%two, 'hamil_cm')
+        this%two = this%two + params%betaCM * two
+        this%one = this%one + params%betaCM * one
+        call two%fin()
+        call one%fin()
+      end if
     end if
   end subroutine SetScalarOperators
 
@@ -333,10 +343,10 @@ contains
     else
 
       if(.not. present(f2)) then
-        if(oprtr == 'rm' .or. oprtr == 'Rm') then
+        if(oprtr == 'Rm' .or. oprtr == 'rm') then
           call calc_bare_2bme('Rm_r_dot_r', params, sps, two, this)
         else
-          write(*,'(a)') "In SetTwoBodyScalars, selected operator has not been implemented"
+          call calc_bare_2bme(oprtr, params, sps, two, this)
         end if
         return
       end if
@@ -441,6 +451,9 @@ contains
     case('Hamil_ho','hamil_ho')
       if(n1 == n2) e = dble(2 * n1 + l) + 1.5d0
       e = e * hw
+    case('Hamil_CM','hamil_cm')
+      if(n1 == n2) e = dble(2 * n1 + l) + 1.5d0
+      e = e * hw / A
     case('Rm','rm')
       if(n1 == n2) e = (dble(2 * n1 + l) + 1.5d0)
       if(n1 == n2 + 1) e = -dsqrt(dble(n1) * (dble(n1 + l) + 0.5d0))
@@ -502,6 +515,9 @@ contains
       ele = r_dot_r(sps, i1, i2, i3, i4, j) * hw / dble(A)
     case('H_p_dot_p') ! pipj / A
       ele = p_dot_p(sps, i1, i2, i3, i4, j) * hw / dble(A)
+    case('hamil_cm') ! (rirj + pipj) / A
+      ele = (p_dot_p(sps, i1, i2, i3, i4, j) + r_dot_r(sps, i1, i2, i3, i4, j)) * &
+          &  hw / dble(A)
     case('Rm_r_dot_r') ! - 4 * rirj / A**2 mc**2 hw
       ele = - 4.d0 * r_dot_r(sps, i1, i2, i3, i4, j) * hc ** 2 / (amnucl * hw * dble(A) ** 2)
     case default

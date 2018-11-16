@@ -22,6 +22,7 @@ module InputParameters
     logical :: MBPT
     integer :: emax, e2max, e3max ! model space
     real(8) :: conv ! tolerance
+    real(8) :: betaCM = 0.d0
     character(256) :: vac = 'ref'
     character(256) :: egs = 'None', no2bhfile = 'None', fmt_hf_snt = 'None'
     character(256) :: reference = 'None', nocoef = 'None'
@@ -36,7 +37,7 @@ contains
     real(8), optional :: hw_in
     integer, optional :: emax_in
     integer :: pmass, nmass, mass
-    real(8) :: hw, conv
+    real(8) :: hw, conv, betaCM
     integer :: emax_2nf, e2max_2nf
     integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
     character(256) :: inputfile, fmt_hf_snt, vac
@@ -49,7 +50,7 @@ contains
       & emax_3nf, e2max_3nf, e3max_3nf, &
       & sv_hf_rslt, &
       & HFloop, NO2B, emax, e2max, &
-      & e3cut, fmt_hf_snt, vac, MBPT, fmt_hf_snt
+      & e3cut, fmt_hf_snt, vac, MBPT, fmt_hf_snt, betaCM
 
     narg = command_argument_count()
     call getarg(1, inputfile)
@@ -81,6 +82,7 @@ contains
     params%vac = vac
     params%MBPT = MBPT
     params%fmt_hf_snt = fmt_hf_snt
+    params%betaCM = betaCM
     if(present(emax_in)) then
       params%emax = emax_in
       params%e2max = 2 * emax_in
@@ -103,7 +105,7 @@ contains
     ! Show Parameters
     if(myrank == 0) then
       write(iunit,'(a)') '! Calculation Parameters:'
-      write(iunit,'(a, f6.2, a)') '! hw = ', params%hw, ' MeV'
+      write(iunit,'(a, f6.2, a, f6.2)') '! hw = ', params%hw, ' MeV, betaCM = ', params%betaCM
       write(iunit,'(a,i3,a,i3,a,i3)') '! Z = ', params%pmass, &
       & ',  N = ', params%nmass, ',  A = ', params%mass
       write(iunit,'(a,i3,a,i3)') '! emax = ', params%emax, &
