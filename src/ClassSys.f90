@@ -1,5 +1,4 @@
 module ClassSys
-  use, intrinsic :: iso_c_binding
   implicit none
 
   public :: sys, iList, cList, dList, imap, cmap, dmap

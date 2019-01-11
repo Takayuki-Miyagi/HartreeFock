@@ -5,10 +5,44 @@
 ! beyond Hartree-Fock calculation methods.
 
 module ModelSpace
+  use omp_lib
   use SingleParticleState
   implicit none
 
-  type :: jpz
+  public :: MSpace
+  public :: OneBodySpace
+  public :: OneBodyChannel
+  public :: TwoBodySpace
+  public :: TwoBodyChannel
+  public :: ThreeBodySpace
+  public :: ThreeBodyChannel
+  public :: AdditionalQN
+
+  private :: FinMSpace
+  private :: InitMSpaceFromAZN
+  private :: InitMSPaceFromReference
+  private :: GetNOCoef
+  private :: GetParticleHoleOrbits
+  private :: GetAZNFromReference
+  private :: FinOneBodySpace
+  private :: InitOneBodySpace
+  private :: FinOneBodyChannel
+  private :: InitOneBodyChannel
+  private :: FinTwoBodySpace
+  private :: InitTwoBodySpace
+  private :: FinTwoBodyChannel
+  private :: InitTwoBodyChannel
+  private :: FinThreeBodySpace
+  private :: InitThreeBodySpace
+  private :: FinThreeBodyChannel
+  private :: InitThreeBodyChannel
+  private :: FinAdditionalQN
+  private :: InitAdditionalQN
+  private :: CntDim
+  private :: GenIter
+  private :: Aop3, A3drct, A3exc1, A3exc2
+
+  type, private :: jpz
     integer :: j = -1
     integer :: p = 0
     integer :: z = 100
@@ -54,13 +88,14 @@ module ModelSpace
 
   type :: AdditionalQN
     integer :: north, nphys
-    integer, allocatable :: Jab2n(:)
+    integer, allocatable :: idx2n(:)
     integer, allocatable :: n2spi1(:) ! permutations
     integer, allocatable :: n2spi2(:) ! permutations
     integer, allocatable :: n2spi3(:) ! permutations
-    integer, allocatable :: n2Jab(:)  ! Jab
+    integer, allocatable :: n2J12(:)  ! Jab
     real(8), allocatable :: cfp(:,:)
   contains
+    procedure :: init => InitAdditionalQN
     procedure :: fin => FinAdditionalQN
   end type AdditionalQN
 
@@ -82,6 +117,7 @@ module ModelSpace
     integer, allocatable :: jpz2ch(:,:,:)
     integer :: NChan
   contains
+    procedure :: init => InitThreeBodySpace
     procedure :: fin => FinThreeBodySpace
   end type ThreeBodySpace
 
@@ -95,6 +131,7 @@ module ModelSpace
     real(8), allocatable :: NOCoef(:)
     integer, allocatable :: holes(:)
     integer, allocatable :: particles(:)
+    character(:), allocatable :: Nucl
     integer :: A, Z, N
     integer :: np, nh
     integer :: emax = 0
@@ -102,12 +139,28 @@ module ModelSpace
     integer :: e3max = 0
     integer :: lmax = 0
   contains
+    procedure :: fin => FinMSpace
     procedure :: InitMSpaceFromReference
     procedure :: InitMSpaceFromAZN
     generic :: init => InitMSPaceFromReference, InitMSpaceFromAZN
     procedure :: GetNOCoef
     procedure :: GetParticleHoleOrbits
   end type MSpace
+
+  character(2), private, parameter :: elements(119) = &
+      [ 'n ', &
+      & 'H ', 'He', 'Li', 'Be', 'B ', 'C ', 'N ', 'O ', 'F ', 'Ne', &
+      & 'Na', 'Mg', 'Al', 'Si', 'P ', 'S ', 'Cl', 'Ar', 'K ', 'Ca', &
+      & 'Sc', 'Ti', 'V ', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', &
+      & 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y ', 'Zr', &
+      & 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', &
+      & 'Sb', 'Te', 'I ', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', &
+      & 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', &
+      & 'Lu', 'Hf', 'Ta', 'W ', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', &
+      & 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th', &
+      & 'Pa', 'U ', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', &
+      & 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', &
+      & 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og' ]
 
   type, private :: iter3
     integer, allocatable :: ii1(:), ii2(:), ii3(:)
@@ -130,18 +183,26 @@ contains
   end subroutine FinMSpace
 
   subroutine InitMSpaceFromAZN(this, A, Z, N, emax, e2max, e3max, lmax)
+    use Profiler, only: timer
+    use ClassSys, only: sys
     class(MSpace), intent(inout) :: this
     integer, intent(in) :: A, Z, N
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
+    type(sys) :: s
     integer :: i, l
+    character(20) :: Nucl
+    real(8) :: ti
 
+    ti = omp_get_wtime()
     write(*,*)
     write(*,'(a)') "### Model-space constructor ###"
+    Nucl = trim(s%str(A)) // trim(elements(Z+1))
     this%is_constructed = .true.
     this%A = A
     this%Z = Z
     this%N = N
+    this%Nucl = adjustl(trim(Nucl))
     this%emax = emax
     this%e2max = e2max
     this%lmax = emax
@@ -151,30 +212,36 @@ contains
     call this%GetNOCoef()
     call this%GetParticleHoleOrbits()
 
-    write(*,'(a)') "Orbits:"
-    write(*,'(a)') "      p/h,   n,  l,  j, tz,  coefficient"
+    write(*,'(3a)') " Target Nuclide is ", trim(this%Nucl), ", Orbits:"
+    write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
     do i = 1, this%nh
       l = this%holes(i)
-      write(*,'(a10,4i4,f14.6)') '     hole:', this%sps%orb(l)%n, this%sps%orb(l)%l, &
+      write(*,'(a10,5i4,f14.6)') '     hole:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
           & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
     end do
 
     do i = 1, this%np
       l = this%particles(i)
-      write(*,'(a10,4i4,f14.6)') ' particle:', this%sps%orb(l)%n, this%sps%orb(l)%l, &
+      write(*,'(a10,5i4,f14.6)') ' particle:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
           & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
     end do
+    write(*,*)
 
     call this%one%init(this%sps)
-    call this%two%init(this%sps, e2max)
-    write(*,'(a)') "# of J, parity, and tz Channels:"
-    write(*,'(a,i3)') "  OneBody: ", this%one%NChan
-    write(*,'(a,i3)') "  TwoBody: ", this%two%NChan
-    if(.not. present(e3max)) return
+    call this%two%init(this%sps, this%e2max)
+    write(*,'(a)') "  # of J, parity, and tz Channels:"
+    write(*,'(a,i3)') "    OneBody: ", this%one%NChan
+    write(*,'(a,i3)') "    TwoBody: ", this%two%NChan
+    if(.not. present(e3max)) then
+      write(*,*)
+      call timer%Add('Construct Model Space', omp_get_wtime()-ti)
+      return
+    end if
     this%is_three_body = .true.
-    !call this%thr%init(sps, e2max, e3max)
-    write(*,'(a,i3)') "ThreeBody: ", this%thr%NChan
+    call this%thr%init(this%sps, this%e2max, this%e3max)
+    write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
     write(*,*)
+    call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
 
   subroutine InitMSpaceFromReference(this, Nucl, emax, e2max, e3max, lmax)
@@ -189,6 +256,7 @@ contains
   end subroutine InitMSpaceFromReference
 
   subroutine GetNOCoef(this)
+    ! This should be called after obtaining A, Z, N
     class(MSpace), intent(inout) :: this
     integer :: Z, N
     integer :: e, l, j, g, ns
@@ -199,6 +267,7 @@ contains
     this%NOCoef(:) = 0.d0
     Z = this%Z
     N = this%N
+    l = 0
     nn = 0
     zz = 0
     do e = 0, this%sps%emax
@@ -207,6 +276,7 @@ contains
         if(g > 0) l = (j-1)/2
         if(g < 0) l = (j+1)/2
         ns = (e-l)/2
+        if(l > this%sps%lmax) cycle
 
         nn = nn + (j+1)
         zz = zz + (j+1)
@@ -237,7 +307,7 @@ contains
 
 #ifdef ModelSpaceDebug
     write(*,'(a)') "In GetNOCoef:"
-    write(*,'(a)') "   n,  l,  j, tz,  coefficient"
+    write(*,'(a)') "   n,  l,  j, tz,   occupation"
     do l = 1, this%sps%norbs
       write(*,'(4i4,f14.6)') this%sps%orb(l)%n, this%sps%orb(l)%l, &
           & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
@@ -246,6 +316,7 @@ contains
   end subroutine GetNOCoef
 
   subroutine GetParticleHoleOrbits(this)
+    ! This should be called after obtaining NOCoef array
     class(MSpace), intent(inout) :: this
     integer :: n_h, n_p, i
 
@@ -285,20 +356,6 @@ contains
     integer :: i
     character(:), allocatable :: str
     character(20) :: str_A, element
-    character(2), parameter :: elements(119) = &
-        [ 'n ', &
-    & 'H ', 'He', 'Li', 'Be', 'B ', 'C ', 'N ', 'O ', 'F ', 'Ne', &
-    & 'Na', 'Mg', 'Al', 'Si', 'P ', 'S ', 'Cl', 'Ar', 'K ', 'Ca', &
-    & 'Sc', 'Ti', 'V ', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', &
-    & 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y ', 'Zr', &
-    & 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', &
-    & 'Sb', 'Te', 'I ', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', &
-    & 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', &
-    & 'Lu', 'Hf', 'Ta', 'W ', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', &
-    & 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th', &
-    & 'Pa', 'U ', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', &
-    & 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', &
-    & 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og' ]
 
     str = Nucl
     str_A = ''
@@ -447,6 +504,9 @@ contains
     this%p = p
     this%z = z
     this%nst = n
+#ifdef ModelSpaceDebug
+    write(*,'(a,i3,a,i3,a,i3,a)') "One-body channel: J=", j, "/2, P=", p, ", Tz=", z, "/2"
+#endif
     allocate(this%n2spi(n))
     allocate(this%spi2n(sps%norbs))
     this%spi2n(:) = 0
@@ -458,7 +518,13 @@ contains
       cnt = cnt + 1
       this%n2spi(cnt) = i
       this%spi2n(i) = cnt
+#ifdef ModelSpaceDebug
+      write(*,'(a,i3,a,i3)') "i1=",i,", Num=",cnt
+#endif
     end do
+#ifdef ModelSpaceDebug
+    write(*,*)
+#endif
   end subroutine InitOneBodyChannel
 
   subroutine FinTwoBodySpace(this)
@@ -558,7 +624,6 @@ contains
             pp(ich) = p
             zz(ich) = z
             nn(ich) = n
-            write(*,*) ich, j, p, z, n
           end if
         end do
       end do
@@ -595,6 +660,9 @@ contains
     allocate(this%spis2n(sps%norbs,sps%norbs))
     allocate(this%iphase(sps%norbs,sps%norbs))
     cnt = 0
+#ifdef ModelSpaceDebug
+    write(*,'(a,i3,a,i3,a,i3)') "Two-body channel: J=", j, ", P=", p, ", Tz=", z
+#endif
     do i1 = 1, sps%norbs
       j1 = sps%orb(i1)%j
       l1 = sps%orb(i1)%l
@@ -619,8 +687,14 @@ contains
         this%spis2n(i2,i1) = cnt
         this%iphase(i1,i2) = 1
         this%iphase(i1,i2) = -(-1) ** ((j1+j2)/2 - j)
+#ifdef ModelSpaceDebug
+        write(*,'(a,i3,a,i3,a,i6)') "i1=",i1,", i2=",i2,", Num=",cnt
+#endif
       end do
     end do
+#ifdef ModelSpaceDebug
+    write(*,*)
+#endif
   end subroutine InitTwoBodyChannel
 
   subroutine FinThreeBodySpace(this)
@@ -737,7 +811,7 @@ contains
                 n = n + ni
                 if(ni /= 0) then
                   nidx = nidx + 1
-                  ch(ich)%spis2nidx(i1,i2,i3) = nidx
+                  ch(ich+1)%spis2nidx(i1,i2,i3) = nidx
                 end if
               end do
             end do
@@ -794,6 +868,9 @@ contains
     this%nst = n
     this%n_idx = nidx
     this%spis2idx = spis2idx
+#ifdef ModelSpaceDebug
+    write(*,'(a,i3,a,i3,a,i3,a)') "Three-body channel: J=", j, "/2, P=", p, ", Tz=", z, "/2"
+#endif
 
     allocate(this%idx(this%n_idx))
     allocate(nni(this%n_idx))
@@ -809,13 +886,13 @@ contains
       l1 = sps%orb(i1)%l
       z1 = sps%orb(i1)%z
       e1 = sps%orb(i1)%e
-      do i2 = 2, sps%norbs
+      do i2 = 1, i1
         j2 = sps%orb(i2)%j
         l2 = sps%orb(i2)%l
         z2 = sps%orb(i2)%z
         e2 = sps%orb(i2)%e
         if(e1 + e2 > e2max) cycle
-        do i3 = 3, sps%norbs
+        do i3 = 1, i2
           j3 = sps%orb(i3)%j
           l3 = sps%orb(i3)%l
           z3 = sps%orb(i3)%z
@@ -830,6 +907,7 @@ contains
           call CntDim(sps,i1,i2,i3,j,ni,nj)
           nni(idx) = ni
           nnj(idx) = nj
+          allocate(this%idx(idx)%idx2n(ni))
           do i = 1, ni
             cnt = cnt + 1
             this%n2spi1(cnt) = i1
@@ -841,20 +919,142 @@ contains
       end do
     end do
 
+    cnt = 0
+    do i1 = 1, sps%norbs
+      j1 = sps%orb(i1)%j
+      l1 = sps%orb(i1)%l
+      z1 = sps%orb(i1)%z
+      e1 = sps%orb(i1)%e
 
+      do i2 = 1, i1
+        j2 = sps%orb(i2)%j
+        l2 = sps%orb(i2)%l
+        z2 = sps%orb(i2)%z
+        e2 = sps%orb(i2)%e
 
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, i2
+          j3 = sps%orb(i3)%j
+          l3 = sps%orb(i3)%l
+          z3 = sps%orb(i3)%z
+          e3 = sps%orb(i3)%e
+
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+          if(z1 + z2 + z3 /= z) cycle
+          if((-1) ** (l1+l2+l3) /= p) cycle
+          idx = this%spis2idx(i1,i2,i3)
+          if(idx == 0) cycle
+          ni = nni(idx)
+          nj = nnj(idx)
+          call this%idx(idx)%init(sps,i1,i2,i3,j,ni,nj)
+          do i = 1, ni
+            cnt = cnt + 1
+            this%n2spi1(cnt) = i1
+            this%n2spi2(cnt) = i2
+            this%n2spi3(cnt) = i3
+            this%n2labl(cnt) = i
+            this%idx(idx)%idx2n(i) = cnt
+#ifdef ModelSpaceDebug
+            write(*,'(a,i3,a,i3,a,i3,a,i3,a,i8)') &
+                & "i1=",i1,", i2=",i2,", i3=",i3, ", label=", i, ", Num=",cnt
+#endif
+          end do
+
+        end do
+      end do
+    end do
+
+#ifdef ModelSpaceDebug
+    write(*,*)
+#endif
 
   end subroutine InitThreeBodyChannel
 
   subroutine FinAdditionalQN(this)
     class(AdditionalQN), intent(inout) :: this
-    deallocate(this%Jab2n)
+    deallocate(this%idx2n)
     deallocate(this%n2spi1)
     deallocate(this%n2spi2)
     deallocate(this%n2spi3)
-    deallocate(this%n2Jab)
+    deallocate(this%n2J12)
     deallocate(this%cfp)
   end subroutine FinAdditionalQN
+
+  subroutine InitAdditionalQN(this, sps, i1, i2, i3, j, nni, nnj)
+    use LinAlgLib
+    use CommonLibrary, only: triag
+    class(AdditionalQN), intent(inout) :: this
+    type(Orbits), intent(in) :: sps
+    integer, intent(in) :: i1, i2, i3, j, nni, nnj
+    type(iter3) :: ite
+    integer :: nj, nch, i, k, kk
+    integer :: bra, ket
+    integer :: ii1, ii2, ii3, jj1, jj2, jj3, jj12
+    integer :: ii4, ii5, ii6, jj45
+    type(DMat) :: mat
+    type(EigenSolSymD) :: sol
+    call ite%GenIter(i1, i2, i3, nch)
+    this%nphys = nnj
+    this%north = nni
+    allocate(this%n2spi1(nnj))
+    allocate(this%n2spi2(nnj))
+    allocate(this%n2spi3(nnj))
+    allocate(this%n2J12( nnj))
+    allocate(this%cfp(nnj,nni))
+    nj = 0
+    do i = 1, nch
+      ii1 = ite%ii1(i)
+      ii2 = ite%ii2(i)
+      ii3 = ite%ii3(i)
+      jj1 = sps%orb(ii1)%j
+      jj2 = sps%orb(ii2)%j
+      jj3 = sps%orb(ii3)%j
+      do jj12 = iabs(jj1 - jj2) / 2, (jj1 + jj2) / 2
+        if(ii1 == ii2 .and. mod(jj12, 2) == 1) cycle
+        if(triag(2*jj12, jj3, j)) cycle
+        nj = nj + 1
+        this%n2spi1(nj) = ii1
+        this%n2spi2(nj) = ii2
+        this%n2spi3(nj) = ii3
+        this%n2J12( nj) = jj12
+      end do
+    end do
+    if(this%nphys < 1) return
+    call mat%Ini(this%nphys, this%nphys)
+    do bra = 1, this%nphys
+      ii1  = this%n2spi1(bra)
+      ii2  = this%n2spi2(bra)
+      ii3  = this%n2spi3(bra)
+      jj12 = this%n2J12( bra)
+      do ket = 1, this%nphys
+        ii4  = this%n2spi1(ket)
+        ii5  = this%n2spi2(ket)
+        ii6  = this%n2spi3(ket)
+        jj45 = this%n2J12( ket)
+        mat%m(bra, ket) = Aop3(sps, ii1, ii2, ii3, jj12, &
+            & ii4, ii5, ii6, jj45, j)
+      end do
+    end do
+    call sol%init(mat)
+    call sol%DiagSym(mat)
+
+    do i = 1, this%nphys
+      kk = 0
+      do k = 1, this%nphys
+        if(abs(1.d0-sol%eig%v(k)).le.1.d-4) then
+          kk = kk + 1
+          this%cfp(i,kk) = sol%vec%m(i, k)
+        end if
+      end do
+    end do
+#ifdef ModelSpaceDebug
+    write(*,'(10f12.6)') sol%eig%v
+#endif
+    call mat%Fin()
+    call sol%fin()
+  end subroutine InitAdditionalQN
 
   subroutine CntDim(sps, i1, i2, i3, j, ni, nj)
     use CommonLibrary, only: triag
@@ -949,9 +1149,9 @@ contains
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
     real(8) :: phase12, phase23, phase31
-    phase12 = (-1.d0) ** ((sps%orb(i1)%j + sps%orb(i2)%j)/2 - j45)
-    phase23 = (-1.d0) ** ((sps%orb(i2)%j + sps%orb(i3)%j)/2 - j45)
-    phase31 = (-1.d0) ** ((sps%orb(i3)%j + sps%orb(i1)%j)/2 - j45)
+    phase12 = (-1.d0) ** ((sps%orb(i4)%j + sps%orb(i5)%j)/2 - j45)
+    phase23 = (-1.d0) ** ((sps%orb(i5)%j + sps%orb(i6)%j)/2 - j45)
+    phase31 = (-1.d0) ** ((sps%orb(i6)%j + sps%orb(i4)%j)/2 - j45)
     a = 0.d0
     a = a + A3drct(i1, i2, i3, j12, i4, i5, i6, j45)
     a = a - A3drct(i1, i2, i3, j12, i5, i4, i6, j45) * phase12
@@ -1011,9 +1211,18 @@ contains
 end module ModelSpace
 
 ! main for test
-!program main
-!  use ModelSpace, only: MSpace
-!  type(MSpace) :: ms
-!
-!  call ms%init('O18', 4, 8)
-!end program main
+program main
+  use Profiler, only: timer
+  use ModelSpace, only: MSpace
+  use CommonLibrary, only: &
+      &init_dbinomial_triangle, fin_dbinomial_triangle
+  type(MSpace) :: ms
+
+  call timer%init()
+  call init_dbinomial_triangle()
+  !call ms%init('O18', 4, 8, e3max=4, lmax=4)
+  call ms%init('16O', 2, 4, e3max=2)
+  call ms%fin()
+  call fin_dbinomial_triangle()
+  call timer%prt()
+end program main

@@ -58,7 +58,6 @@ contains
 
   subroutine FinOrbitsIsospin(this)
     class(OrbitsIsospin), intent(inout) :: this
-    integer :: i
     if(.not. this%is_constructed) return
 #ifdef SingleParticleStateDebug
     write(*,'(a)') 'In FinOrbitsIsospin'
@@ -114,7 +113,6 @@ contains
 
   subroutine FinOrbits(this)
     class(Orbits), intent(inout) :: this
-    integer :: i
     if(.not. this%is_constructed) return
 #ifdef SingleParticleStateDebug
     write(*,'(a)') 'In FinOrbits'
