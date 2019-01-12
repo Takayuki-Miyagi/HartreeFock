@@ -198,6 +198,8 @@ contains
     call timer%cmemory()
     write(*,*)
     write(*,'(a)') "### Model-space constructor ###"
+
+
     Nucl = trim(s%str(A)) // trim(elements(Z+1))
     this%is_constructed = .true.
     this%A = A
@@ -209,6 +211,11 @@ contains
     this%lmax = emax
     if(present(e3max)) this%e3max = e3max
     if(present(lmax)) this%lmax = lmax
+    write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
+    if(present(e3max)) then
+      write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
+    end if
+    write(*,'(a,i3)') ", lmax=",this%lmax
     call this%sps%init(this%emax,this%lmax)
     call this%GetNOCoef()
     call this%GetParticleHoleOrbits()
@@ -242,7 +249,7 @@ contains
     call this%thr%init(this%sps, this%e2max, this%e3max)
     write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
     write(*,*)
-    call timer%tmemory("Model Space")
+    call timer%countup_memory("Model Space")
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
 
@@ -1224,7 +1231,7 @@ program main
   call timer%init()
   call init_dbinomial_triangle()
   !call ms%init('O18', 4, 8, e3max=4, lmax=4)
-  call ms%init('16O', 10, 20, e3max=10)
+  call ms%init('48Ca', 4, 8, e3max=2)
   call ms%fin()
   call fin_dbinomial_triangle()
   call timer%fin()

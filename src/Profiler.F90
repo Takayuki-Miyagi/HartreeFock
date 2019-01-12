@@ -8,8 +8,11 @@ module Profiler
   type, private :: prof
     type(imap) :: counter
     type(dmap) :: timer
+    type(imap) :: nmem
+    type(dmap) :: memories
     real(8) :: start_time
     real(8) :: total_memory = 0.d0
+    real(8) :: max_memory = 0.d0
     character(2) :: memory_unit = 'MB'
     character(:), allocatable :: OS
     character(9) :: tempfile = 'temp_prof'
@@ -22,6 +25,9 @@ module Profiler
     procedure :: set_unit => SetMemoryUnit
     procedure :: cmemory => CurrentMemory
     procedure :: tmemory => TargetMemory
+    procedure :: countup_memory => CountUpMemory
+    procedure :: countdw_memory => CountDownMemory
+    procedure :: prt_memory => PrintMemory
   end type prof
 
   type(prof) :: timer
@@ -61,6 +67,10 @@ contains
     call this%counter%append('Total',1)
     call this%timer%append('Total',0.d0)
     if(present(ut)) call this%set_unit(ut)
+    if(this%os == 'Linux') then
+      call this%nmem%append('Total',1)
+      call this%memories%append('Total',0.d0)
+    end if
   end subroutine InitProf
 
   subroutine StartProf(this,key)
@@ -95,7 +105,7 @@ contains
     if (myrank==0) write(*,'(a,i5,a,i2.2,a,i2.2)') &
         '    summary of time, total = ', n/3600, ':', &
         mod(n, 3600)/60, ':', mod(n, 60)
-    if(myrank == 0) write(*,*)
+    if (myrank==0) write(*,*)
     if (myrank==0) write(*,'(37x,a)') "time,    ncall, time/ncall,   ratio "
     r = ttotal
     do i = 1, this%counter%GetLen()
@@ -130,6 +140,7 @@ contains
     character(*), intent(in), optional :: msg
     integer :: io
     character(512) :: c_num, fn_proc, tmp1, tmp2, cmd
+    real(8) :: mem
 
     if(this%os /= 'Linux') return
     write(c_num,'(i0)') getpid()
@@ -142,7 +153,19 @@ contains
       stop
     end if
 
-    read(999,*,iostat=io) tmp1, this%total_memory, tmp2
+    read(999,*,iostat=io) tmp1, mem, tmp2
+
+    select case(this%memory_unit)
+    case('kB')
+      mem = mem
+    case('MB')
+      mem = mem / dble(1024)
+    case('GB')
+      mem = mem / dble(1024) ** 2
+    end select
+
+    this%max_memory = max(mem,this%max_memory)
+    this%total_memory = mem
 
     if(io /= 0) then
       write(*,*) "File reading error in CurrentMemory"
@@ -152,14 +175,6 @@ contains
     cmd = 'rm ' // trim(this%tempfile)
     call system( trim(cmd) )
 
-    select case(this%memory_unit)
-    case('kB')
-      timer%total_memory = timer%total_memory
-    case('MB')
-      timer%total_memory = timer%total_memory / dble(1024)
-    case('GB')
-      timer%total_memory = timer%total_memory / dble(1024)**2
-    end select
 
     if(.not. present(msg) ) return
     write(*,'(a,f12.4,2a)') trim(msg), timer%total_memory, &
@@ -181,8 +196,101 @@ contains
         & this%total_memory - mem_prev, " ", trim(this%memory_unit)
   end subroutine TargetMemory
 
+  ! call timer%cmemory before using
+  ! msg is object name
+  subroutine CountUpMemory(this, key)
+    class(prof), intent(inout) :: this
+    character(*), intent(in) :: key
+    integer :: n
+    real(8) :: mem_prev, mem
+
+    if(this%os /= 'Linux') return
+    if(.not. this%memories%Search(key)) then
+      call this%nmem%append(key,0)
+      call this%memories%append(key,0.d0)
+    end if
+    n = this%nmem%Get(key)
+    mem = this%memories%Get(key)
+
+    mem_prev = this%total_memory
+    call this%cmemory()
+    call this%nmem%append(key,n+1)
+    call this%memories%append(key,mem+this%total_memory-mem_prev)
+  end subroutine CountUpMemory
+
+  ! call timer%cmemory before using
+  ! msg is object name
+  subroutine CountDownMemory(this, key)
+    class(prof), intent(inout) :: this
+    character(*), intent(in) :: key
+    integer :: n
+    real(8) :: mem_prev, mem
+
+    if(this%os /= 'Linux') return
+    n = this%nmem%Get(key)
+    mem = this%memories%Get(key)
+
+    mem_prev = this%total_memory
+    call this%cmemory()
+    call this%nmem%append(key,n-1)
+    call this%memories%append(key,mem-this%total_memory+mem_prev)
+  end subroutine CountDownMemory
+
+  subroutine PrintMemory(this)
+    use MPIFunction, only: myrank
+    class(prof), intent(inout) :: this
+    integer :: i
+    real(8) :: mtotal, a
+
+    if (myrank==0) write(*,*)
+    call this%cmemory()
+    mtotal = 0.d0
+    select case(this%memory_unit)
+    case('kB')
+      mtotal = this%max_memory / dble(1024) ** 2
+    case('MB')
+      mtotal = this%max_memory / dble(1024)
+    case('GB')
+      mtotal = this%max_memory
+    end select
+
+    if (myrank==0) write(*,'(a,f12.6,a)') &
+        & '      Max used memory = ', mtotal, ' GB'
+    if (myrank==0) write(*,*)
+    if (myrank==0) write(*,'(30x,a)') &
+        & "memory (GB),    ncall,   memory/ncall (GB)"
+    do i = 1, this%nmem%GetLen()
+      if(this%nmem%key(i) == 'Total') cycle
+
+      select case(this%memory_unit)
+      case('kB')
+        a = this%memories%val(i) / dble(1024) ** 2
+      case('MB')
+        a = this%memories%val(i) / dble(1024)
+      case('GB')
+        a = this%memories%val(i)
+      end select
+
+      call PrintEach(this%nmem%key(i), this%nmem%val(i), a)
+    end do
+    if (myrank==0)  write(*,*)
+  contains
+    subroutine PrintEach(title, ncall, amnt)
+      character(*), intent(in) :: title
+      integer, intent(in) :: ncall
+      real(8), intent(in) :: amnt
+
+
+      if (myrank==0) &
+          write(*,'(1a30, 1f12.3, 1i10, 1f20.5)') title,  &
+          amnt, ncall, amnt/ncall
+    end subroutine PrintEach
+
+  end subroutine PrintMemory
+
   subroutine FinProf(this)
     class(prof), intent(inout) :: this
+    call this%prt_memory()
     call this%prt()
   end subroutine FinProf
 
