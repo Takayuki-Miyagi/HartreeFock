@@ -121,14 +121,70 @@ module ModelSpace
     procedure :: fin => FinThreeBodySpace
   end type ThreeBodySpace
 
+  type :: coef
+    integer :: n = 0
+    integer, allocatable :: idx2num(:)
+#ifdef single_precision
+    real(4), allocatable :: TrnsCoef(:)
+#else
+    real(8), allocatable :: TrnsCoef(:)
+#endif
+  end type coef
+
+  type :: sort_index
+    integer :: idx_sorted
+    integer :: j12min, j12max
+    integer :: t12min, t12max
+    type(coef), allocatable :: jt(:,:)
+  contains
+    procedure :: fin => fin_sort_index
+    procedure :: init => init_sort_index
+  end type sort_index
+
+  type :: NonOrthIsospinAdditionalQN
+    integer :: j12min, j12max
+    integer :: t12min, t12max
+    integer, allocatable :: JT2n(:,:)
+  end type NonOrthIsospinAdditionalQN
+
+  type :: NonOrthIsospinThreeBodyChannel
+    integer :: nst, n_idx, n_sort
+    integer :: j, p, t
+    type(sort_index), allocatable :: sort(:)
+    type(NonOrthIsospinAdditionalQN), allocatable :: idxqn(:)
+    integer, allocatable :: n2spi1(:)
+    integer, allocatable :: n2spi2(:)
+    integer, allocatable :: n2spi3(:)
+    integer, allocatable :: n2J12( :)
+    integer, allocatable :: n2T12( :)
+    integer, allocatable :: spis2idx(:,:,:) ! => NonOrthIsospinAdditionalQN
+    integer, allocatable :: sorting(:,:,:)
+  contains
+    procedure :: init => InitNonOrthIsospinThreeBodyChannel
+    procedure :: fin => FinNonOrthIsospinThreeBodyChannel
+    procedure :: set => SetSortingIndices
+  end type NonOrthIsospinThreeBodyChannel
+
+  type :: NonOrthIsospinThreeBodySpace
+    type(NonOrthIsospinThreeBodyChannel), allocatable :: jpt(:)
+    integer, allocatable :: jpt2ch(:,:,:)
+    integer :: NChan
+  contains
+    procedure :: init => InitNonOrthIsospinThreeBodySpace
+    procedure :: fin => FinNonOrthIsospinThreeBodySpace
+  end type NonOrthIsospinThreeBodySpace
+
   type :: MSpace
     type(Orbits) :: sps
+    type(OrbitsIsospin) :: isps
     type(OneBodySpace) :: one
     type(TwoBodySpace) :: two
-    type(ThreeBodySpace) :: thr
+    !type(ThreeBodySpace) :: thr ! Orthogonal pn three-body
+    type(NonOrthIsospinThreeBodySpace) :: thr
     logical :: is_constructed=.false.
     logical :: is_three_body =.false.
     real(8), allocatable :: NOCoef(:)
+    real(8) :: hw
     integer, allocatable :: holes(:)
     integer, allocatable :: particles(:)
     character(:), allocatable :: Nucl
@@ -171,6 +227,7 @@ contains
 
   subroutine FinMSpace(this)
     class(MSpace), intent(inout) :: this
+
     if(.not. this%is_constructed) return
     deallocate(this%NOCoef)
     deallocate(this%holes)
@@ -179,13 +236,27 @@ contains
     call this%one%fin()
     call this%two%fin()
     if(.not. this%is_three_body) return
+    call this%isps%fin()
     call this%thr%fin()
   end subroutine FinMSpace
 
-  subroutine InitMSpaceFromAZN(this, A, Z, N, emax, e2max, e3max, lmax)
+  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, lmax)
+    class(MSpace), intent(inout) :: this
+    character(*), intent(in) :: Nucl
+    real(8), intent(in) :: hw
+    integer, intent(in) :: emax, e2max
+    integer, intent(in), optional :: e3max, lmax
+    integer :: A, Z, N
+
+    call GetAZNFromReference(Nucl,A,Z,N)
+    call this%init(A,Z,N,hw,emax,e2max,e3max,lmax)
+  end subroutine InitMSpaceFromReference
+
+  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax)
     use Profiler, only: timer
     use ClassSys, only: sys
     class(MSpace), intent(inout) :: this
+    real(8), intent(in) :: hw
     integer, intent(in) :: A, Z, N
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
@@ -209,6 +280,7 @@ contains
     this%emax = emax
     this%e2max = e2max
     this%lmax = emax
+    this%hw = hw
     if(present(e3max)) this%e3max = e3max
     if(present(lmax)) this%lmax = lmax
     write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
@@ -216,6 +288,7 @@ contains
       write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
     end if
     write(*,'(a,i3)') ", lmax=",this%lmax
+    write(*,'(a,f6.2,a)') " hw = ",this%hw, " MeV"
     call this%sps%init(this%emax,this%lmax)
     call this%GetNOCoef()
     call this%GetParticleHoleOrbits()
@@ -242,27 +315,18 @@ contains
     write(*,'(a,i3)') "    TwoBody: ", this%two%NChan
     if(.not. present(e3max)) then
       write(*,*)
+      call timer%countup_memory("Model Space")
       call timer%Add('Construct Model Space', omp_get_wtime()-ti)
       return
     end if
     this%is_three_body = .true.
-    call this%thr%init(this%sps, this%e2max, this%e3max)
+    call this%isps%init(this%emax)
+    call this%thr%init(this%isps, this%e2max, this%e3max)
     write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
     write(*,*)
     call timer%countup_memory("Model Space")
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
-
-  subroutine InitMSpaceFromReference(this, Nucl, emax, e2max, e3max, lmax)
-    class(MSpace), intent(inout) :: this
-    character(*), intent(in) :: Nucl
-    integer, intent(in) :: emax, e2max
-    integer, intent(in), optional :: e3max, lmax
-    integer :: A, Z, N
-
-    call GetAZNFromReference(Nucl,A,Z,N)
-    call this%init(A,Z,N,emax,e2max,e3max,lmax)
-  end subroutine InitMSpaceFromReference
 
   subroutine GetNOCoef(this)
     ! This should be called after obtaining A, Z, N
@@ -706,6 +770,637 @@ contains
 #endif
   end subroutine InitTwoBodyChannel
 
+  subroutine FinNonOrthIsospinThreeBodySpace(this)
+    class(NonOrthIsospinThreeBodySpace), intent(inout) :: this
+    integer :: ich
+    do ich = 1, this%NChan
+      call this%jpt(ich)%fin()
+    end do
+    deallocate(this%jpt)
+    deallocate(this%jpt2ch)
+  end subroutine FinNonOrthIsospinThreeBodySpace
+
+  subroutine InitNonOrthIsospinThreeBodySpace(this, sps, e2max, e3max)
+    use CommonLibrary, only: triag
+    class(NonOrthIsospinThreeBodySpace), intent(inout) :: this
+    type(OrbitsIsospin), intent(in) :: sps
+    integer, intent(in) :: e2max, e3max
+    integer :: j, p, t, ich, nidx, n
+    integer :: i1, j1, l1, e1
+    integer :: i2, j2, l2, e2
+    integer :: i3, j3, l3, e3
+    integer :: j12, t12, j12min, j12max, t12min, t12max
+    integer :: nj
+    integer, allocatable :: jj(:), pp(:), tt(:), nn(:), nnidx(:)
+    type :: spis2n
+      integer, allocatable :: spis2nidx(:,:,:)
+    end type spis2n
+    type(spis2n), allocatable :: ch(:)
+
+    allocate(this%jpt2ch(1:2*min(e3max,3*sps%lmax)+3,-1:1,1:3))
+    this%jpt2ch(:,:,:) = 0
+    ich = 0
+    do j = 1, 2*min(e3max,3*sps%lmax)+3, 2
+      do p = 1, -1, -2
+        do t = 1, 3, 2
+          n = 0
+          nidx = 0
+          do i1 = 1, sps%norbs
+            j1 = sps%orb(i1)%j
+            l1 = sps%orb(i1)%l
+            e1 = sps%orb(i1)%e
+            do i2 = 1, i1
+              j2 = sps%orb(i2)%j
+              l2 = sps%orb(i2)%l
+              e2 = sps%orb(i2)%e
+              if(e1 + e2 > e2max) cycle
+              do i3 = 1, i2
+                j3 = sps%orb(i3)%j
+                l3 = sps%orb(i3)%l
+                e3 = sps%orb(i3)%e
+                if(e1 + e3 > e2max) cycle
+                if(e2 + e3 > e2max) cycle
+                if(e1 + e2 + e3 > e3max) cycle
+                if((-1) ** (l1+l2+l3) /= p) cycle
+
+                nj = 0
+                j12min = (j1+j2)/2
+                j12max = abs(j1-j2)/2
+                t12min = 1
+                t12max = 0
+                do j12 = abs(j1-j2)/2, (j1+j2)/2
+                  if(triag(2*j12,j3,j)) cycle
+                  do t12 = 0, 1
+                    if(triag(2*t12, 1,t)) cycle
+                    if(i1 == i2 .and. mod(j12+t12,2) == 0) cycle
+                    n = n + 1
+                    nj = nj + 1
+                    j12max = max(j12, j12max)
+                    j12min = min(j12, j12min)
+                    t12max = max(t12, t12max)
+                    t12min = min(t12, t12max)
+
+                  end do
+                end do
+                if(nj /= 0) nidx = nidx + 1
+              end do
+            end do
+          end do
+          if(n /= 0) then
+            ich = ich + 1
+            this%jpt2ch(j,p,t) = ich
+          end if
+
+        end do
+      end do
+    end do
+    this%NChan = ich
+
+    allocate(this%jpt(ich))
+    allocate(jj(ich))
+    allocate(pp(ich))
+    allocate(tt(ich))
+    allocate(nn(ich))
+    allocate(nnidx(ich))
+    allocate(ch(ich))
+    do ich = 1, this%NChan
+      allocate(ch(ich)%spis2nidx(sps%norbs,sps%norbs,sps%norbs))
+      ch(ich)%spis2nidx(:,:,:) = 0
+    end do
+
+    ich = 0
+    do j = 1, 2*min(e3max,3*sps%lmax)+3, 2
+      do p = 1, -1, -2
+        do t = 1, 3, 2
+          n = 0
+          nidx = 0
+          do i1 = 1, sps%norbs
+            j1 = sps%orb(i1)%j
+            l1 = sps%orb(i1)%l
+            e1 = sps%orb(i1)%e
+            do i2 = 1, i1
+              j2 = sps%orb(i2)%j
+              l2 = sps%orb(i2)%l
+              e2 = sps%orb(i2)%e
+              if(e1 + e2 > e2max) cycle
+              do i3 = 1, i2
+                j3 = sps%orb(i3)%j
+                l3 = sps%orb(i3)%l
+                e3 = sps%orb(i3)%e
+                if(e1 + e3 > e2max) cycle
+                if(e2 + e3 > e2max) cycle
+                if(e1 + e2 + e3 > e3max) cycle
+                if((-1) ** (l1+l2+l3) /= p) cycle
+
+                nj = 0
+                j12min = (j1+j2)/2
+                j12max = abs(j1-j2)/2
+                t12min = 1
+                t12max = 0
+                do j12 = abs(j1-j2)/2, (j1+j2)/2
+                  if(triag(2*j12,j3,j)) cycle
+                  do t12 = 0, 1
+                    if(triag(2*t12, 1,t)) cycle
+                    if(i1 == i2 .and. mod(j12+t12,2) == 0) cycle
+                    n = n + 1
+                    nj = nj + 1
+                    j12max = max(j12, j12max)
+                    j12min = min(j12, j12min)
+                    t12max = max(t12, t12max)
+                    t12min = min(t12, t12max)
+
+                  end do
+                end do
+                if(nj /= 0) then
+                  nidx = nidx + 1
+                  ch(ich+1)%spis2nidx(i1,i2,i3) = nidx
+                end if
+              end do
+            end do
+          end do
+          if(n /= 0) then
+            ich = ich + 1
+            jj(ich) = j
+            pp(ich) = p
+            tt(ich) = t
+            nn(ich) = n
+            nnidx(ich) = nidx
+          end if
+
+        end do
+      end do
+    end do
+
+    do ich = 1, this%NChan
+      call this%jpt(ich)%init(jj(ich),pp(ich),tt(ich),nn(ich),nnidx(ich),&
+          & ch(ich)%spis2nidx, sps, e2max, e3max)
+      deallocate(ch(ich)%spis2nidx)
+      call this%jpt(ich)%set( jj(ich),pp(ich),tt(ich), sps, e2max, e3max)
+    end do
+    deallocate(ch)
+  end subroutine InitNonOrthIsospinThreeBodySpace
+
+  subroutine FinNonOrthIsospinThreeBodyChannel(this)
+    class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
+    integer :: idx
+    do idx = 1, this%n_idx
+      deallocate(this%idxqn(idx)%JT2n)
+    end do
+
+    do idx = 1, this%n_sort
+      call this%sort(idx)%fin()
+    end do
+
+    deallocate(this%sort)
+    deallocate(this%idxqn)
+    deallocate(this%n2spi1)
+    deallocate(this%n2spi2)
+    deallocate(this%n2spi3)
+    deallocate(this%n2J12 )
+    deallocate(this%n2T12 )
+    deallocate(this%spis2idx)
+    deallocate(this%sorting)
+  end subroutine FinNonOrthIsospinThreeBodyChannel
+
+  subroutine InitNonOrthIsospinThreeBodyChannel(this,j,p,t,n,nidx,spis2idx,sps,e2max,e3max)
+    use CommonLibrary, only: triag
+    class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
+    integer, intent(in) :: j, p, t, n, nidx, spis2idx(:,:,:), e2max, e3max
+    type(OrbitsIsospin), intent(in) :: sps
+    integer :: j12max, j12min, t12max, t12min, j12, t12
+    integer :: i1, j1, l1, e1
+    integer :: i2, j2, l2, e2
+    integer :: i3, j3, l3, e3
+    integer :: nj, cnt, idx
+
+    this%j = j
+    this%p = p
+    this%t = t
+    this%nst = n
+    this%n_idx = nidx
+    this%spis2idx = spis2idx
+#ifdef ModelSpaceDebug
+    write(*,'(a,i3,a,i3,a,i3,a)') "Three-body channel: J=", j, "/2, P=", p, ", T=", t, "/2"
+#endif
+    allocate(this%idxqn(this%n_idx))
+    allocate(this%n2spi1(n))
+    allocate(this%n2spi2(n))
+    allocate(this%n2spi3(n))
+    allocate(this%n2J12( n))
+    allocate(this%n2T12( n))
+
+    idx = 0
+    do i1 = 1, sps%norbs
+      j1 = sps%orb(i1)%j
+      l1 = sps%orb(i1)%l
+      e1 = sps%orb(i1)%e
+      do i2 = 1, i1
+        j2 = sps%orb(i2)%j
+        l2 = sps%orb(i2)%l
+        e2 = sps%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, i2
+          j3 = sps%orb(i3)%j
+          l3 = sps%orb(i3)%l
+          e3 = sps%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+          if((-1) ** (l1+l2+l3) /= p) cycle
+
+          j12min = (j1+j2)/2
+          j12max = abs(j1-j2)/2
+          t12min = 1
+          t12max = 0
+          nj = 0
+          do j12 = abs(j1-j2)/2, (j1+j2)/2
+            if(triag(2*j12,j3,j)) cycle
+            do t12 = 0, 1
+              if(triag(2*t12, 1,t)) cycle
+              if(i1 == i2 .and. mod(j12+t12,2) == 0) cycle
+              nj = nj + 1
+              j12max = max(j12, j12max)
+              j12min = min(j12, j12min)
+              t12max = max(t12, t12max)
+              t12min = min(t12, t12min)
+
+            end do
+          end do
+
+          if(nj /= 0) then
+            idx = idx + 1
+            this%idxqn(idx)%j12max = j12max
+            this%idxqn(idx)%j12min = j12min
+            this%idxqn(idx)%t12max = t12max
+            this%idxqn(idx)%t12min = t12min
+            allocate(this%idxqn(idx)%JT2n(j12min:j12max,t12min:t12max))
+          end if
+        end do
+      end do
+    end do
+
+    cnt = 0
+    idx = 0
+    do i1 = 1, sps%norbs
+      j1 = sps%orb(i1)%j
+      l1 = sps%orb(i1)%l
+      e1 = sps%orb(i1)%e
+      do i2 = 1, i1
+        j2 = sps%orb(i2)%j
+        l2 = sps%orb(i2)%l
+        e2 = sps%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, i2
+          j3 = sps%orb(i3)%j
+          l3 = sps%orb(i3)%l
+          e3 = sps%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+          if((-1) ** (l1+l2+l3) /= p) cycle
+
+          j12min = (j1+j2)/2
+          j12max = abs(j1-j2)/2
+          t12min = 1
+          t12max = 0
+          nj = 0
+          do j12 = abs(j1-j2)/2, (j1+j2)/2
+            if(triag(2*j12,j3,j)) cycle
+            do t12 = 0, 1
+              if(triag(2*t12, 1,t)) cycle
+              if(i1 == i2 .and. mod(j12+t12,2) == 0) cycle
+              nj = nj + 1
+              cnt = cnt + 1
+              this%idxqn(idx+1)%JT2n(j12,t12) = cnt
+            end do
+          end do
+          if(nj /= 0) then
+            idx = idx + 1
+          end if
+        end do
+      end do
+    end do
+  end subroutine InitNonOrthIsospinThreeBodyChannel
+
+  subroutine SetSortingIndices(this,j,p,t,sps,e2max,e3max)
+    use CommonLibrary, only: triag
+    class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
+    type(OrbitsIsospin), intent(in) :: sps
+    integer, intent(in) :: j, p, t, e2max, e3max
+    integer :: i1, l1, j1, e1
+    integer :: i2, l2, j2, e2
+    integer :: i3, l3, j3, e3
+    integer :: a, b, c, n_recouple, idx_sorted
+    integer :: cnt, idx
+    integer :: j12min, j12, j12max
+    integer :: t12min, t12, t12max
+
+    allocate(this%sorting(sps%norbs,sps%norbs,sps%norbs))
+    this%sorting(:,:,:) = 0
+    idx = 0
+    do i1 = 1, sps%norbs
+      j1 = sps%orb(i1)%j
+      l1 = sps%orb(i1)%l
+      e1 = sps%orb(i1)%e
+      do i2 = 1, sps%norbs
+        j2 = sps%orb(i2)%j
+        l2 = sps%orb(i2)%l
+        e2 = sps%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, sps%norbs
+          j3 = sps%orb(i3)%j
+          l3 = sps%orb(i3)%l
+          e3 = sps%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+          if((-1) ** (l1+l2+l3) /= p) cycle
+          idx = idx + 1
+          this%sorting(i1,i2,i3) = idx
+        end do
+      end do
+    end do
+
+    this%n_sort = idx
+    allocate(this%sort(this%n_sort))
+    cnt = 0
+    do i1 = 1, sps%norbs
+      j1 = sps%orb(i1)%j
+      l1 = sps%orb(i1)%l
+      e1 = sps%orb(i1)%e
+      do i2 = 1, sps%norbs
+        j2 = sps%orb(i2)%j
+        l2 = sps%orb(i2)%l
+        e2 = sps%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, sps%norbs
+          j3 = sps%orb(i3)%j
+          l3 = sps%orb(i3)%l
+          e3 = sps%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+          if((-1) ** (l1+l2+l3) /= p) cycle
+
+          call Sort123(i1,i2,i3,a,b,c,n_recouple)
+          idx        = this%sorting(i1,i2,i3)
+          idx_sorted = this%spis2idx(a,b,c)
+          this%sort(idx)%idx_sorted = idx_sorted
+          if(idx == 0) cycle
+          if(idx_sorted == 0) cycle
+
+          j12min = (j1+j2)/2
+          j12max = abs(j1-j2)/2
+          t12min = 1
+          t12max = 0
+
+          do j12 = iabs(j1-j2)/2, (j1+j2)/2
+            if(triag(2*j12, j3, j)) cycle
+            do t12 = 0, 1
+              if(triag(2*t12,  1, t)) cycle
+              if(i1 == i2 .and. mod(j12+t12, 2) == 0) cycle
+              j12min = min(j12min, j12)
+              j12max = max(j12max, j12)
+              t12min = min(t12min, t12)
+              t12max = max(t12max, t12)
+            end do
+          end do
+
+          this%sort(idx)%j12min = j12min
+          this%sort(idx)%j12max = j12max
+          this%sort(idx)%t12min = t12min
+          this%sort(idx)%t12max = t12max
+          allocate(this%sort(idx)%jt(j12min:j12max,t12min:t12max))
+          call this%sort(idx)%init(sps,i1,i2,i3,a,b,c,&
+              & n_recouple,j,t,this%idxqn(idx_sorted))
+
+        end do
+      end do
+    end do
+  end subroutine SetSortingIndices
+
+  subroutine Sort123(i1,i2,i3,ii1,ii2,ii3,n_recouple)
+    integer, intent(in) :: i1, i2, i3
+    integer, intent(out) :: ii1, ii2, ii3, n_recouple
+
+    n_recouple = 0
+    if(i1 >= i2 .and. i2 >= i3) n_recouple = 1                ! i1 >= i2 >= i3
+    if(i1 >= i2 .and. i2 <  i3 .and. i1 >= i3) n_recouple = 2 ! i1 >= i3 >  i2
+    if(i1 >= i2 .and. i2 <  i3 .and. i1 <  i3) n_recouple = 3 ! i3 >  i1 >= i2
+    if(i1 <  i2 .and. i1 >= i3) n_recouple = 4                ! i2 >  i1 >= i3
+    if(i1 <  i2 .and. i1 <  i3 .and. i2 >= i3) n_recouple = 5 ! i2 >= i3 >  i1
+    if(i1 <  i2 .and. i1 <  i3 .and. i2 <  i3) n_recouple = 6 ! i3 >  i2 >  i1
+
+    select case(n_recouple)
+    case(1)
+      ii1 = i1; ii2 = i2; ii3 = i3
+    case(2)
+      ii1 = i1; ii2 = i3; ii3 = i2
+    case(3)
+      ii1 = i3; ii2 = i1; ii3 = i2
+    case(4)
+      ii1 = i2; ii2 = i1; ii3 = i3
+    case(5)
+      ii1 = i2; ii2 = i3; ii3 = i1
+    case(6)
+      ii1 = i3; ii2 = i2; ii3 = i1
+    case default
+      write(*,*) "Error in Sort123"
+      stop
+    end select
+  end subroutine Sort123
+
+  subroutine fin_sort_index(this)
+    class(sort_index), intent(inout) :: this
+    integer :: j12, t12
+    if(this%idx_sorted == 0) return
+    do j12 = this%j12min, this%j12max
+      do t12 = this%t12min, this%t12max
+        if(this%JT(j12,t12)%n == 0) cycle
+        deallocate(this%JT(j12,t12)%TrnsCoef)
+        deallocate(this%JT(j12,t12)%Idx2num)
+      end do
+    end do
+    deallocate(this%JT)
+  end subroutine fin_sort_index
+
+  subroutine init_sort_index(this, sps, i1, i2, i3, a, b, c, &
+        &    n_recouple, j, t, NOIAQN)
+    use CommonLibrary, only: triag, sjs, hat
+    class(sort_index), intent(inout) :: this
+    type(OrbitsIsospin), intent(in) :: sps
+    integer, intent(in) :: i1, i2, i3, a, b, c, n_recouple, j, t
+    type(NonOrthIsospinAdditionalQN), intent(in) :: NOIAQN
+    integer :: n, loop
+    integer :: j1, j2, j3, ja, jb, jc
+    integer :: j12, t12, jab, tab
+
+    j1 = sps%orb(i1)%j
+    j2 = sps%orb(i2)%j
+    j3 = sps%orb(i3)%j
+    ja = sps%orb(a)%j
+    jb = sps%orb(b)%j
+    jc = sps%orb(c)%j
+    do j12 = iabs(j1 - j2) / 2, (j1 + j2)/2
+      do t12 = 0, 1
+        if(i1 == i2 .and. mod(j12 + t12, 2) == 0) cycle
+        if(triag(2 * t12,  1, t)) cycle
+        if(triag(2 * j12, j3, j)) cycle
+        do loop = 1, 2
+          if(loop == 1) then
+            n = 0
+            if(n_recouple == 1 .or. n_recouple == 4) then
+              n = 1
+            else
+              do jab = iabs(ja - jb)/2, (ja + jb)/2
+                do tab = 0, 1
+                  if(a == b .and. mod(jab + tab, 2) == 0) cycle
+                  if(triag(2 * tab,  1, t)) cycle
+                  if(triag(2 * jab, jc, j)) cycle
+                  n = n + 1
+                end do
+              end do
+            end if
+            this%jt(j12, t12)%n = n
+            allocate(this%jt(j12,t12)%idx2num( n))
+            allocate(this%jt(j12,t12)%TrnsCoef(n))
+            this%jt(j12,t12)%idx2num(:) = 0
+#ifdef single_precision
+            this%jt(j12,t12)%TrnsCoef(:) = 0.0
+#else
+            this%jt(j12,t12)%TrnsCoef(:) = 0.d0
+#endif
+          elseif(loop == 2) then
+            n = 0
+            select case(n_recouple)
+            case(1)
+              n = 1
+#ifdef single_precision
+              this%jt(j12,t12)%TrnsCoef(n) = 1.0
+#else
+              this%jt(j12,t12)%TrnsCoef(n) = 1.d0
+#endif
+              this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(j12, t12)
+            case(2)
+              do jab = iabs(ja - jb)/2, (ja + jb)/2
+                do tab = 0, 1
+                  if(a == b .and. mod(jab + tab, 2) == 0) cycle
+                  if(triag(2 * tab,  1, t)) cycle
+                  if(triag(2 * jab, jc, j)) cycle
+                  n = n + 1
+#ifdef single_precision
+                  this%jt(j12,t12)%TrnsCoef(n) = &
+                      & real((-1.d0) ** ((jb + jc) / 2 + j12 + jab + t12 + tab) * &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab, t,  1, 2 * t12))
+#else
+                  this%jt(j12,t12)%TrnsCoef(n) = &
+                      & (-1.d0) ** ((jb + jc) / 2 + j12 + jab + t12 + tab) * &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab, t,  1, 2 * t12)
+#endif
+                  this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
+                end do
+              end do
+            case(3)
+              do jab = iabs(ja - jb)/2, (ja + jb)/2
+                do tab = 0, 1
+                  if(a == b .and. mod(jab + tab, 2) == 0) cycle
+                  if(triag(2 * tab,  1, t)) cycle
+                  if(triag(2 * jab, jc, j)) cycle
+                  n = n + 1
+#ifdef single_precision
+                  this%jt(j12,t12)%TrnsCoef(n) = real(&
+                      & - (-1.d0) ** ((jb + jc) / 2 + j12 + t12) * &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab,  1, t, 2 * t12))
+#else
+                  this%jt(j12,t12)%TrnsCoef(n) = &
+                      & - (-1.d0) ** ((jb + jc) / 2 + j12 + t12) * &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab,  1, t, 2 * t12)
+#endif
+                  this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
+                end do
+              end do
+            case(4)
+              n = n + 1
+#ifdef single_precision
+              this%jt(j12,t12)%TrnsCoef(n) = real(&
+                  & (-1.d0) ** ((ja + jb) / 2 - j12 - t12))
+#else
+              this%jt(j12,t12)%TrnsCoef(n) = &
+                  & (-1.d0) ** ((ja + jb) / 2 - j12 - t12)
+#endif
+              this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(j12, t12)
+            case(5)
+              do jab = iabs(ja - jb)/2, (ja + jb)/2
+                do tab = 0, 1
+                  if(a == b .and. mod(jab + tab, 2) == 0) cycle
+                  if(triag(2 * tab,  1, t)) cycle
+                  if(triag(2 * jab, jc, j)) cycle
+                  n = n + 1
+#ifdef single_precision
+                  this%jt(j12,t12)%TrnsCoef(n) = real(&
+                      & - (-1.d0) ** ((ja + jb) / 2 + jab+ tab) * &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab, t, 1, 2 * t12))
+#else
+                  this%jt(j12,t12)%TrnsCoef(n) = &
+                      & - (-1.d0) ** ((ja + jb) / 2 + jab+ tab) * &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab, t, 1, 2 * t12)
+#endif
+                  this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
+                end do
+              end do
+            case(6)
+              do jab = iabs(ja - jb)/2, (ja + jb)/2
+                do tab = 0, 1
+                  if(a == b .and. mod(jab + tab, 2) == 0) cycle
+                  if(triag(2 * tab,  1, t)) cycle
+                  if(triag(2 * jab, jc, j)) cycle
+                  n = n + 1
+#ifdef single_precision
+                  this%jt(j12,t12)%TrnsCoef(n) = &
+                      & real(- &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab,  1, t, 2 * t12))
+#else
+                  this%jt(j12,t12)%TrnsCoef(n) = &
+                      & - &
+                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
+                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sjs( 1,  1, 2 * tab,  1, t, 2 * t12)
+#endif
+                  this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
+                end do
+              end do
+
+            end select
+          end if
+        end do
+        !write(*,'(10f10.4)') this%jt(j12,t12)%TrnsCoef
+
+      end do
+    end do
+  end subroutine init_sort_index
+
   subroutine FinThreeBodySpace(this)
     class(ThreeBodySpace), intent(inout) :: this
     integer :: ich
@@ -715,6 +1410,7 @@ contains
     deallocate(this%jpz)
     deallocate(this%jpz2ch)
   end subroutine FinThreeBodySpace
+
 
   subroutine InitThreeBodySpace(this, sps, e2max, e3max)
     class(ThreeBodySpace), intent(inout) :: this
@@ -1230,8 +1926,8 @@ program main
 
   call timer%init()
   call init_dbinomial_triangle()
-  !call ms%init('O18', 4, 8, e3max=4, lmax=4)
-  call ms%init('48Ca', 4, 8, e3max=2)
+  !call ms%init('O18', 20.d0, 4, 8, e3max=4, lmax=4)
+  call ms%init('48Ca', 20.d0, 14, 28, e3max=14)
   call ms%fin()
   call fin_dbinomial_triangle()
   call timer%fin()

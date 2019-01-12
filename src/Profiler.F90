@@ -242,6 +242,7 @@ contains
     integer :: i
     real(8) :: mtotal, a
 
+    if(this%os /= 'Linux') return
     if (myrank==0) write(*,*)
     call this%cmemory()
     mtotal = 0.d0
