@@ -195,6 +195,7 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
+    call timer%cmemory()
     write(*,*)
     write(*,'(a)') "### Model-space constructor ###"
     Nucl = trim(s%str(A)) // trim(elements(Z+1))
@@ -241,6 +242,7 @@ contains
     call this%thr%init(this%sps, this%e2max, this%e3max)
     write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
     write(*,*)
+    call timer%tmemory("Model Space")
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
 
@@ -725,7 +727,7 @@ contains
     allocate(this%jpz2ch(1:2*min(e3max,3*sps%lmax)+3,-1:1,-3:3))
     this%jpz2ch(:,:,:) = 0
     ich = 0
-    do j = 1, 2*min(e3max,3*sps%lmax)+3
+    do j = 1, 2*min(e3max,3*sps%lmax)+3, 2
       do p = 1, -1, -2
         do z = -3, 3, 2
           n = 0
@@ -780,7 +782,7 @@ contains
     end do
 
     ich = 0
-    do j = 1, 2*min(e3max,3*sps%lmax)+3
+    do j = 1, 2*min(e3max,3*sps%lmax)+3, 2
       do p = 1, -1, -2
         do z = -3, 3, 2
           n = 0
@@ -1047,11 +1049,12 @@ contains
           kk = kk + 1
           this%cfp(i,kk) = sol%vec%m(i, k)
         end if
+
+        if(abs(1.d0 - sol%eig%v(k)) > 1.d-4 .and. abs(sol%eig%v(k)) > 1.d-4) then
+          write(*,'(10f12.6)') sol%eig%v(k)
+        end if
       end do
     end do
-#ifdef ModelSpaceDebug
-    write(*,'(10f12.6)') sol%eig%v
-#endif
     call mat%Fin()
     call sol%fin()
   end subroutine InitAdditionalQN
@@ -1149,12 +1152,12 @@ contains
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
     real(8) :: phase12, phase23, phase31
-    phase12 = (-1.d0) ** ((sps%orb(i4)%j + sps%orb(i5)%j)/2 - j45)
-    phase23 = (-1.d0) ** ((sps%orb(i5)%j + sps%orb(i6)%j)/2 - j45)
-    phase31 = (-1.d0) ** ((sps%orb(i6)%j + sps%orb(i4)%j)/2 - j45)
+    phase12 = (-1.d0) ** ((sps%orb(i1)%j + sps%orb(i2)%j)/2 - j45)
+    phase23 = (-1.d0) ** ((sps%orb(i2)%j + sps%orb(i3)%j)/2 - j45)
+    phase31 = (-1.d0) ** ((sps%orb(i3)%j + sps%orb(i1)%j)/2 - j45)
     a = 0.d0
-    a = a + A3drct(i1, i2, i3, j12, i4, i5, i6, j45)
-    a = a - A3drct(i1, i2, i3, j12, i5, i4, i6, j45) * phase12
+    a = a + A3drct(     i1, i2, i3, j12, i4, i5, i6, j45   )
+    a = a - A3drct(     i1, i2, i3, j12, i5, i4, i6, j45   ) * phase12
     a = a + A3exc1(sps, i1, i2, i3, j12, i4, i5, i6, j45, j)
     a = a - A3exc1(sps, i1, i2, i3, j12, i5, i4, i6, j45, j) * phase31
     a = a + A3exc2(sps, i1, i2, i3, j12, i4, i5, i6, j45, j)
@@ -1221,8 +1224,8 @@ program main
   call timer%init()
   call init_dbinomial_triangle()
   !call ms%init('O18', 4, 8, e3max=4, lmax=4)
-  call ms%init('16O', 2, 4, e3max=2)
+  call ms%init('16O', 10, 20, e3max=10)
   call ms%fin()
   call fin_dbinomial_triangle()
-  call timer%prt()
+  call timer%fin()
 end program main

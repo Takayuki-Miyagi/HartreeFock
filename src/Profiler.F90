@@ -9,22 +9,58 @@ module Profiler
     type(imap) :: counter
     type(dmap) :: timer
     real(8) :: start_time
+    real(8) :: total_memory = 0.d0
+    character(2) :: memory_unit = 'MB'
+    character(:), allocatable :: OS
+    character(9) :: tempfile = 'temp_prof'
   contains
     procedure :: init => InitProf
     procedure :: start => StartProf
     procedure :: fin => FinProf
     procedure :: add => AddProf
     procedure :: prt => PrintSummary
+    procedure :: set_unit => SetMemoryUnit
+    procedure :: cmemory => CurrentMemory
+    procedure :: tmemory => TargetMemory
   end type prof
 
   type(prof) :: timer
 
 contains
-  subroutine InitProf(this)
+  subroutine InitProf(this, ut)
     class(prof), intent(inout) :: this
+    character(*), intent(in), optional :: ut
+    character(512) :: os_str
+    integer :: io
+
+    call system( 'uname > ' // trim(this%tempfile) )
+    open(999,file=this%tempfile,iostat=io)
+    if(io /= 0) then
+      write(*,*) "Error opening file in InitProf"
+      stop
+    end if
+    read(999,*,iostat=io) os_str
+    if(io /= 0) then
+      write(*,*) "Error reading file in InitProf"
+      stop
+    end if
+    close(999)
+    call system( 'rm ' // trim(this%tempfile) )
+
+    select case(os_str)
+    case("Linux", "linux")
+      this%OS = "Linux"
+    case("Darwin","darwin")
+      this%OS = "OSX"
+    case default
+      write(*,'(2a)') "OS type is not clear: ", os_str
+      this%OS = "unkown"
+    end select
+
     this%start_time = omp_get_wtime()
     call this%counter%append('Total',1)
     call this%timer%append('Total',0.d0)
+    if(present(ut)) call this%set_unit(ut)
   end subroutine InitProf
 
   subroutine StartProf(this,key)
@@ -83,66 +119,99 @@ contains
 
   end subroutine PrintSummary
 
+  subroutine SetMemoryUnit(this,ut)
+    class(prof), intent(inout) :: this
+    character(*), intent(in) :: ut
+    this%memory_unit = ut
+  end subroutine SetMemoryUnit
+
+  subroutine CurrentMemory(this, msg)
+    class(prof), intent(inout) :: this
+    character(*), intent(in), optional :: msg
+    integer :: io
+    character(512) :: c_num, fn_proc, tmp1, tmp2, cmd
+
+    if(this%os /= 'Linux') return
+    write(c_num,'(i0)') getpid()
+    fn_proc = '/proc/' // trim(c_num) // '/status'
+    cmd = 'cat ' // trim(fn_proc) // ' | grep VmRSS > ' // trim(this%tempfile)
+    call system( trim(cmd) )
+    open(999,file=this%tempfile,iostat=io)
+    if(io /= 0) then
+      write(*,*) "File opening error in CurrentMemory"
+      stop
+    end if
+
+    read(999,*,iostat=io) tmp1, this%total_memory, tmp2
+
+    if(io /= 0) then
+      write(*,*) "File reading error in CurrentMemory"
+      stop
+    end if
+    close(999)
+    cmd = 'rm ' // trim(this%tempfile)
+    call system( trim(cmd) )
+
+    select case(this%memory_unit)
+    case('kB')
+      timer%total_memory = timer%total_memory
+    case('MB')
+      timer%total_memory = timer%total_memory / dble(1024)
+    case('GB')
+      timer%total_memory = timer%total_memory / dble(1024)**2
+    end select
+
+    if(.not. present(msg) ) return
+    write(*,'(a,f12.4,2a)') trim(msg), timer%total_memory, &
+        & " ", trim(this%memory_unit)
+
+  end subroutine CurrentMemory
+
+  ! call timer%cmemory before using
+  ! msg is object name
+  subroutine TargetMemory(this, msg)
+    class(prof), intent(inout) :: this
+    character(*), intent(in) :: msg
+    real(8) :: mem_prev
+
+    if(this%os /= 'Linux') return
+    mem_prev = this%total_memory
+    call this%cmemory()
+    write(*,'(3a,f12.4,2a)') "Used memory for ", trim(msg), " is ", &
+        & this%total_memory - mem_prev, " ", trim(this%memory_unit)
+  end subroutine TargetMemory
+
   subroutine FinProf(this)
-    class(prof), intent(out) :: this
+    class(prof), intent(inout) :: this
+    call this%prt()
   end subroutine FinProf
 
 end module Profiler
 
 !program test_Profiler
 !  use omp_lib
-!  use Profiler, only: prof
+!  use Profiler, only: timer
 !  implicit none
-!  type(prof) :: timer
 !  integer :: i, j, k
 !  real(8) :: ti, tj, tk
 !  real(8) :: wa
+!  real(8), allocatable :: a(:), b(:)
+!
 !  call timer%init()
-!
-!  call timer%Start('iloop')
-!  call timer%Start('jloop')
-!  call timer%Start('kloop')
-!
-!  wa = 0.d0
-!  do i = 1, 10000
-!    ti = omp_get_wtime()
-!    wa = wa + dble(i)
-!    call timer%Add('iloop',omp_get_wtime()-ti)
-!  end do
-!
+!  allocate(a(10000000))
+!  a = 0.d0
+!  call timer%cmemory(.true.,'a is allocated : ')
 !  ti = omp_get_wtime()
-!  wa = 0.d0
-!  do j = 1, 10000000
-!    wa = wa + dble(j)
-!  end do
-!  call timer%Add('jloop',omp_get_wtime()-ti)
+!  allocate(b(100000000))
+!  call timer%add("Allocation ", omp_get_wtime() - ti)
+!  ti = omp_get_wtime()
+!  b = 0.d0
+!  call timer%add("All zero ", omp_get_wtime() - ti)
+!  call timer%tmemory('b')
 !
-!  ti = omp_get_wtime()
-!  wa = 0.d0
-!  do k = 1, 100000000
-!    wa = wa + dble(k)
-!  end do
-!  call timer%Add('kloop',omp_get_wtime()-ti)
 !
-!  ti = omp_get_wtime()
-!  wa = 0.d0
-!  do i = 1, 10000000
-!    wa = wa + dble(i)
-!  end do
-!  call timer%Add('iloop',omp_get_wtime()-ti)
-!  ti = omp_get_wtime()
-!  wa = 0.d0
-!  do i = 1, 10000000
-!    wa = wa + dble(i)
-!  end do
-!  call timer%Add('iloop',omp_get_wtime()-ti)
-!  ti = omp_get_wtime()
-!  wa = 0.d0
-!  do i = 1, 10000000
-!    wa = wa + dble(i)
-!  end do
-!  call timer%Add('iloop',omp_get_wtime()-ti)
+!  deallocate(a,b)
 !
-!  call timer%prt()
+!  call timer%fin()
 !
 !end program test_Profiler
