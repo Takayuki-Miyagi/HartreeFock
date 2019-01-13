@@ -769,7 +769,7 @@ contains
         this%spis2n(i1,i2) = cnt
         this%spis2n(i2,i1) = cnt
         this%iphase(i1,i2) = 1
-        this%iphase(i1,i2) = -(-1) ** ((j1+j2)/2 - j)
+        this%iphase(i2,i1) = -(-1) ** ((j1+j2)/2 - j)
 #ifdef ModelSpaceDebug
         write(*,'(a,i3,a,i3,a,i6)') "i1=",i1,", i2=",i2,", Num=",cnt
 #endif
