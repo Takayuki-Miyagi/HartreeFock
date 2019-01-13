@@ -32,6 +32,16 @@ module ModelSpace
   private :: InitTwoBodySpace
   private :: FinTwoBodyChannel
   private :: InitTwoBodyChannel
+
+  private :: FinNonOrthIsospinThreeBodySpace
+  private :: InitNonOrthIsospinThreeBodySpace
+  private :: FinNonOrthIsospinThreeBodyChannel
+  private :: InitNonOrthIsospinThreeBodyChannel
+  private :: SetSortingIndices
+  private :: Sort123
+  private :: fin_sort_index
+  private :: init_sort_index
+
   private :: FinThreeBodySpace
   private :: InitThreeBodySpace
   private :: FinThreeBodyChannel
@@ -132,7 +142,7 @@ module ModelSpace
   end type coef
 
   type :: sort_index
-    integer :: idx_sorted
+    integer :: idx_sorted = 0
     integer :: j12min, j12max
     integer :: t12min, t12max
     type(coef), allocatable :: jt(:,:)
@@ -184,7 +194,7 @@ module ModelSpace
     logical :: is_constructed=.false.
     logical :: is_three_body =.false.
     real(8), allocatable :: NOCoef(:)
-    real(8) :: hw
+    real(8) :: hw, beta = 0.d0
     integer, allocatable :: holes(:)
     integer, allocatable :: particles(:)
     character(:), allocatable :: Nucl
@@ -1917,18 +1927,18 @@ contains
 end module ModelSpace
 
 ! main for test
-program main
-  use Profiler, only: timer
-  use ModelSpace, only: MSpace
-  use CommonLibrary, only: &
-      &init_dbinomial_triangle, fin_dbinomial_triangle
-  type(MSpace) :: ms
-
-  call timer%init()
-  call init_dbinomial_triangle()
-  !call ms%init('O18', 20.d0, 4, 8, e3max=4, lmax=4)
-  call ms%init('48Ca', 20.d0, 14, 28, e3max=14)
-  call ms%fin()
-  call fin_dbinomial_triangle()
-  call timer%fin()
-end program main
+!program main
+!  use Profiler, only: timer
+!  use ModelSpace, only: MSpace
+!  use CommonLibrary, only: &
+!      &init_dbinomial_triangle, fin_dbinomial_triangle
+!  type(MSpace) :: ms
+!
+!  call timer%init()
+!  call init_dbinomial_triangle()
+!  !call ms%init('O18', 20.d0, 4, 8, e3max=4, lmax=4)
+!  call ms%init('O16', 20.d0, 14, 28, e3max=14)
+!  call ms%fin()
+!  call fin_dbinomial_triangle()
+!  call timer%fin()
+!end program main

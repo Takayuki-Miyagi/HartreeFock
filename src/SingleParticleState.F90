@@ -12,6 +12,8 @@ module SingleParticleState
   private :: FinOrbitsIsospin
   private :: InitOrbits
   private :: FinOrbits
+  private :: iso2pn
+  private :: pn2iso
 
   type :: SingleParticleOrbitIsospin
     integer :: n = -1
@@ -42,6 +44,7 @@ module SingleParticleState
   contains
     procedure :: init => InitOrbitsIsospin
     procedure :: fin => FinOrbitsIsospin
+    procedure :: iso2pn
   end type OrbitsIsospin
 
   type :: Orbits
@@ -52,6 +55,7 @@ module SingleParticleState
   contains
     procedure :: init => InitOrbits
     procedure :: fin => FinOrbits
+    procedure :: pn2iso
   end type Orbits
 
 contains
@@ -198,6 +202,28 @@ contains
         & 'indx=',idx,', n=', n, ', l=', l, ', j=', j, ', z=', z, ', e=', 2*n+l
 #endif
   end subroutine SetSingleParticleOrbit
+
+  function iso2pn(this, sps, idx, z) result(r)
+    class(OrbitsIsospin), intent(in) :: this
+    type(Orbits), intent(in) :: sps
+    integer, intent(in) :: idx, z
+    integer :: r
+
+    if(z /= -1 .and. z /= 1) then
+      write(*,'(a,i3)') "Error in iso2pn, tz has to be -1 or 1. tz = ", z
+      stop
+    end if
+    r=sps%nljz2idx(this%orb(idx)%n,this%orb(idx)%l,this%orb(idx)%j,z)
+  end function iso2pn
+
+  function pn2iso(this, sps, idx) result(r)
+    class(Orbits), intent(in) :: this
+    type(OrbitsIsospin), intent(in) :: sps
+    integer, intent(in) :: idx
+    integer :: r
+
+    r=sps%nlj2idx(this%orb(idx)%n,this%orb(idx)%l,this%orb(idx)%j)
+  end function pn2iso
 end module SingleParticleState
 
 ! main program for check

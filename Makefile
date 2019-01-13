@@ -1,7 +1,7 @@
 #--------------------------------------------------
 # Make file for TTFcalc code
 #--------------------------------------------------
-TARGET=MS
+TARGET=HF
 INSTLDIR=~/Desktop/HFtest/
 HOST= $(shell if hostname|grep -q apt1; then echo apt; else echo other; fi)
 $(info Host:$(HOST))
