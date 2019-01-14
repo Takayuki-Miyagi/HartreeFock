@@ -25,7 +25,7 @@ contains
 
   subroutine skip_comment(nfile, comment)
     implicit none
-    integer,intent(in)::nfile
+    integer,intent(in) :: nfile
     character(*), intent(in) :: comment
     type(sys) :: s
     character(20) :: line

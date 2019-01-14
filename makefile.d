@@ -1,9 +1,8 @@
 obj/CommonLibrary.o : src/CommonLibrary.f90 obj/ClassSys.o 
 obj/ClassSys.o : src/ClassSys.f90 
-obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/NOperators.o obj/ModelSpace.o 
-obj/NOperators.o : src/NOperators.F90 obj/Profiler.o obj/ClassSys.o obj/DefineOperators.o obj/CommonLibrary.o obj/ModelSpace.o obj/LinAlgLib.o 
+obj/Operators.o : src/Operators.F90 obj/CommonLibrary.o obj/Profiler.o obj/DefineOperators.o obj/NOperators.o obj/ModelSpace.o 
+obj/NOperators.o : src/NOperators.F90 obj/ClassSys.o obj/DefineOperators.o obj/CommonLibrary.o obj/ModelSpace.o obj/LinAlgLib.o 
 obj/MPIFunction.o : src/MPIFunction.F90 
-obj/OneBodyOperators.o : src/OneBodyOperators.F90 
 obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o 
 obj/ModelSpace.o : src/ModelSpace.F90 obj/LinAlgLib.o obj/CommonLibrary.o obj/ClassSys.o obj/Profiler.o obj/SingleParticleState.o 
 obj/SingleParticleState.o : src/SingleParticleState.F90 

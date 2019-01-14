@@ -30,6 +30,7 @@ contains
     integer :: na, la, ja, za
     integer :: nb, lb, jb, zb
 
+    r = 0.d0
     na = ia(1)
     la = ia(2)
     ja = ia(3)
@@ -104,6 +105,7 @@ contains
     real(8), intent(in) :: hw
     integer, intent(in) :: ia(4), ib(4), ic(4), id(4), A, Z, N, Jab, Jcd
 
+    r = 0.d0
     select case(optr)
     case("Hamil", "hamil")
       return

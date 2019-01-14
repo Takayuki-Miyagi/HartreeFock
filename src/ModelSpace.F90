@@ -71,6 +71,7 @@ module ModelSpace
     type(OneBodyChannel), allocatable :: jpz(:)
     integer, allocatable :: jpz2ch(:,:,:)
     integer :: NChan
+    integer :: emax
   contains
     procedure :: init => InitOneBodySpace
     procedure :: fin => FinOneBodySpace
@@ -90,6 +91,7 @@ module ModelSpace
   type :: TwoBodySpace
     type(TwoBodyChannel), allocatable :: jpz(:)
     integer, allocatable :: jpz2ch(:,:,:)
+    integer :: emax, e2max
     integer :: NChan
   contains
     procedure :: init => InitTwoBodySpace
@@ -126,6 +128,7 @@ module ModelSpace
     type(ThreeBodyChannel), allocatable :: jpz(:)
     integer, allocatable :: jpz2ch(:,:,:)
     integer :: NChan
+    integer :: emax, e2max, e3max
   contains
     procedure :: init => InitThreeBodySpace
     procedure :: fin => FinThreeBodySpace
@@ -179,6 +182,7 @@ module ModelSpace
     type(NonOrthIsospinThreeBodyChannel), allocatable :: jpt(:)
     integer, allocatable :: jpt2ch(:,:,:)
     integer :: NChan
+    integer :: emax, e2max, e3max
   contains
     procedure :: init => InitNonOrthIsospinThreeBodySpace
     procedure :: fin => FinNonOrthIsospinThreeBodySpace
@@ -538,6 +542,7 @@ contains
     end do
 
     this%NChan = ich
+    this%emax = sps%emax
     allocate(this%jpz(this%NChan))
     allocate(jj(this%NChan))
     allocate(pp(this%NChan))
@@ -668,6 +673,8 @@ contains
     end do
 
     this%NChan = ich
+    this%emax = sps%emax
+    this%e2max = e2max
     allocate(this%jpz(this%NChan))
     allocate(jj(this%NChan))
     allocate(pp(this%NChan))
@@ -865,6 +872,9 @@ contains
       end do
     end do
     this%NChan = ich
+    this%emax = sps%emax
+    this%e2max = e2max
+    this%e3max = e3max
 
     allocate(this%jpt(ich))
     allocate(jj(ich))
@@ -1482,6 +1492,9 @@ contains
       end do
     end do
     this%NChan = ich
+    this%emax = sps%emax
+    this%e2max = e2max
+    this%e3max = e3max
     allocate(this%jpz(ich))
     allocate(jj(ich))
     allocate(pp(ich))

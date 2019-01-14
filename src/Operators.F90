@@ -22,23 +22,23 @@ module Operators
     procedure :: InitOp
     procedure :: InitOpFromString
     generic :: init => InitOp, InitOpFromString
+
+    procedure :: SetOperatorFromFile
+    procedure :: SetOperator
+    generic :: set => SetOperatorFromFile, SetOperator
+
+    procedure :: prt => PrintOperator
+
+    procedure :: CopyOp
+    procedure :: SumOp
+    procedure :: SubtractOp
+    procedure :: ScaleOp
+    generic :: assignment(=) => CopyOp
+    generic :: operator(+) => SumOp
+    generic :: operator(-) => SubtractOp
+    generic :: operator(*) => ScaleOp
   end type Op
 
-  interface assignment(=)
-    procedure :: CopyOp
-  end interface assignment(=)
-
-  interface operator(+)
-    procedure :: SumOp
-  end interface operator(+)
-
-  interface operator(-)
-    procedure :: SubtractOp
-  end interface operator(-)
-
-  interface operator(*)
-    procedure :: ScaleLeftOp, ScaleRightOp
-  end interface operator(*)
 contains
   subroutine FinOp(this)
     class(Op), intent(inout) :: this
@@ -94,7 +94,7 @@ contains
   end subroutine InitOp
 
   subroutine CopyOp(a, b)
-    type(Op), intent(inout) :: a
+    class(Op), intent(inout) :: a
     type(Op), intent(in) :: b
 
     a%optr = b%optr
@@ -111,7 +111,7 @@ contains
   end subroutine CopyOp
 
   function SumOp(a, b) result(c)
-    type(Op), intent(in) :: a, b
+    class(Op), intent(in) :: a, b
     type(Op) :: c
 
     c = a
@@ -123,7 +123,7 @@ contains
   end function SumOp
 
   function SubtractOp(a, b) result(c)
-    type(Op), intent(in) :: a, b
+    class(Op), intent(in) :: a, b
     type(Op) :: c
 
     c = a
@@ -134,8 +134,8 @@ contains
     c%thr = a%thr - b%thr
   end function SubtractOp
 
-  function ScaleLeftOp(a, b) result(c)
-    type(Op), intent(in) :: a
+  function ScaleOp(a, b) result(c)
+    class(Op), intent(in) :: a
     real(8), intent(in) :: b
     type(Op) :: c
 
@@ -145,20 +145,7 @@ contains
     c%two = a%two * b
     if(.not. a%is_three_body) return
     c%thr = a%thr * b
-  end function ScaleLeftOp
-
-  function ScaleRightOp(a, b) result(c)
-    type(Op), intent(in) :: b
-    real(8), intent(in) :: a
-    type(Op) :: c
-
-    c = b
-    c%zero = b%zero * a
-    c%one = b%one * a
-    c%two = b%two * a
-    if(.not. b%is_three_body) return
-    c%thr = b%thr * a
-  end function ScaleRightOp
+  end function ScaleOp
 
   subroutine SetOperatorFromFile(this, ms, file_nn, file_3n, &
         & bound_2b_file, bound_3b_file)
@@ -234,6 +221,82 @@ contains
 
     call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
     call this%two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
+    this%is_three_body = .false.
   end subroutine SetOperator
 
+  subroutine PrintOperator(this, iunit)
+    class(Op), intent(in) :: this
+    integer, intent(in), optional :: iunit
+    integer :: ut
+    ut = 6
+    if(present(iunit)) ut = iunit
+
+    write(ut,'(a)') "## Zero-body part"
+    write(ut,'(f12.6)') this%zero
+
+    write(ut,'(a)') "## One-body part"
+    call this%one%prt(iunit)
+
+    write(ut,'(a)') "## Two-body part"
+    call this%two%prt(iunit)
+
+    if(.not. this%is_three_body) return
+    write(ut,'(a)') "## Three-body part"
+    call this%thr%prt(iunit)
+  end subroutine PrintOperator
+
+  subroutine NormalOrdering(this, ms)
+    class(Op), intent(inout) :: this
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart) :: op2from3, op1from3, op1from2
+    real(8) :: from1, from2, from3
+
+    !op2from3 =
+
+  end subroutine NormalOrdering
+
 end module Operators
+
+program test
+  use Profiler, only: timer
+  use CommonLibrary, only: &
+      &init_dbinomial_triangle, fin_dbinomial_triangle
+  use ModelSpace, only: MSpace
+  use Operators
+
+  implicit none
+
+  type(MSpace) :: ms
+  type(Op) :: h_me2j
+  type(Op) :: h_myg
+  type(Op) :: h_diff
+  character(:), allocatable :: file_nn, file_3n
+
+  call timer%init()
+  call init_dbinomial_triangle()
+
+  call ms%init('O16', 25.d0, 2, 4, e3max=2)
+  call h_me2j%init('hamil',ms,.false.)
+  call h_myg%init('hamil',ms,.false.)
+
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.me2j'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.bin.myg'
+  file_3n = 'none'
+  call h_me2j%set(ms,file_nn,file_3n,[2,4,2],[2,2,2,2])
+
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.myg'
+  file_3n = 'none'
+  call h_myg%set(ms,file_nn,file_3n,[2,4,2],[2,2,2,2])
+
+  h_diff = h_myg - h_me2j
+  call h_myg%prt()
+
+  call h_diff%fin()
+  call h_me2j%fin()
+  call h_myg%fin()
+  call ms%fin()
+
+  call fin_dbinomial_triangle()
+  call timer%fin()
+
+end program test

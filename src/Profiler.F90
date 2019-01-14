@@ -177,9 +177,8 @@ contains
 
 
     if(.not. present(msg) ) return
-    write(*,'(a,f12.4,2a)') trim(msg), timer%total_memory, &
+    write(*,'(a,f12.4,2a)') trim(msg), this%total_memory, &
         & " ", trim(this%memory_unit)
-
   end subroutine CurrentMemory
 
   ! call timer%cmemory before using

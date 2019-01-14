@@ -4,6 +4,83 @@ module NOperators
   use ModelSpace
   implicit none
 
+  public :: NBodyChannelSp
+  public :: NBodyChannel
+  public :: NBodyPartSp
+  public :: NBodyPart
+
+  private :: FinNBodyPart
+  private :: FinNBodyPartSp
+  private :: InitOneBodyPart
+  private :: InitTwoBodyPart
+  private :: InitThreeBodyPart
+  private :: InitNonOrthIsospinThreeBodyPart
+  private :: InitNonOrthIsospinThreeBodyPartSp
+
+  private :: SetOneBOdyPart
+  private :: GetTwBME_general
+  private :: GetTwBME_scalar
+  private :: SetTwBME_general
+  private :: SetTwBME_scalar
+  private :: AddToTwBME_general
+  private :: AddToTwBME_scalar
+  private :: SetTwoBodyPart
+
+  private :: GetThBMEIso_scalar
+  private :: GetThBMEpn_scalar
+  private :: GetThBMEIso_scalar_sp
+  private :: GetThBMEpn_scalar_sp
+
+  private :: SetOneBodyChannel
+  private :: SetTwoBodyChannel
+  private :: PrintNBodyPartSp
+  private :: PrintNBodyPart
+
+  private :: ReadTwoBodyFile
+  private :: ReadIsospinThreeBodyFileSp
+  private :: ReadIsospinThreeBodyFile
+
+  private :: CopyNBodyPartSp
+  private :: CopyNBodyPart
+  private :: SumNBodyPartSp
+  private :: SumNBodyPart
+  private :: SubtractNBodyPartSp
+  private :: SubtractNBodyPart
+  private :: ScaleNBodyPartSp
+  private :: ScaleNBodyPart
+
+  ! reading methdos
+  ! two-body scalar
+  private :: ReadScalar2BFile
+  private :: read_scalar_me2j_txt
+  private :: read_scalar_me2j_bin
+  private :: count_scalar_me2j
+  private :: get_vector_me2j_formatted
+  private :: read_scalar_myg_txt
+  private :: read_Scalar_myg_bin
+  private :: read_scalar_snt_txt
+  private :: read_scalar_nv_txt
+  ! two-body tensor
+  private :: ReadTensor2BFile
+  ! three-body scalar
+  private :: ReadScalar3BFile
+  private :: read_scalar_3bme_txt
+  private :: read_scalar_3bme_bin
+  private :: ReadScalar3BFileSp
+  private :: read_scalar_3bme_txt_sp
+  private :: read_scalar_3bme_bin_sp
+  private :: count_scalar_3bme
+  private :: store_scalar_3bme
+  private :: store_scalar_3bme_sp
+  ! three-body tensor
+  private :: ReadTensor3BFile
+  private :: read_tensor_3bme_txt
+  private :: read_tensor_3bme_bin
+  private :: ReadTensor3BFileSp
+  private :: read_tensor_3bme_txt_sp
+  private :: read_tensor_3bme_bin_sp
+
+
   type, extends(SMat) :: NBodyChannelSp
     integer :: ndims(2)
     logical :: is = .false.
@@ -23,6 +100,14 @@ module NOperators
     generic :: GetThBME => GetThBMEpn_scalar_Sp, GetThBMEIso_scalar_Sp
     procedure :: ReadFile => ReadIsospinThreeBodyFileSp
     procedure :: prt => PrintNBodyPartSp
+    procedure :: CopyNBodyPartSp
+    procedure :: SumNBodyPartSp
+    procedure :: SubtractNBodyPartSp
+    procedure :: ScaleNBodyPartSp
+    generic :: assignment(=) => CopyNBodyPartSp
+    generic :: operator(+) => SumNBodyPartSp
+    generic :: operator(-) => SubtractNBodyPartSp
+    generic :: operator(*) => ScaleNBodyPartSp
   end type NBodyPartSp
 
   type, extends(DMat) :: NBodyChannel
@@ -72,6 +157,15 @@ module NOperators
     procedure :: SetTwoBodyPart
     generic :: set => SetOneBodyPart, SetTwoBodyPart
     procedure :: prt => PrintNBodyPart
+
+    procedure :: CopyNBodyPart
+    procedure :: SumNBodyPart
+    procedure :: SubtractNBodyPart
+    procedure :: ScaleNBodyPart
+    generic :: assignment(=) => CopyNBodyPart
+    generic :: operator(+) => SumNBodyPart
+    generic :: operator(-) => SubtractNBodyPart
+    generic :: operator(*) => ScaleNBodyPart
   end type NBodyPart
 
   type :: ReadFiles
@@ -79,6 +173,7 @@ module NOperators
     integer :: emax2, e2max2, lmax2
     integer :: emax3, e2max3, e3max3, lmax3
   contains
+    ! methods for two-body matrix element
     procedure :: ReadScalar2BFile
     procedure :: ReadTensor2BFile
     procedure :: read_scalar_me2j_txt
@@ -87,24 +182,22 @@ module NOperators
     procedure :: read_scalar_myg_bin
     procedure :: read_scalar_snt_txt
     procedure :: read_scalar_nv_txt
+
+    ! methods for three-body marix element
+    procedure :: ReadScalar3BFile
+    procedure :: ReadScalar3BFileSp
+    procedure :: ReadTensor3BFile
+    procedure :: ReadTensor3BFileSp
+    procedure :: read_scalar_3bme_txt
+    procedure :: read_scalar_3bme_bin
+    procedure :: read_scalar_3bme_txt_sp
+    procedure :: read_scalar_3bme_bin_sp
+    procedure :: read_tensor_3bme_txt
+    procedure :: read_tensor_3bme_bin
+    procedure :: read_tensor_3bme_txt_sp
+    procedure :: read_tensor_3bme_bin_sp
+
   end type ReadFiles
-
-  interface assignment(=)
-    procedure :: CopyNBodyPartSp, CopyNBodyPart
-  end interface assignment(=)
-
-  interface operator(+)
-    procedure :: SumNBodyPartSp, SumNBodyPart
-  end interface operator(+)
-
-  interface operator(-)
-    procedure :: SubtractNBodyPartSp, SubtractNBodyPart
-  end interface operator(-)
-
-  interface operator(*)
-    procedure :: ScaleLeftNBodyPartSp, ScaleRightNBodyPartSp
-    procedure :: ScaleLeftNBodyPart, ScaleRightNBodyPart
-  end interface operator(*)
 
 contains
 
@@ -363,7 +456,7 @@ contains
   end subroutine CopyNBodyPartSp
 
   subroutine CopyNBodyPart(a, b)
-    class(NBodyPart), intent(inout) :: a
+    class(NBodyPart), intent(out) :: a
     type(NBodyPart), intent(in) :: b
     integer :: chbra, chket
 
@@ -388,7 +481,7 @@ contains
   end subroutine CopyNBodyPart
 
   function SumNBodyPart(a, b) result(c)
-    type(NBodyPart), intent(in) :: a, b
+    class(NBodyPart), intent(in) :: a, b
     type(NBodyPart) :: c
     integer :: chbra, chket
     c = a
@@ -404,7 +497,7 @@ contains
   end function SumNBodyPart
 
   function SumNBodyPartSp(a, b) result(c)
-    type(NBodyPartSp), intent(in) :: a, b
+    class(NBodyPartSp), intent(in) :: a, b
     type(NBodyPartSp) :: c
     integer :: chbra, chket
     c = a
@@ -420,7 +513,7 @@ contains
   end function SumNBodyPartSp
 
   function SubtractNBodyPart(a, b) result(c)
-    type(NBodyPart), intent(in) :: a, b
+    class(NBodyPart), intent(in) :: a, b
     type(NBodyPart) :: c
     integer :: chbra, chket
     c = a
@@ -436,7 +529,7 @@ contains
   end function SubtractNBodyPart
 
   function SubtractNBodyPartSp(a, b) result(c)
-    type(NBodyPartSp), intent(in) :: a, b
+    class(NBodyPartSp), intent(in) :: a, b
     type(NBodyPartSp) :: c
     integer :: chbra, chket
     c = a
@@ -451,8 +544,8 @@ contains
     end do
   end function SubtractNBodyPartSp
 
-  function ScaleLeftNBodyPart(a, b) result(c)
-    type(NBodyPart), intent(in) :: a
+  function ScaleNBodyPart(a, b) result(c)
+    class(NBodyPart), intent(in) :: a
     real(8), intent(in) :: b
     type(NBodyPart) :: c
     integer :: chbra, chket
@@ -466,10 +559,10 @@ contains
             & a%MatCh(chbra,chket)%DMat * b
       end do
     end do
-  end function ScaleLeftNBodyPart
+  end function ScaleNBodyPart
 
-  function ScaleLeftNBodyPartSp(a, b) result(c)
-    type(NBodyPartSp), intent(in) :: a
+  function ScaleNBodyPartSp(a, b) result(c)
+    class(NBodyPartSp), intent(in) :: a
     real(8), intent(in) :: b
     type(NBodyPartSp) :: c
     integer :: chbra, chket
@@ -483,41 +576,7 @@ contains
             & a%MatCh(chbra,chket)%SMat * real(b)
       end do
     end do
-  end function ScaleLeftNBodyPartSp
-
-  function ScaleRightNBodyPart(a, b) result(c)
-    type(NBodyPart), intent(in) :: b
-    real(8), intent(in) :: a
-    type(NBodyPart) :: c
-    integer :: chbra, chket
-    c = b
-    do chbra = 1, b%NChan
-      do chket = 1, b%NChan
-        if(.not. b%MatCh(chbra,chket)%is) cycle
-        c%MatCh(chbra,chket)%is = b%MatCh(chbra,chket)%is
-        c%MatCh(chbra,chket)%ndims(:) = b%MatCh(chbra,chket)%ndims(:)
-        c%MatCh(chbra,chket)%DMat = &
-            & b%MatCh(chbra,chket)%DMat * a
-      end do
-    end do
-  end function ScaleRightNBodyPart
-
-  function ScaleRightNBodyPartSp(a, b) result(c)
-    type(NBodyPartSp), intent(in) :: b
-    real(8), intent(in) :: a
-    type(NBodyPartSp) :: c
-    integer :: chbra, chket
-    c = b
-    do chbra = 1, b%NChan
-      do chket = 1, b%NChan
-        if(.not. b%MatCh(chbra,chket)%is) cycle
-        c%MatCh(chbra,chket)%is = b%MatCh(chbra,chket)%is
-        c%MatCh(chbra,chket)%ndims(:) = b%MatCh(chbra,chket)%ndims(:)
-        c%MatCh(chbra,chket)%SMat = &
-            & b%MatCh(chbra,chket)%SMat * real(a)
-      end do
-    end do
-  end function ScaleRightNBodyPartSp
+  end function ScaleNBodyPartSp
 
   subroutine SetOneBodyPart(this, ms, sps, hw, A, Z, N)
     class(NBodyPart), intent(inout) :: this
@@ -1034,10 +1093,194 @@ contains
     end function mat_elm
   end subroutine SetTwoBodyChannel
 
+  ! for now, only scalar
+  function NormalOrderingFromSp3To2(this,ms) result(r)
+    class(NBodyPartSp), intent(in) :: this
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart) :: r
+    integer :: i1, i2, i3, i4, ih, J12, J34, jh, J
+    integer :: chbra, chket, bra, ket, bra_max, ket_max
+    real(8) :: v, fact
+
+    call r%init(ms%two,this%Scalar,this%optr,this%jr,this%pr,this%zr)
+    do chbra = 1, ms%two%NChan
+      do chket = 1, chbra
+        if( .not. r%MatCh(chbra,chket)%is) cycle
+
+        bra_max = ms%two%jpz(chbra)%nst
+        ket_max = ms%two%jpz(chket)%nst
+
+        J12 = ms%two%jpz(chbra)%j
+        J34 = ms%two%jpz(chket)%j
+
+        do bra = 1, bra_max
+          i1 = ms%two%jpz(chbra)%n2spi1(bra)
+          i2 = ms%two%jpz(chbra)%n2spi2(bra)
+          if(chbra == chket) ket_max = bra
+          do ket = 1, ket_max
+            i3 = ms%two%jpz(chket)%n2spi1(ket)
+            i4 = ms%two%jpz(chket)%n2spi2(ket)
+
+            fact = 1.d0
+            if(i1==i2) fact = fact / dsqrt(2.d0)
+            if(i3==i4) fact = fact / dsqrt(2.d0)
+
+            v = 0.d0
+            do ih = 1, ms%sps%norbs
+              if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
+              jh = ms%sps%orb(ih)%j
+
+              do J = max(abs(2*J12-jh),abs(2*J34-jh)), &
+                    &min(    2*J12+jh ,    2*J34+jh ), 2
+
+                v = v + dble(J+1) * ms%NOCoef(ih) * &
+                    & this%GetThBME(ms,i1,i2,ih,J12,i3,i4,ih,J34,J) ! scalar
+
+              end do
+            end do
+            r%MatCh(chbra,chket)%m(bra,ket) = &
+                & v / dble(2*J12+1) * fact ! scalar
+          end do
+        end do
+
+      end do
+    end do
+
+  end function NormalOrderingFromSp3To2
+
+  ! for now, only scalar
+  function NormalOrderingFrom3To2(this,ms) result(r)
+    class(NBodyPart), intent(in) :: this
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart) :: r
+    integer :: i1, i2, i3, i4, ih, J12, J34, jh, J
+    integer :: chbra, chket, bra, ket, bra_max, ket_max
+    real(8) :: v, fact
+
+    call r%init(ms%two,this%Scalar,this%optr,this%jr,this%pr,this%zr)
+    do chbra = 1, ms%two%NChan
+      do chket = 1, chbra
+        if( .not. r%MatCh(chbra,chket)%is) cycle
+
+        bra_max = ms%two%jpz(chbra)%nst
+        ket_max = ms%two%jpz(chket)%nst
+
+        J12 = ms%two%jpz(chbra)%j
+        J34 = ms%two%jpz(chket)%j
+
+        do bra = 1, bra_max
+          i1 = ms%two%jpz(chbra)%n2spi1(bra)
+          i2 = ms%two%jpz(chbra)%n2spi2(bra)
+          if(chbra == chket) ket_max = bra
+          do ket = 1, ket_max
+            i3 = ms%two%jpz(chket)%n2spi1(ket)
+            i4 = ms%two%jpz(chket)%n2spi2(ket)
+
+            fact = 1.d0
+            if(i1==i2) fact = fact / dsqrt(2.d0)
+            if(i3==i4) fact = fact / dsqrt(2.d0)
+
+            v = 0.d0
+            do ih = 1, ms%sps%norbs
+              if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
+              jh = ms%sps%orb(ih)%j
+
+              do J = max(abs(2*J12-jh),abs(2*J34-jh)), &
+                    &min(    2*J12+jh ,    2*J34+jh ), 2
+
+                v = v + dble(J+1) * ms%NOCoef(ih) * &
+                    & this%GetThBME(ms,i1,i2,ih,J12,i3,i4,ih,J34,J) ! scalar
+
+              end do
+            end do
+            r%MatCh(chbra,chket)%m(bra,ket) = &
+                & v / dble(2*J12+1) * fact ! scalar
+          end do
+        end do
+
+      end do
+    end do
+
+  end function NormalOrderingFrom3To2
+
+  ! for now, only scalar
+  function NormalOrderingFrom2To1(this,ms) result(r)
+    class(NBodyPart), intent(in) :: this
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart) :: r
+    integer :: i1, i2, ih, j1, j2, jh, J
+    integer :: chbra, chket, bra, ket, bra_max, ket_max
+    real(8) :: v, fact
+
+    call r%init(ms%one,this%Scalar,this%optr,this%jr,this%pr,this%zr)
+
+    do chbra = 1, ms%one%NChan
+      do chket = 1, chbra
+        if( .not. r%MatCh(chbra,chket)%is) cycle
+
+        bra_max = ms%one%jpz(chbra)%nst
+        ket_max = ms%one%jpz(chket)%nst
+
+        j1 = ms%one%jpz(chbra)%j
+        j2 = ms%one%jpz(chket)%j
+
+        do bra = 1, bra_max
+          i1 = ms%one%jpz(chbra)%n2spi(bra)
+          if(chbra == chket) ket_max = bra
+          do ket = 1, ket_max
+            i2 = ms%one%jpz(chket)%n2spi(ket)
+
+
+            v = 0.d0
+            do ih = 1, ms%sps%norbs
+              if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
+              jh = ms%sps%orb(ih)%j
+              fact = 1.d0
+              if(i1==ih) fact = fact * dsqrt(2.d0)
+              if(i2==ih) fact = fact * dsqrt(2.d0)
+
+              do J = max(abs(j1-jh),abs(j2-jh))/2, &
+                    &min(    j1+jh ,    j2+jh )/2
+
+                v = v + dble(2*J+1) * ms%NOCoef(ih) * &
+                    & this%GetTwBME(ms%sps,ms%two,i1,ih,i2,ih,J,J) ! scalar
+
+              end do
+            end do
+            r%MatCh(chbra,chket)%m(bra,ket) = &
+                & v / dble(2*J1+1) * fact ! scalar
+          end do
+        end do
+
+      end do
+    end do
+
+  end function NormalOrderingFrom2To1
+
+  function NormalOrderingFrom1To0(this,ms) result(r)
+    class(NBodyPart), intent(in) :: this
+    type(MSpace), intent(in) :: ms
+    real(8) :: r
+    integer :: ih, lh, jh, zh, ch, nh
+    real(8) :: v, fact
+
+    r = 0.d0
+    do ih = 1, ms%sps%norbs
+      if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
+      jh = ms%sps%orb(ih)%j
+      lh = ms%sps%orb(ih)%l
+      zh = ms%sps%orb(ih)%z
+      ch = ms%one%jpz2ch(jh,(-1)**lh,zh)
+      nh = ms%one%jpz(ch)%spi2n(ih)
+      r = r + dble(jh+1) * ms%NOCoef(ih) * &
+          & this%MatCh(ch,ch)%m(nh,nh)
+    end do
+  end function NormalOrderingFrom1To0
+
   subroutine PrintNBodyPartSp(this, wunit)
     use ClassSys, only: sys
     class(NBodyPartSp), intent(in) :: this
-    integer, intent(in) :: wunit
+    integer, intent(in), optional :: wunit
     integer :: chbra, chket
     type(sys) :: s
     character(:), allocatable :: msg
@@ -1056,7 +1299,7 @@ contains
   subroutine PrintNBodyPart(this, wunit)
     use ClassSys, only: sys
     class(NBodyPart), intent(in) :: this
-    integer, intent(in) :: wunit
+    integer, intent(in), optional :: wunit
     integer :: chbra, chket
     type(sys) :: s
     character(:), allocatable :: msg
@@ -1078,10 +1321,14 @@ contains
   !
 
   subroutine ReadTwoBodyFile(this, sps, ms, rd)
+    use Profiler, only: timer
     class(NBodyPart), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
     type(ReadFiles), intent(in) :: rd
+    real(8) :: ti
+
+    ti = omp_get_wtime()
 
     select case(rd%file_nn)
     case('None', 'NONE', 'none')
@@ -1092,6 +1339,8 @@ contains
       if(this%Scalar) call rd%ReadScalar2BFile(this,sps,ms)
       if(.not. this%Scalar) call rd%ReadTensor2BFile(this,sps,ms)
     end select
+
+    call timer%Add("Read from file", omp_get_wtime()-ti)
 
   end subroutine ReadTwoBodyFile
 
@@ -1202,6 +1451,10 @@ contains
               me_pp = v(icnt+2)
               me_10 = v(icnt+3)
               me_nn = v(icnt+4)
+#ifdef NOperatorsDebug
+              write(*,'(5i3,4f12.6)') a, b, c, d, J, &
+                  &  me_00, me_pp, me_10, me_nn
+#endif
               fact = 1.d0
               if(a == b) fact = fact / dsqrt(2.d0)
               if(c == d) fact = fact / dsqrt(2.d0)
@@ -1417,6 +1670,9 @@ contains
     read(runit,*)       ! header
     do n = 1, lines
       read(runit,*) a, b, c, d, J, me
+#ifdef NOperatorsDebug
+      write(*,'(5i3,f12.6)') a, b, c, d, J, me
+#endif
       if(a > sps%norbs) cycle
       if(b > sps%norbs) cycle
       if(c > sps%norbs) cycle
@@ -1431,17 +1687,93 @@ contains
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
+    integer :: runit = 22, io
+    integer :: lines, n
+    integer, allocatable :: a(:), b(:), c(:), d(:), J(:)
+    real(8), allocatable :: me(:)
 
-    return
+    open(runit,file=this%file_nn, action='read', iostat=io, form='unformatted',&
+        & access='stream')
+    if(io /= 0) then
+      write(*,'(2a)') 'File open error: ', trim(this%file_nn)
+      return
+    end if
+
+    read(runit) lines ! header
+    allocate(a(lines))
+    allocate(b(lines))
+    allocate(c(lines))
+    allocate(d(lines))
+    allocate(J(lines))
+    allocate(me(lines))
+    read(runit) a, b, c, d, J, me
+    close(runit)
+
+    !$omp parallel
+    !$omp do private(n)
+    do n = 1, lines
+      if(a(n) > sps%norbs) cycle
+      if(b(n) > sps%norbs) cycle
+      if(c(n) > sps%norbs) cycle
+      if(d(n) > sps%norbs) cycle
+      call two%SetTwBME(sps,ms,a(n),b(n),c(n),d(n),J(n),me(n))
+    end do
+    !$omp end do
+    !$omp end parallel
   end subroutine read_scalar_myg_bin
 
   subroutine read_scalar_snt_txt(this,two,sps,ms)
+    use CommonLibrary, only: skip_comment
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
+    type(SingleParticleOrbit), allocatable :: ssnt(:)
+    integer :: a, b, c, d, J, lines, idx, n, l, z
+    integer :: ia, ib, ic, id
+    integer :: runit=22, io
+    integer :: porbs, norbs, pc, nc, line
+    real(8) :: me
 
-    return
+    open(runit, file=this%file_nn, action='read',iostat=io)
+    if(io /= 0) then
+      write(*,'(2a)') 'File open error: ', trim(this%file_nn)
+      return
+    end if
+    call skip_comment(runit,'#')
+    read(runit,*) porbs, norbs, pc, nc
+    lines = porbs+norbs
+    allocate(ssnt(lines))
+    do line = 1, lines
+      read(runit,*) idx, n, l, j, z
+      call ssnt(line)%set(n,l,j,z,idx)
+    end do
+
+    call skip_comment(runit,'#')
+    read(runit,*)  me ! zero-body part
+    call skip_comment(runit,'#')
+    read(runit,*) lines
+    call skip_comment(runit,'#')
+
+    do line = 1, lines
+      read(runit,*) a, b, me ! one-body part
+    end do
+
+    call skip_comment(runit,'#')
+    read(runit,*) lines
+    call skip_comment(runit,'#')
+    do line = 1, lines
+      read(runit,*) a, b, c, d, J, me
+#ifdef NOperatorsDebug
+      write(*,'(5i3,f12.6)') a, b, c, d, J, me
+#endif
+      ia = sps%nljz2idx(ssnt(a)%n, ssnt(a)%l, ssnt(a)%j, ssnt(a)%z)
+      ib = sps%nljz2idx(ssnt(b)%n, ssnt(b)%l, ssnt(b)%j, ssnt(b)%z)
+      ic = sps%nljz2idx(ssnt(c)%n, ssnt(c)%l, ssnt(c)%j, ssnt(c)%z)
+      id = sps%nljz2idx(ssnt(d)%n, ssnt(d)%l, ssnt(d)%j, ssnt(d)%z)
+      call two%SetTwBME(sps,ms,ia,ib,ic,id,J,me)
+    end do
+    close(runit)
   end subroutine read_scalar_snt_txt
 
   subroutine read_scalar_nv_txt(this,two,sps,ms)
@@ -1450,8 +1782,15 @@ contains
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
 
+    write(*,*) "reading this format has not been implemented yet."
     return
   end subroutine read_scalar_nv_txt
+
+  !
+  !
+  ! reading two-body tensor
+  !
+  !
 
   subroutine ReadTensor2BFile(this,two,sps,ms)
     use ClassSys, only: sys
@@ -1462,12 +1801,35 @@ contains
     return
   end subroutine ReadTensor2BFile
 
+
+  !
+  !
+  ! reading three-body scalar
+  !
+  !
+
   subroutine ReadIsospinThreeBodyFile(this, sps, ms, rd)
+    use Profiler, only: timer
     class(NBodyPart), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(ReadFiles), intent(in) :: rd
-    return
+    real(8) :: ti
+
+    ti = omp_get_wtime()
+
+    select case(rd%file_3n)
+    case('None', 'NONE', 'none')
+      write(*,*) "No three-body matrix element."
+      return
+    case default
+
+      if(this%Scalar) call rd%ReadScalar3BFile(this,sps,ms)
+      if(.not. this%Scalar) call rd%ReadTensor3BFile(this,sps,ms)
+    end select
+
+    call timer%Add('Read from file', omp_get_wtime()-ti)
+
   end subroutine ReadIsospinThreeBodyFile
 
   subroutine ReadIsospinThreeBodyFileSp(this, sps, ms, rd)
@@ -1476,42 +1838,636 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(ReadFiles), intent(in) :: rd
 
-    return
+    select case(rd%file_3n)
+    case('None', 'NONE', 'none')
+      write(*,*) "No three-body matrix element."
+      return
+    case default
+
+      if(this%Scalar) call rd%ReadScalar3BFileSp(this,sps,ms)
+      if(.not. this%Scalar) call rd%ReadTensor3BFileSp(this,sps,ms)
+    end select
+
   end subroutine ReadIsospinThreeBodyFileSp
+
+  subroutine ReadScalar3BFile(this,thr,sps,ms)
+    use ClassSys, only: sys
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(sys) :: s
+
+    if(s%find(this%file_3n,'.txt')) then
+      call this%read_scalar_3bme_txt(thr,sps,ms)
+      return
+    end if
+
+    if(s%find(this%file_3n,'.bin')) then
+      call this%read_scalar_3bme_bin(thr,sps,ms)
+      return
+    end if
+  end subroutine ReadScalar3BFile
+
+  subroutine read_scalar_3bme_txt(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: spsf
+    real(8), allocatable :: v(:)
+    integer :: nelm, n
+    integer :: runit = 22, io
+    call spsf%init(this%emax3, this%lmax3)
+    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    allocate(v(nelm))
+    open(runit, file=this%file_3n, action='read', iostat=io)
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+      return
+    end if
+    do n = 1, nelm
+      read(runit,*) v(n)
+    end do
+    close(runit)
+
+    call store_scalar_3bme(thr,sps,ms,v,spsf,this%e2max3,this%e3max3)
+
+    deallocate(v)
+    call spsf%fin()
+  end subroutine read_scalar_3bme_txt
+
+  subroutine read_scalar_3bme_bin(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: spsf
+    real(8), allocatable :: v(:)
+    integer :: nelm, n
+    integer :: runit = 22, io
+    call spsf%init(this%emax3, this%lmax3)
+    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    allocate(v(nelm))
+    open(runit, file=this%file_3n, action='read', iostat=io)
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+      return
+    end if
+    do n = 1, nelm
+      read(runit) v
+    end do
+    close(runit)
+
+    call store_scalar_3bme(thr,sps,ms,v,spsf,this%e2max3,this%e3max3)
+
+    deallocate(v)
+    call spsf%fin()
+  end subroutine read_scalar_3bme_bin
+
+  subroutine ReadScalar3BFileSp(this,thr,sps,ms)
+    use ClassSys, only: sys
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(sys) :: s
+
+    if(s%find(this%file_3n,'.txt')) then
+      call this%read_scalar_3bme_txt_sp(thr,sps,ms)
+      return
+    end if
+
+    if(s%find(this%file_3n,'.bin')) then
+      call this%read_scalar_3bme_bin_sp(thr,sps,ms)
+      return
+    end if
+  end subroutine ReadScalar3BFileSp
+
+  subroutine read_scalar_3bme_txt_sp(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: spsf
+    real(4), allocatable :: v(:)
+    integer :: nelm, n
+    integer :: runit = 22, io
+    call spsf%init(this%emax3, this%lmax3)
+    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    allocate(v(nelm))
+    open(runit, file=this%file_3n, action='read', iostat=io)
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+      return
+    end if
+    do n = 1, nelm
+      read(runit,*) v(n)
+    end do
+    close(runit)
+
+    call store_scalar_3bme_sp(thr,sps,ms,v,spsf,this%e2max3,this%e3max3)
+
+    deallocate(v)
+    call spsf%fin()
+  end subroutine read_scalar_3bme_txt_sp
+
+  subroutine read_scalar_3bme_bin_sp(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: spsf
+    real(4), allocatable :: v(:)
+    integer :: nelm, n
+    integer :: runit = 22, io
+    call spsf%init(this%emax3, this%lmax3)
+    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    allocate(v(nelm))
+    open(runit, file=this%file_3n, action='read', iostat=io, &
+        & form='unformatted', access='stream')
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+      return
+    end if
+    read(runit) v
+    close(runit)
+
+    call store_scalar_3bme_sp(thr,sps,ms,v,spsf,this%e2max3,this%e3max3)
+
+    deallocate(v)
+    call spsf%fin()
+  end subroutine read_scalar_3bme_bin_sp
+
+  function count_scalar_3bme(spsf, e2max, e3max) result(r)
+    type(OrbitsIsospin), intent(in) :: spsf
+    integer, intent(in) :: e2max, e3max
+    integer :: r
+    integer :: i1, l1, j1, e1
+    integer :: i2, l2, j2, e2
+    integer :: i3, l3, j3, e3
+    integer :: i4, l4, j4, e4
+    integer :: i5, l5, j5, e5, i5max
+    integer :: i6, l6, j6, e6, i6max
+    integer :: J12, T12, J45, T45, J, T, P123, P456
+
+    r = 0
+    do i1 = 1, spsf%norbs
+      l1 = spsf%orb(i1)%l
+      j1 = spsf%orb(i1)%j
+      e1 = spsf%orb(i1)%e
+      do i2 = 1, i1
+        l2 = spsf%orb(i2)%l
+        j2 = spsf%orb(i2)%j
+        e2 = spsf%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, i2
+          l3 = spsf%orb(i3)%l
+          j3 = spsf%orb(i3)%j
+          e3 = spsf%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+
+          P123 = (-1) ** (l1+l2+l3)
+
+          do i4 = 1, i1
+            l4 = spsf%orb(i4)%l
+            j4 = spsf%orb(i4)%j
+            e4 = spsf%orb(i4)%e
+
+            i5max = i4
+            if(i1 == i4) i5max = i2
+
+            do i5 = 1, i5max
+              l5 = spsf%orb(i5)%l
+              j5 = spsf%orb(i5)%j
+              e5 = spsf%orb(i5)%e
+              if(e4 + e5 > e2max) cycle
+
+              i6max = i5
+              if(i1 == i4 .and. i2 == i5) i6max = i3
+
+              do i6 = 1, i6max
+                l6 = spsf%orb(i6)%l
+                j6 = spsf%orb(i6)%j
+                e6 = spsf%orb(i6)%e
+                if(e4 + e6 > e2max) cycle
+                if(e5 + e6 > e2max) cycle
+                if(e4 + e5 + e6 > e3max) cycle
+
+                P456 = (-1) ** (l4+l5+l6)
+
+                if(P123 /= P456) cycle
+                do J12 = abs(j1-j2)/2, (j1+j2)/2
+                  do J45 = abs(j4-j5)/2, (j4+j5)/2
+                    do J = max(abs(2*J12-j3),abs(2*J45-j6)),&
+                          &min(   (2*J12+j3),   (2*J45+j6)), 2
+
+                      do T12 = 0, 1
+                        do T45 = 0, 1
+                          do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                                &min(   (2*T12+1),   (2*T45+1)), 2
+
+                            r = r + 1
+
+                          end do
+
+                        end do
+                      end do
+                    end do
+                  end do
+                end do
+
+
+              end do
+            end do
+          end do
+
+
+        end do
+      end do
+    end do
+  end function count_scalar_3bme
+
+  subroutine store_scalar_3bme(thr,sps,ms,v,spsf,e2max,e3max)
+    type(NBodyPart), intent(inout) :: thr
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin), intent(in) :: spsf,sps
+    real(8), intent(in) :: v(:)
+    integer, intent(in) :: e2max, e3max
+    integer :: cnt
+    integer :: i1, l1, j1, e1
+    integer :: i2, l2, j2, e2
+    integer :: i3, l3, j3, e3
+    integer :: i4, l4, j4, e4
+    integer :: i5, l5, j5, e5, i5max
+    integer :: i6, l6, j6, e6, i6max
+    integer :: J12, T12, J45, T45, J, T, P123, P456
+    integer :: ch, idxb, idxk, bra, ket
+
+    cnt = 0
+    do i1 = 1, spsf%norbs
+      l1 = spsf%orb(i1)%l
+      j1 = spsf%orb(i1)%j
+      e1 = spsf%orb(i1)%e
+      do i2 = 1, i1
+        l2 = spsf%orb(i2)%l
+        j2 = spsf%orb(i2)%j
+        e2 = spsf%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, i2
+          l3 = spsf%orb(i3)%l
+          j3 = spsf%orb(i3)%j
+          e3 = spsf%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+
+          P123 = (-1) ** (l1+l2+l3)
+
+          do i4 = 1, i1
+            l4 = spsf%orb(i4)%l
+            j4 = spsf%orb(i4)%j
+            e4 = spsf%orb(i4)%e
+
+            i5max = i4
+            if(i1 == i4) i5max = i2
+
+            do i5 = 1, i5max
+              l5 = spsf%orb(i5)%l
+              j5 = spsf%orb(i5)%j
+              e5 = spsf%orb(i5)%e
+              if(e4 + e5 > e2max) cycle
+
+              i6max = i5
+              if(i1 == i4 .and. i2 == i5) i6max = i3
+
+              do i6 = 1, i6max
+                l6 = spsf%orb(i6)%l
+                j6 = spsf%orb(i6)%j
+                e6 = spsf%orb(i6)%e
+                if(e4 + e6 > e2max) cycle
+                if(e5 + e6 > e2max) cycle
+                if(e4 + e5 + e6 > e3max) cycle
+
+                P456 = (-1) ** (l4+l5+l6)
+
+                if(P123 /= P456) cycle
+                do J12 = abs(j1-j2)/2, (j1+j2)/2
+                  do J45 = abs(j4-j5)/2, (j4+j5)/2
+                    do J = max(abs(2*J12-j3),abs(2*J45-j6)),&
+                          &min(   (2*J12+j3),   (2*J45+j6)), 2
+
+                      do T12 = 0, 1
+                        do T45 = 0, 1
+                          do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                                &min(   (2*T12+1),   (2*T45+1)), 2
+                            cnt = cnt + 1
+
+                            if(e1 > ms%emax) cycle
+                            if(e2 > ms%emax) cycle
+                            if(e3 > ms%emax) cycle
+
+                            if(e4 > ms%emax) cycle
+                            if(e5 > ms%emax) cycle
+                            if(e6 > ms%emax) cycle
+
+                            if(e1 + e2 > ms%e2max) cycle
+                            if(e2 + e3 > ms%e2max) cycle
+                            if(e3 + e1 > ms%e2max) cycle
+
+                            if(e4 + e5 > ms%e2max) cycle
+                            if(e5 + e6 > ms%e2max) cycle
+                            if(e6 + e4 > ms%e2max) cycle
+
+                            if(e1 + e2 + e3 > ms%e3max) cycle
+                            if(e4 + e5 + e6 > ms%e3max) cycle
+
+                            if(i1==i2 .and. mod(J12+T12,2)==0) cycle
+                            if(i4==i5 .and. mod(J45+T45,2)==0) cycle
+                            ch = ms%jpt2ch(J,P123,T)
+                            idxb = ms%jpt(ch)%spis2idx(i1,i2,i3)
+                            idxk = ms%jpt(ch)%spis2idx(i4,i5,i6)
+                            if(idxb*idxk == 0) cycle
+                            bra = ms%jpt(ch)%idxqn(idxb)%JT2n(J12,T12)
+                            ket = ms%jpt(ch)%idxqn(idxk)%JT2n(J45,T45)
+                            if(bra*ket == 0) cycle
+                            thr%MatCh(ch,ch)%m(bra,ket) = v(cnt)
+                          end do
+
+                        end do
+                      end do
+                    end do
+                  end do
+                end do
+
+
+              end do
+            end do
+          end do
+
+
+        end do
+      end do
+    end do
+  end subroutine store_scalar_3bme
+
+  subroutine store_scalar_3bme_sp(thr,sps,ms,v,spsf,e2max,e3max)
+    type(NBodyPartSp), intent(inout) :: thr
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin), intent(in) :: spsf,sps
+    real(4), intent(in) :: v(:)
+    integer, intent(in) :: e2max, e3max
+    integer :: cnt
+    integer :: i1, l1, j1, e1
+    integer :: i2, l2, j2, e2
+    integer :: i3, l3, j3, e3
+    integer :: i4, l4, j4, e4
+    integer :: i5, l5, j5, e5, i5max
+    integer :: i6, l6, j6, e6, i6max
+    integer :: J12, T12, J45, T45, J, T, P123, P456
+    integer :: ch, idxb, idxk, bra, ket
+
+    cnt = 0
+    do i1 = 1, spsf%norbs
+      l1 = spsf%orb(i1)%l
+      j1 = spsf%orb(i1)%j
+      e1 = spsf%orb(i1)%e
+      do i2 = 1, i1
+        l2 = spsf%orb(i2)%l
+        j2 = spsf%orb(i2)%j
+        e2 = spsf%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, i2
+          l3 = spsf%orb(i3)%l
+          j3 = spsf%orb(i3)%j
+          e3 = spsf%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+
+          P123 = (-1) ** (l1+l2+l3)
+
+          do i4 = 1, i1
+            l4 = spsf%orb(i4)%l
+            j4 = spsf%orb(i4)%j
+            e4 = spsf%orb(i4)%e
+
+            i5max = i4
+            if(i1 == i4) i5max = i2
+
+            do i5 = 1, i5max
+              l5 = spsf%orb(i5)%l
+              j5 = spsf%orb(i5)%j
+              e5 = spsf%orb(i5)%e
+              if(e4 + e5 > e2max) cycle
+
+              i6max = i5
+              if(i1 == i4 .and. i2 == i5) i6max = i3
+
+              do i6 = 1, i6max
+                l6 = spsf%orb(i6)%l
+                j6 = spsf%orb(i6)%j
+                e6 = spsf%orb(i6)%e
+                if(e4 + e6 > e2max) cycle
+                if(e5 + e6 > e2max) cycle
+                if(e4 + e5 + e6 > e3max) cycle
+
+                P456 = (-1) ** (l4+l5+l6)
+
+                if(P123 /= P456) cycle
+                do J12 = abs(j1-j2)/2, (j1+j2)/2
+                  do J45 = abs(j4-j5)/2, (j4+j5)/2
+                    do J = max(abs(2*J12-j3),abs(2*J45-j6)),&
+                          &min(   (2*J12+j3),   (2*J45+j6)), 2
+
+                      do T12 = 0, 1
+                        do T45 = 0, 1
+                          do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                                &min(   (2*T12+1),   (2*T45+1)), 2
+                            cnt = cnt + 1
+
+                            if(e1 > ms%emax) cycle
+                            if(e2 > ms%emax) cycle
+                            if(e3 > ms%emax) cycle
+
+                            if(e4 > ms%emax) cycle
+                            if(e5 > ms%emax) cycle
+                            if(e6 > ms%emax) cycle
+
+                            if(e1 + e2 > ms%e2max) cycle
+                            if(e2 + e3 > ms%e2max) cycle
+                            if(e3 + e1 > ms%e2max) cycle
+
+                            if(e4 + e5 > ms%e2max) cycle
+                            if(e5 + e6 > ms%e2max) cycle
+                            if(e6 + e4 > ms%e2max) cycle
+
+                            if(e1 + e2 + e3 > ms%e3max) cycle
+                            if(e4 + e5 + e6 > ms%e3max) cycle
+
+                            if(i1==i2 .and. mod(J12+T12,2)==0) cycle
+                            if(i4==i5 .and. mod(J45+T45,2)==0) cycle
+                            ch = ms%jpt2ch(J,P123,T)
+                            idxb = ms%jpt(ch)%spis2idx(i1,i2,i3)
+                            idxk = ms%jpt(ch)%spis2idx(i4,i5,i6)
+                            if(idxb*idxk == 0) cycle
+                            bra = ms%jpt(ch)%idxqn(idxb)%JT2n(J12,T12)
+                            ket = ms%jpt(ch)%idxqn(idxk)%JT2n(J45,T45)
+                            if(bra*ket == 0) cycle
+                            thr%MatCh(ch,ch)%m(bra,ket) = v(cnt)
+                          end do
+
+                        end do
+                      end do
+                    end do
+                  end do
+                end do
+
+
+              end do
+            end do
+          end do
+
+
+        end do
+      end do
+    end do
+  end subroutine store_scalar_3bme_sp
+
+  !
+  !
+  ! reading three-body tensor
+  !
+  !
+
+  subroutine ReadTensor3BFile(this,thr,sps,ms)
+    use ClassSys, only: sys
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(sys) :: s
+
+    if(s%find(this%file_3n,'.txt')) then
+      call this%read_tensor_3bme_txt(thr,sps,ms)
+      return
+    end if
+
+    if(s%find(this%file_3n,'.bin')) then
+      call this%read_tensor_3bme_bin(thr,sps,ms)
+      return
+    end if
+  end subroutine ReadTensor3BFile
+
+  subroutine read_tensor_3bme_txt(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    write(*,*) "reading tensor is not ready"
+    return
+  end subroutine read_tensor_3bme_txt
+
+  subroutine read_tensor_3bme_bin(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    write(*,*) "reading tensor is not ready"
+    return
+  end subroutine read_tensor_3bme_bin
+
+  subroutine ReadTensor3BFileSp(this,thr,sps,ms)
+    use ClassSys, only: sys
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(sys) :: s
+    if(s%find(this%file_3n,'.txt')) then
+      call this%read_tensor_3bme_txt_sp(thr,sps,ms)
+      return
+    end if
+
+    if(s%find(this%file_3n,'.bin')) then
+      call this%read_tensor_3bme_bin_sp(thr,sps,ms)
+      return
+    end if
+  end subroutine ReadTensor3BFileSp
+
+  subroutine read_tensor_3bme_txt_sp(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    write(*,*) "reading tensor is not ready"
+    return
+  end subroutine read_tensor_3bme_txt_sp
+
+  subroutine read_tensor_3bme_bin_sp(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    write(*,*) "reading tensor is not ready"
+    return
+  end subroutine read_tensor_3bme_bin_sp
 
 end module NOperators
 
 ! test for operators
-program test
-  use Profiler, only: timer
-  use CommonLibrary, only: &
-      &init_dbinomial_triangle, fin_dbinomial_triangle
-  use ModelSpace, only: MSpace
-  use NOperators
-
-  type(MSpace) :: ms
-  type(NBodyPart) :: vnn
-  type(ReadFiles) :: rd
-
-  call timer%init()
-  call init_dbinomial_triangle()
-
-  call ms%init('O16', 25.d0, 2, 4, e3max=2)
-
-  !rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax6_e2max12.txt.me2j'
-  rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.me2j'
-  !rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.myg'
-  rd%emax2 = 2
-  rd%e2max2 =4
-  rd%lmax2 = 2
-  call vnn%init(ms%two,.true.,'hamil',0,1,0)
-  call vnn%ReadFile(ms%sps, ms%two, rd)
-
-  call vnn%prt(6)
-
-  call vnn%fin()
-  call ms%fin()
-
-  call fin_dbinomial_triangle()
-  call timer%fin()
-end program test
+!program test
+!  use Profiler, only: timer
+!  use CommonLibrary, only: &
+!      &init_dbinomial_triangle, fin_dbinomial_triangle
+!  use ModelSpace, only: MSpace
+!  use NOperators
+!
+!  implicit none
+!
+!  type(MSpace) :: ms
+!  type(NBodyPart) :: vnn_me2j, vnn_myg, vnn_diff
+!  type(NBodyPart) :: vnn_myg_bin
+!  type(ReadFiles) :: rd
+!
+!  call timer%init()
+!  call init_dbinomial_triangle()
+!
+!  call ms%init('O16', 25.d0, 2, 4, e3max=2)
+!
+!  !rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax6_e2max12.txt.me2j'
+!  rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.me2j'
+!  rd%emax2 = 2
+!  rd%e2max2 =4
+!  rd%lmax2 = 2
+!  call vnn_me2j%init(ms%two,.true.,'hamil',0,1,0)
+!  call vnn_me2j%ReadFile(ms%sps, ms%two, rd)
+!
+!  rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.myg'
+!  rd%emax2 = 2
+!  rd%e2max2 =4
+!  rd%lmax2 = 2
+!  call vnn_myg%init(ms%two,.true.,'hamil',0,1,0)
+!  call vnn_myg%ReadFile(ms%sps, ms%two, rd)
+!
+!  rd%file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.snt'
+!  rd%emax2 = 2
+!  rd%e2max2 =4
+!  rd%lmax2 = 2
+!  call vnn_myg_bin%init(ms%two,.true.,'hamil',0,1,0)
+!  call vnn_myg_bin%ReadFile(ms%sps, ms%two, rd)
+!
+!  vnn_diff = vnn_myg - vnn_myg_bin
+!
+!  call vnn_diff%prt()
+!
+!  call vnn_me2j%fin()
+!  call vnn_myg%fin()
+!  call vnn_diff%fin()
+!  call ms%fin()
+!
+!  call fin_dbinomial_triangle()
+!  call timer%fin()
+!end program test
