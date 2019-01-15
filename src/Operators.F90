@@ -8,11 +8,11 @@ module Operators
     character(32) :: optr
     real(8) :: zero
     type(NBodyPart) :: one, two
-!#ifdef single_precision
+#ifdef single_precision
     type(NBodyPartSp) :: thr
-!#else
-!    type(NBodyPart) :: thr
-!#endif
+#else
+    type(NBodyPart) :: thr
+#endif
     logical :: is_normal_ordered = .false.
     logical :: Scalar
     logical :: is_three_body = .false.
@@ -278,7 +278,7 @@ contains
   subroutine UnNormalOrdering(this, ms) ! From NO2B approx. Op
     class(Op), intent(inout) :: this
     type(MSpace), intent(in) :: ms
-    type(NBodyPart) :: op2from3, op1from3, op1from2
+    type(NBodyPart) :: op1from2
     real(8) :: op0from1, op0from2
 
     if(.not. this%is_normal_ordered) then

@@ -31,6 +31,11 @@ module NOperators
   private :: GetThBMEIso_scalar_sp
   private :: GetThBMEpn_scalar_sp
 
+  !private :: GetThBMEIso_general
+  !private :: GetThBMEpn_general
+  !private :: GetThBMEIso_general_sp
+  !private :: GetThBMEpn_general_sp
+
   private :: SetOneBodyChannel
   private :: SetTwoBodyChannel
   private :: PrintNBodyPartSp
@@ -616,8 +621,8 @@ contains
     r = 0.d0
     P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
     P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (-1) ** (sps%orb(i1)%z + sps%orb(i2)%z)
-    Z34 = (-1) ** (sps%orb(i3)%z + sps%orb(i4)%z)
+    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z)/2
+    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z)/2
 
     if(triag(J12, J34, this%jr)) stop "Error, in GetTwBME_general: J"
     if(P12 * P34 * this%pr /= 1) stop "Error, in GetTwBME_general: P"
@@ -651,11 +656,11 @@ contains
     r = 0.d0
     P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
     P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (-1) ** (sps%orb(i1)%z + sps%orb(i2)%z)
-    Z34 = (-1) ** (sps%orb(i3)%z + sps%orb(i4)%z)
+    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z)/2
+    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z)/2
 
-    if(P12 * P34 /= 1) stop "Error, in GetTwBME_general: P"
-    if(Z12 - Z34 /= 0) stop "Error, in GetTwBME_general: Tz"
+    if(P12 * P34 /= 1) stop "Error, in GetTwBME_scalar: P"
+    if(Z12 - Z34 /= 0) stop "Error, in GetTwBME_scalar: Tz"
 
     ch = ms%jpz2ch(J,P12,Z12)
     if(ch == 0) return
@@ -686,9 +691,9 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
 
-    if(triag(J12, J34, this%jr)) stop "Error, in GetTwBME_general: J"
-    if(P12 * P34 * this%pr /= 1) stop "Error, in GetTwBME_general: P"
-    if(Z12 - Z34 - this%zr /= 0) stop "Error, in GetTwBME_general: Tz"
+    if(triag(J12, J34, this%jr)) stop "Error, in SetTwBME_general: J"
+    if(P12 * P34 * this%pr /= 1) stop "Error, in SetTwBME_general: P"
+    if(Z12 - Z34 - this%zr /= 0) stop "Error, in SetTwBME_general: Tz"
 
     chbra = ms%jpz2ch(J12,P12,Z12)
     chket = ms%jpz2ch(J34,P34,Z34)
@@ -753,9 +758,9 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
 
-    if(triag(J12, J34, this%jr)) stop "Error, in GetTwBME_general: J"
-    if(P12 * P34 * this%pr /= 1) stop "Error, in GetTwBME_general: P"
-    if(Z12 - Z34 - this%zr /= 0) stop "Error, in GetTwBME_general: Tz"
+    if(triag(J12, J34, this%jr)) stop "Error, in AddToTwBME_general: J"
+    if(P12 * P34 * this%pr /= 1) stop "Error, in AddToTwBME_general: P"
+    if(Z12 - Z34 - this%zr /= 0) stop "Error, in AddToTwBME_general: Tz"
 
     chbra = ms%jpz2ch(J12,P12,Z12)
     chket = ms%jpz2ch(J34,P34,Z34)
@@ -1218,7 +1223,7 @@ contains
     integer :: i1, i2, ih, j1, j2, l1, l2, z1, z2, e1, e2
     integer :: jh, eh, J_bra, J_ket
     integer :: chbra, chket, bra, ket, bra_max, ket_max
-    real(8) :: v, fact, tfact
+    real(8) :: vsum, v, fact, tfact
 
     call r%init(ms%one,this%Scalar,this%optr,this%jr,this%pr,this%zr)
 
@@ -1245,7 +1250,7 @@ contains
             z2 = ms%sps%orb(i2)%z
             e2 = ms%sps%orb(i2)%e
 
-            v = 0.d0
+            vsum = 0.d0
             do ih = 1, ms%sps%norbs
               if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
               jh = ms%sps%orb(ih)%j
@@ -1256,6 +1261,7 @@ contains
               if(i1==ih) fact = fact * dsqrt(2.d0)
               if(i2==ih) fact = fact * dsqrt(2.d0)
 
+              v = 0.d0
               do J_bra = abs(j1-jh)/2, (j1+jh)/2
                 if(i1 == ih .and. mod(J_bra,2)==1) cycle
                 do J_ket = abs(j2-jh)/2, (j2+jh)/2
@@ -1273,13 +1279,11 @@ contains
                       & ms%NOcoef(ih)
                 end do
               end do
-
+              vsum = vsum + v * fact
             end do
-            r%MatCh(chbra,chket)%m(bra,ket) = v  * fact
+            r%MatCh(chbra,chket)%m(bra,ket) = vsum
             if(this%Scalar) r%MatCh(chbra,chket)%m(bra,ket) = &
-                & v  * fact / dble(j1+1)
-            if(this%Scalar) r%MatCh(chket,chbra)%m(ket,bra) = &
-                & v  * fact / dble(j1+1)
+                & vsum / dble(j1+1)
           end do
         end do
 
