@@ -639,3 +639,35 @@ contains
     i6 = mod(rshift(idx,50),1024)
   end subroutine GetSpLabels3
 end module HartreeFock
+
+program test
+  use Profiler, only: timer
+  use CommonLibrary, only: &
+      &init_dbinomial_triangle, fin_dbinomial_triangle
+  use ModelSpace, only: MSpace
+  use Operators
+
+  implicit none
+
+  type(MSpace) :: ms
+  type(Op) :: h
+  character(:), allocatable :: file_nn, file_3n
+
+  call timer%init()
+  call init_dbinomial_triangle()
+
+  call ms%init('O16', 35.d0, 2, 4, e3max=2)
+  call h%init('hamil',ms,.false.)
+
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.txt.me2j'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.bin.me2j'
+  file_3n = 'none'
+  call h%set(ms,file_nn,file_3n,[6,12,6],[2,2,2,2])
+
+  call h%fin()
+  call ms%fin()
+
+  call fin_dbinomial_triangle()
+  call timer%fin()
+
+end program test
