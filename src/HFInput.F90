@@ -8,6 +8,7 @@ module InputParameters
 
     ! two-body matrix element file
     character(256) :: twbmefile = 'None', scfile2 = 'None'
+    integer :: emax_2nf, e2max_2nf
 
     ! three-body matrix element file
     integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut

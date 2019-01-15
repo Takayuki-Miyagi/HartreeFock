@@ -1518,4 +1518,129 @@ contains
     ! ------------
   end subroutine read_2bme_nv_txt
 
+  subroutine read_2bme_me2j_txt(f2, params, sps, two, tbme)
+    use common_library, only: skip_comment
+    type(NBodyScalars), intent(inout) :: tbme
+    type(parameters), intent(in) :: params
+    type(spo_pn), intent(in) :: sps
+    type(TwoBodySpace), intent(in) :: two
+    character(*), intent(in) :: f2
+
+    integer :: iunit = 19
+    integer :: ia, ib, ic, id
+    integer :: iza, izb, izc, izd
+    integer :: it, ij, numpot, num
+    integer :: ichpp, ichpn, ichnn
+    integer :: brapp, ketpp, brapn, ketpn, brann, ketnn
+    integer :: ip, phasepp, phasenn, phasepn_bra, phasepn_ket, phasepn
+    integer :: idummy1, idummy2
+    real(8) :: dummy1, dummy2, vtemp
+    real(8) :: trel, hrel, vcoul, vpn, vpp, vnn, dnorm
+    integer :: a, b, c, d
+
+    type(spo_isospin) :: isps
+
+    call isps%init(params%emax_2nf)
+    nelm = count_me2j(isps,params%e2max_2nf)
+
+    open(iunit, file = f2, status = "old")
+    read(iunit, *) numpot, idummy1, idummy2, dummy1, dummy2
+    do num = 1, numpot
+      read(iunit, *) ia, ib, ic, id, ij, it, trel, hrel, vcoul, vpn, vpp, vnn
+      if(2*ia > sps%n) cycle
+      if(2*ib > sps%n) cycle
+      if(2*ic > sps%n) cycle
+      if(2*id > sps%n) cycle
+      if(sps%nshell(2*ia) + sps%nshell(2*ib) > params%e2max) cycle
+      if(sps%nshell(2*ic) + sps%nshell(2*id) > params%e2max) cycle
+
+      ip = (-1) ** (sps%ll(2*ia) + sps%ll(2*ib))
+      ichpn = two%jptz2n(ij, ip, 0)
+      dnorm = 1.d0
+      if(ia == ib) dnorm = dnorm * dsqrt(2.d0)
+      if(ic == id) dnorm = dnorm * dsqrt(2.d0)
+      vtemp = vpn * dnorm * 0.5d0
+      phasepn_bra = (-1) ** ((sps%jj(2*ia) + sps%jj(2*ib)) / 2 + ij + it)
+      phasepn_ket = (-1) ** ((sps%jj(2*ic) + sps%jj(2*id)) / 2 + ij + it)
+
+      brapn = two%jptz(ichpn)%labels2n(2*ia-1,2*ib)
+      ketpn = two%jptz(ichpn)%labels2n(2*ic-1,2*id)
+      phasepn = two%jptz(ichpn)%iphase(2*ia-1,2*ib) * &
+          &     two%jptz(ichpn)%iphase(2*ic-1,2*id)
+      tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+      tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+
+      if(ia /= ib) then
+        brapn = two%jptz(ichpn)%labels2n(2*ib-1,2*ia)
+        ketpn = two%jptz(ichpn)%labels2n(2*ic-1,2*id)
+        phasepn = phasepn_bra * &
+            &     two%jptz(ichpn)%iphase(2*ib-1,2*ia) * &
+            &     two%jptz(ichpn)%iphase(2*ic-1,2*id)
+        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+      end if
+
+      if(ic /= id .and. (ia /= ic .or. ib /= id)) then
+        brapn = two%jptz(ichpn)%labels2n(2*ia-1,2*ib)
+        ketpn = two%jptz(ichpn)%labels2n(2*id-1,2*ic)
+        phasepn = phasepn_ket * &
+            &     two%jptz(ichpn)%iphase(2*ia-1,2*ib) * &
+            &     two%jptz(ichpn)%iphase(2*id-1,2*ic)
+        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+      end if
+
+      if(ia /= ib .and. ic /= id) then
+        brapn = two%jptz(ichpn)%labels2n(2*ib-1,2*ia)
+        ketpn = two%jptz(ichpn)%labels2n(2*id-1,2*ic)
+        phasepn = phasepn_bra * phasepn_ket * &
+            &     two%jptz(ichpn)%iphase(2*ib-1,2*ia) * &
+            &     two%jptz(ichpn)%iphase(2*id-1,2*ic)
+        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
+        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
+      end if
+
+      ichpp = two%jptz2n(ij, ip,-1)
+      if(ichpp /= 0) then
+        brapp = two%jptz(ichpp)%labels2n(2*ia-1, 2*ib-1)
+        ketpp = two%jptz(ichpp)%labels2n(2*ic-1, 2*id-1)
+        phasepp = two%jptz(ichpp)%iphase(2*ia-1, 2*ib-1) * &
+            &     two%jptz(ichpp)%iphase(2*ic-1, 2*id-1)
+        if(brapp * ketpp /= 0) then
+          tbme%jptz(ichpp)%m(brapp, ketpp) = tbme%jptz(ichpp)%m(brapp, ketpp) + &
+              &   vpp * dble(phasepp)
+          tbme%jptz(ichpp)%m(ketpp, brapp) = tbme%jptz(ichpp)%m(brapp, ketpp)
+        end if
+      end if
+
+      ichnn = two%jptz2n(ij, ip, 1)
+      if(ichnn /= 0) then
+        brann = two%jptz(ichnn)%labels2n(2*ia, 2*ib)
+        ketnn = two%jptz(ichnn)%labels2n(2*ic, 2*id)
+        phasenn = two%jptz(ichnn)%iphase(2*ia, 2*ib) * &
+            &     two%jptz(ichnn)%iphase(2*ic, 2*id)
+        if(brann * ketnn /= 0) then
+          tbme%jptz(ichnn)%m(brann, ketnn) = tbme%jptz(ichnn)%m(brann, ketnn) + &
+              &   vnn * dble(phasenn)
+          tbme%jptz(ichnn)%m(ketnn, brann) = tbme%jptz(ichnn)%m(brann, ketnn)
+        end if
+      end if
+
+    end do
+    close(iunit)
+    ! ---- print 2bme for check
+#ifdef debug
+    do ichpp = 1, two%n
+      write(*,*) two%j(ichpp), two%p(ichpp), two%tz(ichpp)
+      call tbme%jptz(ichpp)%prt()
+    end do
+#endif
+    ! ------------
+  end subroutine read_2bme_me2j_txt
+
+  function count_me2j(sps, e2max) result(r)
+    integer :: r
+    type(spo_isospin), intent(in) :: sps
+    integer, intent(in) :: e2max
+  end function count_me2j
 end module ScalarOperator
