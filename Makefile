@@ -2,8 +2,11 @@
 # Make file for TTFcalc code
 #--------------------------------------------------
 TARGET=HartreeFock
-INSTLDIR=~/Desktop/HFtest/
-HOST= $(shell if hostname|grep -q apt1; then echo apt; else echo other; fi)
+INSTLDIR=./
+HOST= $(shell if hostname|grep -q apt1; then echo apt; \
+			elif hostname|grep -q oak; then echo oak; \
+			elif hostname|grep -q cedar; then echo cedar; \
+			else echo other; fi)
 $(info Host:$(HOST))
 
 #--------------------------------------------------
@@ -33,6 +36,26 @@ ifeq ($(HOST),apt)
 	FF2C=
 	#FDFLAGS=-Ddebug
 	#FDFLAGS+=-check-all
+endif
+
+#-----------------------------
+# oak (oak.arc.ubc.ca)
+# -heap-arrays option is needed for built in transpose function with
+#  large dimension matrix
+#-----------------------------
+ifeq ($(strip $(HOST)),oak)
+	FDEP=
+	CC=icc
+	FC=ifort
+	MKL=-L$(MKLROOT)/lib/ -L$(MKLROOT)/lib/intel64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -Wl,-rpath,$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/../compiler/lib/
+	LDFLAGS=$(MKL) -lgsl
+	OMP = -qopenmp
+	FFLAGS=-O3 -heap-arrays
+	CFLAGS=-O3
+	LINT = -i8
+	FF2C=
+	#FDFLAGS =-check all
+	FFLAGS+= -Dsingle_precision
 endif
 
 #--------------------------------------------------
@@ -144,11 +167,11 @@ $(OBJDIR)/HFInput.o : $(SRCDIR)/HFInput.F90 $(OBJDIR)/class_sys.o $(OBJDIR)/MPIF
 $(OBJDIR)/class_stopwatch.o : $(SRCDIR)/class_stopwatch.F90 $(OBJDIR)/MPIFunction.o
 $(OBJDIR)/Read3BME.o : $(SRCDIR)/Read3BME.F90 $(OBJDIR)/class_sys.o $(OBJDIR)/common_library.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/MPIFunction.o $(OBJDIR)/HFInput.o
 $(OBJDIR)/HFMain.o : $(SRCDIR)/HFMain.F90 $(OBJDIR)/class_stopwatch.o $(OBJDIR)/MPIFunction.o $(OBJDIR)/MBPT3.o $(OBJDIR)/WriteOperator.o $(OBJDIR)/HFSolver.o $(OBJDIR)/NormalOrdering.o $(OBJDIR)/ScalarOperator.o $(OBJDIR)/Read3BME.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/common_library.o
-$(OBJDIR)/LinAlgLib.o : $(LINSRCDIR)/LinAlgLib.f90 $(OBJDIR)/Parameters.o $(OBJDIR)/MatVecComplex.o $(OBJDIR)/MatVecDouble.o $(OBJDIR)/MatrixComplex.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/VectorComplex.o $(OBJDIR)/VectorDouble.o
+$(OBJDIR)/LinAlgLib.o : $(LINSRCDIR)/LinAlgLib.f90 $(OBJDIR)/LinAlgParameters.o $(OBJDIR)/MatVecComplex.o $(OBJDIR)/MatVecDouble.o $(OBJDIR)/MatrixComplex.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/VectorComplex.o $(OBJDIR)/VectorDouble.o
 $(OBJDIR)/MatVecDouble.o : $(LINSRCDIR)/MatVecDouble.f90 $(OBJDIR)/MatrixDouble.o $(OBJDIR)/VectorDouble.o
-$(OBJDIR)/VectorComplex.o : $(LINSRCDIR)/VectorComplex.f90 $(OBJDIR)/Parameters.o
+$(OBJDIR)/VectorComplex.o : $(LINSRCDIR)/VectorComplex.f90 $(OBJDIR)/LinAlgParameters.o
 $(OBJDIR)/MatrixDouble.o : $(LINSRCDIR)/MatrixDouble.f90 $(OBJDIR)/VectorDouble.o
-$(OBJDIR)/VectorDouble.o : $(LINSRCDIR)/VectorDouble.f90 $(OBJDIR)/Parameters.o
+$(OBJDIR)/VectorDouble.o : $(LINSRCDIR)/VectorDouble.f90 $(OBJDIR)/LinAlgParameters.o
 $(OBJDIR)/MatrixComplex.o : $(LINSRCDIR)/MatrixComplex.f90 $(OBJDIR)/VectorComplex.o
-$(OBJDIR)/Parameters.o : $(LINSRCDIR)/Parameters.f90
+$(OBJDIR)/LinAlgParameters.o : $(LINSRCDIR)/LinAlgParameters.f90
 $(OBJDIR)/MatVecComplex.o : $(LINSRCDIR)/MatVecComplex.f90 $(OBJDIR)/MatrixComplex.o $(OBJDIR)/VectorComplex.o
