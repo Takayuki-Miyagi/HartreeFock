@@ -1451,6 +1451,12 @@ contains
               me_pp = v(icnt+2)
               me_10 = v(icnt+3)
               me_nn = v(icnt+4)
+              if(ap > sps%norbs) cycle
+              if(bp > sps%norbs) cycle
+              if(cp > sps%norbs) cycle
+              if(dp > sps%norbs) cycle
+              if(sps%orb(ap)%e + sps%orb(bp)%e > ms%e2max) cycle
+              if(sps%orb(cp)%e + sps%orb(dp)%e > ms%e2max) cycle
 #ifdef NOperatorsDebug
               write(*,'(5i3,4f12.6)') a, b, c, d, J, &
                   &  me_00, me_pp, me_10, me_nn
@@ -1463,10 +1469,10 @@ contains
                 call two%SetTwBME(sps,ms,ap,bp,cp,dp,J,me_pp*fact)
                 call two%SetTwBME(sps,ms,an,bn,cn,dn,J,me_nn*fact)
                 call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_10)
-                if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,0.5d0*me_10)
+                if(a/=b) call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,0.5d0*me_10)
                 if(a/=b .and. c/=d) &
                     &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,0.5d0*me_10)
-                if(a/=b .and. (a/=c .or. b/=d)) &
+                if(c/=d .and. (a/=c .or. b/=d)) &
                     &    call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_10)
               end if
 
@@ -1560,6 +1566,13 @@ contains
               me_pp = v(icnt+2)
               me_10 = v(icnt+3)
               me_nn = v(icnt+4)
+              if(ap > sps%norbs) cycle
+              if(bp > sps%norbs) cycle
+              if(cp > sps%norbs) cycle
+              if(dp > sps%norbs) cycle
+              if(sps%orb(ap)%e + sps%orb(bp)%e > ms%e2max) cycle
+              if(sps%orb(cp)%e + sps%orb(dp)%e > ms%e2max) cycle
+
               fact = 1.d0
               if(a == b) fact = fact / dsqrt(2.d0)
               if(c == d) fact = fact / dsqrt(2.d0)
@@ -1572,7 +1585,7 @@ contains
                 if(a/=b .and. c/=d) &
                     &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,0.5d0*me_10)
                 if(a/=b .and. (a/=c .or. b/=d)) &
-                    &    call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_10)
+                    &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,0.5d0*me_10)
               end if
 
               if(abs(1.d0-fact) < 1.d-4 .or. mod(J,2) == 1) then
@@ -1581,7 +1594,7 @@ contains
                 if(a/=b .and. c/=d) &
                     &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J, 0.5d0*me_00)
                 if(a/=b .and. (a/=c .or. b/=d)) &
-                    &    call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,-0.5d0*me_00)
+                    &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,-0.5d0*me_00)
               end if
             end do
           end do
@@ -2184,8 +2197,20 @@ contains
                             if(e1 + e2 + e3 > ms%e3max) cycle
                             if(e4 + e5 + e6 > ms%e3max) cycle
 
-                            if(i1==i2 .and. mod(J12+T12,2)==0) cycle
-                            if(i4==i5 .and. mod(J45+T45,2)==0) cycle
+                            if(i1==i2 .and. mod(J12+T12,2)==0) then
+                              if(abs(v(cnt)) > 1.d-6) then
+                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                              end if
+                              cycle
+                            end if
+
+                            if(i4==i5 .and. mod(J45+T45,2)==0) then
+                              if(abs(v(cnt)) > 1.d-6) then
+                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                              end if
+                              cycle
+                            end if
+
                             ch = ms%jpt2ch(J,P123,T)
                             idxb = ms%jpt(ch)%spis2idx(i1,i2,i3)
                             idxk = ms%jpt(ch)%spis2idx(i4,i5,i6)
@@ -2307,8 +2332,19 @@ contains
                             if(e1 + e2 + e3 > ms%e3max) cycle
                             if(e4 + e5 + e6 > ms%e3max) cycle
 
-                            if(i1==i2 .and. mod(J12+T12,2)==0) cycle
-                            if(i4==i5 .and. mod(J45+T45,2)==0) cycle
+                            if(i1==i2 .and. mod(J12+T12,2)==0) then
+                              if(abs(v(cnt)) > 1.d-6) then
+                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                              end if
+                              cycle
+                            end if
+
+                            if(i4==i5 .and. mod(J45+T45,2)==0) then
+                              if(abs(v(cnt)) > 1.d-6) then
+                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                              end if
+                              cycle
+                            end if
                             ch = ms%jpt2ch(J,P123,T)
                             idxb = ms%jpt(ch)%spis2idx(i1,i2,i3)
                             idxk = ms%jpt(ch)%spis2idx(i4,i5,i6)

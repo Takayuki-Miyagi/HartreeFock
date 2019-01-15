@@ -138,7 +138,7 @@ contains
   subroutine CurrentMemory(this, msg)
     class(prof), intent(inout) :: this
     character(*), intent(in), optional :: msg
-    integer :: io
+    integer :: io, getpid
     character(512) :: c_num, fn_proc, tmp1, tmp2, cmd
     real(8) :: mem
 
