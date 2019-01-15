@@ -8,12 +8,12 @@ module Operators
     character(32) :: optr
     real(8) :: zero
     type(NBodyPart) :: one, two
-#ifdef single_precision
+!#ifdef single_precision
     type(NBodyPartSp) :: thr
-#else
-    type(NBodyPart) :: thr
-#endif
-    logical :: is_nomal_ordred = .false.
+!#else
+!    type(NBodyPart) :: thr
+!#endif
+    logical :: is_normal_ordered = .false.
     logical :: Scalar
     logical :: is_three_body = .false.
     integer :: jr, pr, zr
@@ -245,16 +245,59 @@ contains
     call this%thr%prt(iunit)
   end subroutine PrintOperator
 
-  subroutine NormalOrdering(this, ms)
+  subroutine NormalOrdering(this, ms) ! NO2B approx
     class(Op), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPart) :: op2from3, op1from3, op1from2
-    real(8) :: from1, from2, from3
+    real(8) :: op0from1, op0from2, op0from3
 
-    !op2from3 =
+    if(this%is_normal_ordered) then
+      write(*,*) "Operator ", trim(this%optr), " is already normal ordered!"
+      return
+    end if
+
+    if(this%is_three_body) then
+      op2from3 = this%thr%NormalOrderingFromSp3To2(ms)
+    end if
+
+    op1from3 = op2from3%NormalOrderingFrom2To1(ms)
+    op1from2 = this%two%NormalOrderingFrom2To1(ms)
+
+    op0from3 = op1from3%NormalOrderingFrom1To0(ms)
+    op0from2 = op1from2%NormalOrderingFrom1To0(ms)
+    op0from1 = this%one%NormalOrderingFrom1To0(ms)
+
+    this%two = this%two + op2from3
+    this%one = this%one + op1from2 + op1from3 * 0.5d0
+    this%zero = this%zero + op0from1 + op0from2 * 0.5d0 + op0from3 / 6.d0
+
+    this%is_normal_ordered = .true.
 
   end subroutine NormalOrdering
 
+  subroutine UnNormalOrdering(this, ms) ! From NO2B approx. Op
+    class(Op), intent(inout) :: this
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart) :: op2from3, op1from3, op1from2
+    real(8) :: op0from1, op0from2
+
+    if(.not. this%is_normal_ordered) then
+      write(*,*) "Operator ", trim(this%optr), " is already unnormal ordered!"
+      return
+    end if
+
+    op1from2 = this%two%NormalOrderingFrom2To1(ms)
+
+    op0from2 = op1from2%NormalOrderingFrom1To0(ms)
+    op0from1 = this%one%NormalOrderingFrom1To0(ms)
+
+    ! this%two is unchanged
+    this%one = this%one - op1from2
+    this%zero = this%zero - op0from1 + op0from2 * 0.5d0
+
+    this%is_normal_ordered = .false.
+
+  end subroutine UnNormalOrdering
 end module Operators
 
 program test
@@ -275,21 +318,21 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('O16', 25.d0, 2, 4, e3max=2)
+  call ms%init('O16', 35.d0, 2, 4, e3max=2)
   call h_me2j%init('hamil',ms,.false.)
   call h_myg%init('hamil',ms,.false.)
 
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.me2j'
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.bin.myg'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.txt.me2j'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.bin.me2j'
   file_3n = 'none'
-  call h_me2j%set(ms,file_nn,file_3n,[2,4,2],[2,2,2,2])
+  call h_me2j%set(ms,file_nn,file_3n,[6,12,6],[2,2,2,2])
 
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax2_e2max4.txt.myg'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.txt.myg'
   file_3n = 'none'
-  call h_myg%set(ms,file_nn,file_3n,[2,4,2],[2,2,2,2])
+  call h_myg%set(ms,file_nn,file_3n,[6,12,6],[2,2,2,2])
 
   h_diff = h_myg - h_me2j
-  call h_myg%prt()
+  call h_diff%prt()
 
   call h_diff%fin()
   call h_me2j%fin()

@@ -209,10 +209,13 @@ contains
     integer, intent(in) :: idx, z
     integer :: r
 
+    r = 0
     if(z /= -1 .and. z /= 1) then
       write(*,'(a,i3)') "Error in iso2pn, tz has to be -1 or 1. tz = ", z
       stop
     end if
+    if(this%orb(idx)%e > sps%emax) return
+    if(this%orb(idx)%l > sps%lmax) return
     r=sps%nljz2idx(this%orb(idx)%n,this%orb(idx)%l,this%orb(idx)%j,z)
   end function iso2pn
 
@@ -222,6 +225,9 @@ contains
     integer, intent(in) :: idx
     integer :: r
 
+    r = 0
+    if(this%orb(idx)%e > sps%emax) return
+    if(this%orb(idx)%l > sps%lmax) return
     r=sps%nlj2idx(this%orb(idx)%n,this%orb(idx)%l,this%orb(idx)%j)
   end function pn2iso
 end module SingleParticleState

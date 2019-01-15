@@ -108,6 +108,8 @@ module NOperators
     generic :: operator(+) => SumNBodyPartSp
     generic :: operator(-) => SubtractNBodyPartSp
     generic :: operator(*) => ScaleNBodyPartSp
+
+    procedure :: NormalOrderingFromSp3To2
   end type NBodyPartSp
 
   type, extends(DMat) :: NBodyChannel
@@ -157,6 +159,10 @@ module NOperators
     procedure :: SetTwoBodyPart
     generic :: set => SetOneBodyPart, SetTwoBodyPart
     procedure :: prt => PrintNBodyPart
+
+    procedure :: NormalOrderingFrom3To2
+    procedure :: NormalOrderingFrom2To1
+    procedure :: NormalOrderingFrom1To0
 
     procedure :: CopyNBodyPart
     procedure :: SumNBodyPart
@@ -1158,6 +1164,7 @@ contains
     real(8) :: v, fact
 
     call r%init(ms%two,this%Scalar,this%optr,this%jr,this%pr,this%zr)
+
     do chbra = 1, ms%two%NChan
       do chket = 1, chbra
         if( .not. r%MatCh(chbra,chket)%is) cycle
@@ -1203,20 +1210,22 @@ contains
 
   end function NormalOrderingFrom3To2
 
-  ! for now, only scalar
   function NormalOrderingFrom2To1(this,ms) result(r)
+    use CommonLibrary, only: sjs, triag
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPart) :: r
-    integer :: i1, i2, ih, j1, j2, jh, J
+    integer :: i1, i2, ih, j1, j2, l1, l2, z1, z2, e1, e2
+    integer :: jh, eh, J_bra, J_ket
     integer :: chbra, chket, bra, ket, bra_max, ket_max
-    real(8) :: v, fact
+    real(8) :: v, fact, tfact
 
     call r%init(ms%one,this%Scalar,this%optr,this%jr,this%pr,this%zr)
 
     do chbra = 1, ms%one%NChan
       do chket = 1, chbra
         if( .not. r%MatCh(chbra,chket)%is) cycle
+
 
         bra_max = ms%one%jpz(chbra)%nst
         ket_max = ms%one%jpz(chket)%nst
@@ -1226,35 +1235,56 @@ contains
 
         do bra = 1, bra_max
           i1 = ms%one%jpz(chbra)%n2spi(bra)
+          l1 = ms%sps%orb(i1)%l
+          z1 = ms%sps%orb(i1)%z
+          e1 = ms%sps%orb(i1)%e
           if(chbra == chket) ket_max = bra
           do ket = 1, ket_max
             i2 = ms%one%jpz(chket)%n2spi(ket)
-
+            l2 = ms%sps%orb(i2)%l
+            z2 = ms%sps%orb(i2)%z
+            e2 = ms%sps%orb(i2)%e
 
             v = 0.d0
             do ih = 1, ms%sps%norbs
               if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
               jh = ms%sps%orb(ih)%j
+              eh = ms%sps%orb(ih)%e
+              if(e1 + eh > ms%e2max) cycle
+              if(e2 + eh > ms%e2max) cycle
               fact = 1.d0
               if(i1==ih) fact = fact * dsqrt(2.d0)
               if(i2==ih) fact = fact * dsqrt(2.d0)
 
-              do J = max(abs(j1-jh),abs(j2-jh))/2, &
-                    &min(    j1+jh ,    j2+jh )/2
+              do J_bra = abs(j1-jh)/2, (j1+jh)/2
+                if(i1 == ih .and. mod(J_bra,2)==1) cycle
+                do J_ket = abs(j2-jh)/2, (j2+jh)/2
+                  if(i2 == ih .and. mod(J_bra,2)==1) cycle
 
-                v = v + dble(2*J+1) * ms%NOCoef(ih) * &
-                    & this%GetTwBME(ms%sps,ms%two,i1,ih,i2,ih,J,J) ! scalar
-
+                  if(triag(J_bra,J_ket,this%jr)) cycle
+                  tfact = sqrt(dble( (2*J_bra+1) * (2*J_ket+1) ) )
+                  if(.not. this%Scalar) then
+                    tfact = sqrt(dble( (2*J_bra+1) * (2*J_ket+1) ) ) * &
+                        (-1.d0) ** ((j1+jh)/2+J_ket+this%jr) * &
+                        & sjs(j1,2*J_bra,jh,2*J_ket,j2,2*this%jr)
+                  end if
+                  v = v + tfact * &
+                      & this%GetTwBME(ms%sps,ms%two,i1,ih,i2,ih,J_bra,J_ket) * &
+                      & ms%NOcoef(ih)
+                end do
               end do
+
             end do
-            r%MatCh(chbra,chket)%m(bra,ket) = &
-                & v / dble(2*J1+1) * fact ! scalar
+            r%MatCh(chbra,chket)%m(bra,ket) = v  * fact
+            if(this%Scalar) r%MatCh(chbra,chket)%m(bra,ket) = &
+                & v  * fact / dble(j1+1)
+            if(this%Scalar) r%MatCh(chket,chbra)%m(ket,bra) = &
+                & v  * fact / dble(j1+1)
           end do
         end do
 
       end do
     end do
-
   end function NormalOrderingFrom2To1
 
   function NormalOrderingFrom1To0(this,ms) result(r)
@@ -1262,9 +1292,9 @@ contains
     type(MSpace), intent(in) :: ms
     real(8) :: r
     integer :: ih, lh, jh, zh, ch, nh
-    real(8) :: v, fact
 
     r = 0.d0
+    if(.not. this%Scalar) return
     do ih = 1, ms%sps%norbs
       if(abs(ms%NOCoef(ih)) < 1.d-6) cycle
       jh = ms%sps%orb(ih)%j
@@ -1448,18 +1478,21 @@ contains
             if(Jmin > Jmax) cycle
             do J = Jmin, Jmax
               me_00 = v(icnt+1)
-              me_pp = v(icnt+2)
+              me_nn = v(icnt+2)
               me_10 = v(icnt+3)
-              me_nn = v(icnt+4)
-              if(ap > sps%norbs) cycle
-              if(bp > sps%norbs) cycle
-              if(cp > sps%norbs) cycle
-              if(dp > sps%norbs) cycle
+              me_pp = v(icnt+4)
+              icnt = icnt + 4
+
+              if(ap == 0) cycle
+              if(bp == 0) cycle
+              if(cp == 0) cycle
+              if(dp == 0) cycle
+
               if(sps%orb(ap)%e + sps%orb(bp)%e > ms%e2max) cycle
               if(sps%orb(cp)%e + sps%orb(dp)%e > ms%e2max) cycle
 #ifdef NOperatorsDebug
               write(*,'(5i3,4f12.6)') a, b, c, d, J, &
-                  &  me_00, me_pp, me_10, me_nn
+                  &  me_00, me_nn, me_10, me_pp
 #endif
               fact = 1.d0
               if(a == b) fact = fact / dsqrt(2.d0)
@@ -1468,21 +1501,21 @@ contains
               if(abs(1.d0-fact) < 1.d-4 .or. mod(J,2) == 0) then
                 call two%SetTwBME(sps,ms,ap,bp,cp,dp,J,me_pp*fact)
                 call two%SetTwBME(sps,ms,an,bn,cn,dn,J,me_nn*fact)
-                call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_10)
-                if(a/=b) call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,0.5d0*me_10)
+                call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_10) ! pnpn
+                if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,0.5d0*me_10) ! pnnp
                 if(a/=b .and. c/=d) &
-                    &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,0.5d0*me_10)
-                if(c/=d .and. (a/=c .or. b/=d)) &
-                    &    call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_10)
+                    &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,0.5d0*me_10) ! npnp
+                if(a/=b .and. (a/=c .or. b/=d)) &
+                    &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,0.5d0*me_10) ! nppn
               end if
 
               if(abs(1.d0-fact) < 1.d-4 .or. mod(J,2) == 1) then
-                call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_00)
-                if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,-0.5d0*me_00)
+                call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,0.5d0*me_00) ! pnpn
+                if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,-0.5d0*me_00) ! pnnp
                 if(a/=b .and. c/=d) &
-                    &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J, 0.5d0*me_00)
+                    &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J, 0.5d0*me_00) ! npnp
                 if(a/=b .and. (a/=c .or. b/=d)) &
-                    &    call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,-0.5d0*me_00)
+                    &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,-0.5d0*me_00) ! nppn
               end if
             end do
           end do
@@ -1520,7 +1553,8 @@ contains
     call sps_me2j%init(this%emax2, this%lmax2)
     nelm = count_scalar_me2j(sps_me2j,this%e2max2)
     allocate(v(nelm))
-    open(runit, file=this%file_nn, action='read',iostat=io)
+    open(runit, file=this%file_nn, action='read',iostat=io, &
+        & form='unformatted', access='stream')
     if(io /= 0) then
       write(*,'(2a)') 'File open error: ', trim(this%file_nn)
       return
@@ -1563,13 +1597,16 @@ contains
             if(Jmin > Jmax) cycle
             do J = Jmin, Jmax
               me_00 = v(icnt+1)
-              me_pp = v(icnt+2)
+              me_nn = v(icnt+2)
               me_10 = v(icnt+3)
-              me_nn = v(icnt+4)
-              if(ap > sps%norbs) cycle
-              if(bp > sps%norbs) cycle
-              if(cp > sps%norbs) cycle
-              if(dp > sps%norbs) cycle
+              me_pp = v(icnt+4)
+              icnt = icnt + 4
+
+              if(ap == 0) cycle
+              if(bp == 0) cycle
+              if(cp == 0) cycle
+              if(dp == 0) cycle
+
               if(sps%orb(ap)%e + sps%orb(bp)%e > ms%e2max) cycle
               if(sps%orb(cp)%e + sps%orb(dp)%e > ms%e2max) cycle
 
@@ -1992,7 +2029,7 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(OrbitsIsospin) :: spsf
     real(4), allocatable :: v(:)
-    integer :: nelm, n
+    integer :: nelm
     integer :: runit = 22, io
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
