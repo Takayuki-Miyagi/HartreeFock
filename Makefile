@@ -16,13 +16,13 @@ ifeq ($(HOST),other)
 #	FDEP=makedepf90
 	CC=gcc
 	FC=gfortran
-	LDFLAGS= -llapack -lblas -lgsl
+	LDFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl
 	OMP = -fopenmp
 	FFLAGS=-O3 -Dsingle_precision
 	CFLAGS=-O3
 	FF2C= -ff2c
-	#FDFLAGS=-Ddebug
-	#FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+	FDFLAGS=-Ddebug
+	FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 endif
 
 ifeq ($(HOST),apt)
@@ -74,7 +74,7 @@ OBJF77 = $(SRCF77:$(SRCDIR)/%.f=$(OBJDIR)/%.o)
 OBJF90 = $(SRCF90:$(SRCDIR)/%.f90=$(OBJDIR)/%.o)
 OBJF95 = $(SRCF95:$(SRCDIR)/%.F90=$(OBJDIR)/%.o)
 
-MODDIR = mod
+MODDIR = src
 MODF90 = $(SRCF90:$(SRCDIR)/%.f90=$(MODDIR)/%.mod)
 MODF95 = $(SRCF95:$(SRCDIR)/%.F90=$(MODDIR)/%.mod)
 
@@ -101,6 +101,10 @@ ifeq ($(HOST),other)
 endif
 
 ifeq ($(HOST),apt)
+	MODOUT=-module $(MODDIR)
+endif
+
+ifeq ($(HOST),oak)
 	MODOUT=-module $(MODDIR)
 endif
 

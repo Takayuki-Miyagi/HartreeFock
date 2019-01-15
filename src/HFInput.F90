@@ -71,6 +71,8 @@ contains
     params%hw = hw
     params%conv = conv
     params%fmt_hf_snt = fmt_hf_snt
+    params%emax_2nf = emax_2nf
+    params%e2max_2nf = e2max_2nf
     params%emax_3nf = emax_3nf
     params%e2max_3nf = e2max_3nf
     params%e3max_3nf = e3max_3nf

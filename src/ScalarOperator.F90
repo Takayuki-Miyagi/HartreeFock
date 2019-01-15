@@ -1,7 +1,7 @@
 module ScalarOperator
   use class_sys, only: sy
   use InputParameters, only: parameters
-  use ModelSpace, only: spo_pn, MSpace, OneBodySpace, TwoBodySpace, ThreeBodySpace, &
+  use ModelSpace, only: spo_isospin, spo_pn, MSpace, OneBodySpace, TwoBodySpace, ThreeBodySpace, &
       & OneBodyChannel, TwoBodyChannel, ThreeBodyChannel, SpinParityTz
   use MatrixDouble, only: DMat
   use VectorDouble, only: DVec
@@ -101,7 +101,7 @@ contains
     cnt = 0.d0
     do ich = 1, nbody%n
       n = nbody%ndim(ich)
-      call this%jptz(ich)%ini(n,n)
+      call this%jptz(ich)%zeros(n,n)
       cnt = cnt + n ** 2
     end do
     this%usedmem = 8.d0 * cnt / (1024.d0) ** 3
@@ -363,6 +363,8 @@ contains
       call read_2bme_snt_bin(f2, sps, two, this)
     elseif(sys%find(f2, '.txt') .and. sys%find(f2, '.nv')) then
       call read_2bme_nv_txt(f2, params, sps, two, this)
+    elseif(sys%find(f2, '.txt') .and. sys%find(f2, '.me2j')) then
+      call read_2bme_me2j_txt(f2, params, sps, two, this)
     elseif(f2 == 'None' .or. f2 == 'none') then
 
     else ! default
@@ -1526,121 +1528,234 @@ contains
     type(TwoBodySpace), intent(in) :: two
     character(*), intent(in) :: f2
 
-    integer :: iunit = 19
-    integer :: ia, ib, ic, id
-    integer :: iza, izb, izc, izd
-    integer :: it, ij, numpot, num
-    integer :: ichpp, ichpn, ichnn
-    integer :: brapp, ketpp, brapn, ketpn, brann, ketnn
-    integer :: ip, phasepp, phasenn, phasepn_bra, phasepn_ket, phasepn
-    integer :: idummy1, idummy2
-    real(8) :: dummy1, dummy2, vtemp
-    real(8) :: trel, hrel, vcoul, vpn, vpp, vnn, dnorm
-    integer :: a, b, c, d
-
     type(spo_isospin) :: isps
+    integer :: nelm, lines, i
+    real(8), allocatable :: v(:)
+    integer :: iunit = 19, icnt
 
+    integer :: a, b, c, d, dmax
+    integer :: la, ja, ea, ap, an
+    integer :: lb, jb, eb, bp, bn
+    integer :: lc, jc, ec, cp, cn
+    integer :: ld, jd, ed, dp, dn
+    integer :: J, Jmin, Jmax, ich, bra, ket, phs
+    real(8) :: me_00, me_nn, me_10, me_pp, fact
+
+
+    write(*,'(a)') "File reading me2j format"
     call isps%init(params%emax_2nf)
     nelm = count_me2j(isps,params%e2max_2nf)
-
-    open(iunit, file = f2, status = "old")
-    read(iunit, *) numpot, idummy1, idummy2, dummy1, dummy2
-    do num = 1, numpot
-      read(iunit, *) ia, ib, ic, id, ij, it, trel, hrel, vcoul, vpn, vpp, vnn
-      if(2*ia > sps%n) cycle
-      if(2*ib > sps%n) cycle
-      if(2*ic > sps%n) cycle
-      if(2*id > sps%n) cycle
-      if(sps%nshell(2*ia) + sps%nshell(2*ib) > params%e2max) cycle
-      if(sps%nshell(2*ic) + sps%nshell(2*id) > params%e2max) cycle
-
-      ip = (-1) ** (sps%ll(2*ia) + sps%ll(2*ib))
-      ichpn = two%jptz2n(ij, ip, 0)
-      dnorm = 1.d0
-      if(ia == ib) dnorm = dnorm * dsqrt(2.d0)
-      if(ic == id) dnorm = dnorm * dsqrt(2.d0)
-      vtemp = vpn * dnorm * 0.5d0
-      phasepn_bra = (-1) ** ((sps%jj(2*ia) + sps%jj(2*ib)) / 2 + ij + it)
-      phasepn_ket = (-1) ** ((sps%jj(2*ic) + sps%jj(2*id)) / 2 + ij + it)
-
-      brapn = two%jptz(ichpn)%labels2n(2*ia-1,2*ib)
-      ketpn = two%jptz(ichpn)%labels2n(2*ic-1,2*id)
-      phasepn = two%jptz(ichpn)%iphase(2*ia-1,2*ib) * &
-          &     two%jptz(ichpn)%iphase(2*ic-1,2*id)
-      tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
-      tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
-
-      if(ia /= ib) then
-        brapn = two%jptz(ichpn)%labels2n(2*ib-1,2*ia)
-        ketpn = two%jptz(ichpn)%labels2n(2*ic-1,2*id)
-        phasepn = phasepn_bra * &
-            &     two%jptz(ichpn)%iphase(2*ib-1,2*ia) * &
-            &     two%jptz(ichpn)%iphase(2*ic-1,2*id)
-        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
-        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
-      end if
-
-      if(ic /= id .and. (ia /= ic .or. ib /= id)) then
-        brapn = two%jptz(ichpn)%labels2n(2*ia-1,2*ib)
-        ketpn = two%jptz(ichpn)%labels2n(2*id-1,2*ic)
-        phasepn = phasepn_ket * &
-            &     two%jptz(ichpn)%iphase(2*ia-1,2*ib) * &
-            &     two%jptz(ichpn)%iphase(2*id-1,2*ic)
-        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
-        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
-      end if
-
-      if(ia /= ib .and. ic /= id) then
-        brapn = two%jptz(ichpn)%labels2n(2*ib-1,2*ia)
-        ketpn = two%jptz(ichpn)%labels2n(2*id-1,2*ic)
-        phasepn = phasepn_bra * phasepn_ket * &
-            &     two%jptz(ichpn)%iphase(2*ib-1,2*ia) * &
-            &     two%jptz(ichpn)%iphase(2*id-1,2*ic)
-        tbme%jptz(ichpn)%m(brapn, ketpn) = tbme%jptz(ichpn)%m(brapn, ketpn) + vtemp * dble(phasepn)
-        tbme%jptz(ichpn)%m(ketpn, brapn) = tbme%jptz(ichpn)%m(brapn, ketpn)
-      end if
-
-      ichpp = two%jptz2n(ij, ip,-1)
-      if(ichpp /= 0) then
-        brapp = two%jptz(ichpp)%labels2n(2*ia-1, 2*ib-1)
-        ketpp = two%jptz(ichpp)%labels2n(2*ic-1, 2*id-1)
-        phasepp = two%jptz(ichpp)%iphase(2*ia-1, 2*ib-1) * &
-            &     two%jptz(ichpp)%iphase(2*ic-1, 2*id-1)
-        if(brapp * ketpp /= 0) then
-          tbme%jptz(ichpp)%m(brapp, ketpp) = tbme%jptz(ichpp)%m(brapp, ketpp) + &
-              &   vpp * dble(phasepp)
-          tbme%jptz(ichpp)%m(ketpp, brapp) = tbme%jptz(ichpp)%m(brapp, ketpp)
-        end if
-      end if
-
-      ichnn = two%jptz2n(ij, ip, 1)
-      if(ichnn /= 0) then
-        brann = two%jptz(ichnn)%labels2n(2*ia, 2*ib)
-        ketnn = two%jptz(ichnn)%labels2n(2*ic, 2*id)
-        phasenn = two%jptz(ichnn)%iphase(2*ia, 2*ib) * &
-            &     two%jptz(ichnn)%iphase(2*ic, 2*id)
-        if(brann * ketnn /= 0) then
-          tbme%jptz(ichnn)%m(brann, ketnn) = tbme%jptz(ichnn)%m(brann, ketnn) + &
-              &   vnn * dble(phasenn)
-          tbme%jptz(ichnn)%m(ketnn, brann) = tbme%jptz(ichnn)%m(brann, ketnn)
-        end if
-      end if
-
+    allocate(v(nelm))
+    lines = nelm/10
+    open(iunit,file=f2,status='old')
+    read(iunit,*) ! header
+    do i = 1, lines
+      read(iunit,*) v( (i-1)*10+1 : i*10)
     end do
+    read(iunit,*) v( lines*10+1 : nelm)
     close(iunit)
-    ! ---- print 2bme for check
-#ifdef debug
-    do ichpp = 1, two%n
-      write(*,*) two%j(ichpp), two%p(ichpp), two%tz(ichpp)
-      call tbme%jptz(ichpp)%prt()
+
+    icnt = 0
+    do a = 1, isps%n
+      la = isps%ll(a)
+      ja = isps%jj(a)
+      ea = isps%nshell(a)
+      do b = 1, a
+        lb = isps%ll(b)
+        jb = isps%jj(b)
+        eb = isps%nshell(b)
+        if(ea+eb > params%e2max_2nf) cycle
+        do c = 1, a
+          lc = isps%ll(c)
+          jc = isps%jj(c)
+          ec = isps%nshell(c)
+          dmax = c
+          if(a == c) dmax = b
+          do d = 1, dmax
+            ld = isps%ll(d)
+            jd = isps%jj(d)
+            ed = isps%nshell(d)
+            if(ec+ed > params%e2max_2nf) cycle
+            if((-1)**(la+lb+lc+ld) /= 1) cycle
+            Jmin = max(abs(ja-jb), abs(jc-jd))/2
+            Jmax = min(   (ja+jb),    (jc+jd))/2
+            if(Jmin > Jmax) cycle
+
+            do J = Jmin, Jmax
+              me_00 = v(icnt+1)
+              me_nn = v(icnt+2)
+              me_10 = v(icnt+3)
+              me_pp = v(icnt+4)
+              icnt = icnt + 4
+
+              if(ea > params%emax) cycle
+              if(eb > params%emax) cycle
+              if(ec > params%emax) cycle
+              if(ed > params%emax) cycle
+              if(ea + eb > params%e2max) cycle
+              if(ec + ed > params%e2max) cycle
+
+              ap = sps%spo2n(isps%nn(a),la,ja,-1)
+              an = sps%spo2n(isps%nn(a),la,ja, 1)
+
+              bp = sps%spo2n(isps%nn(b),lb,jb,-1)
+              bn = sps%spo2n(isps%nn(b),lb,jb, 1)
+
+              cp = sps%spo2n(isps%nn(c),lc,jc,-1)
+              cn = sps%spo2n(isps%nn(c),lc,jc, 1)
+
+              dp = sps%spo2n(isps%nn(d),ld,jd,-1)
+              dn = sps%spo2n(isps%nn(d),ld,jd, 1)
+
+              fact = 1.d0
+              if(a == b) fact = fact / dsqrt(2.d0)
+              if(c == d) fact = fact / dsqrt(2.d0)
+
+              if(abs(1.d0 - fact) < 1.d-4 .or. mod(J,2)==0) then
+                ! pp
+                ich = two%jptz2n(J,(-1)**(la+lb),-1)
+                if(ich /= 0) then
+                  bra = two%jptz(ich)%labels2n(ap,bp)
+                  ket = two%jptz(ich)%labels2n(cp,dp)
+                  phs = two%jptz(ich)%iphase(ap,bp) * two%jptz(ich)%iphase(cp,dp)
+                  tbme%jptz(ich)%m(bra,ket) = me_pp * fact * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+                ! nn
+                ich = two%jptz2n(J,(-1)**(la+lb), 1)
+                if(ich /= 0) then
+                  bra = two%jptz(ich)%labels2n(an,bn)
+                  ket = two%jptz(ich)%labels2n(cn,dn)
+                  phs = two%jptz(ich)%iphase(an,bn) * two%jptz(ich)%iphase(cn,dn)
+                  tbme%jptz(ich)%m(bra,ket) = me_nn * fact * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+
+                ! pn
+                ich = two%jptz2n(J,(-1)**(la+lb), 0)
+                bra = two%jptz(ich)%labels2n(ap,bn)
+                ket = two%jptz(ich)%labels2n(cp,dn)
+                phs = two%jptz(ich)%iphase(ap,bn) * two%jptz(ich)%iphase(cp,dn)
+                tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + 0.5d0 * me_10 * dble(phs)
+                tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+
+                if(c /= d) then
+                  bra = two%jptz(ich)%labels2n(ap,bn)
+                  ket = two%jptz(ich)%labels2n(cn,dp)
+                  phs = two%jptz(ich)%iphase(ap,bn) * two%jptz(ich)%iphase(cn,dp)
+                  tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + 0.5d0 * me_10 * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+
+                if(a /= b .and. c /= d) then
+                  bra = two%jptz(ich)%labels2n(an,bp)
+                  ket = two%jptz(ich)%labels2n(cn,dp)
+                  phs = two%jptz(ich)%iphase(an,bp) * two%jptz(ich)%iphase(cn,dp)
+                  tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + 0.5d0 * me_10 * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+
+                if(a /= b .and. (a/=c .or. b /= d)) then
+                  bra = two%jptz(ich)%labels2n(an,bp)
+                  ket = two%jptz(ich)%labels2n(cp,dn)
+                  phs = two%jptz(ich)%iphase(an,bp) * two%jptz(ich)%iphase(cp,dn)
+                  tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + 0.5d0 * me_10 * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+
+              end if
+
+              if(abs(1.d0 - fact) < 1.d-4 .or. mod(J,2)==1) then
+                ! pn
+                ich = two%jptz2n(J,(-1)**(la+lb), 0)
+                bra = two%jptz(ich)%labels2n(ap,bn)
+                ket = two%jptz(ich)%labels2n(cp,dn)
+                phs = two%jptz(ich)%iphase(ap,bn) * two%jptz(ich)%iphase(cp,dn)
+                tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + 0.5d0 * me_00 * dble(phs)
+                tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+
+                if(c /= d) then
+                  bra = two%jptz(ich)%labels2n(ap,bn)
+                  ket = two%jptz(ich)%labels2n(cn,dp)
+                  phs = two%jptz(ich)%iphase(ap,bn) * two%jptz(ich)%iphase(cn,dp)
+                  tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) - 0.5d0 * me_00 * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+
+                if(a /= b .and. c /= d) then
+                  bra = two%jptz(ich)%labels2n(an,bp)
+                  ket = two%jptz(ich)%labels2n(cn,dp)
+                  phs = two%jptz(ich)%iphase(an,bp) * two%jptz(ich)%iphase(cn,dp)
+                  tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) + 0.5d0 * me_00 * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+
+                if(a /= b .and. (a/=c .or. b /= d)) then
+                  bra = two%jptz(ich)%labels2n(an,bp)
+                  ket = two%jptz(ich)%labels2n(cp,dn)
+                  phs = two%jptz(ich)%iphase(an,bp) * two%jptz(ich)%iphase(cp,dn)
+                  tbme%jptz(ich)%m(bra,ket) = tbme%jptz(ich)%m(bra,ket) - 0.5d0 * me_00 * dble(phs)
+                  tbme%jptz(ich)%m(ket,bra) = tbme%jptz(ich)%m(bra,ket)
+                end if
+              end if
+
+            end do
+
+          end do
+        end do
+      end do
     end do
-#endif
-    ! ------------
+    deallocate(v)
+
   end subroutine read_2bme_me2j_txt
 
   function count_me2j(sps, e2max) result(r)
     integer :: r
     type(spo_isospin), intent(in) :: sps
     integer, intent(in) :: e2max
+
+    integer :: a, b, c, d, dmax
+    integer :: la, ja, ea
+    integer :: lb, jb, eb
+    integer :: lc, jc, ec
+    integer :: ld, jd, ed
+    integer :: J, Jmin, Jmax
+
+    r = 0
+    do a = 1, sps%n
+      la = sps%ll(a)
+      ja = sps%jj(a)
+      ea = sps%nshell(a)
+      do b = 1, a
+        lb = sps%ll(b)
+        jb = sps%jj(b)
+        eb = sps%nshell(b)
+        if(ea+eb > e2max) cycle
+        do c = 1, a
+          lc = sps%ll(c)
+          jc = sps%jj(c)
+          ec = sps%nshell(c)
+          dmax = c
+          if(a == c) dmax = b
+          do d = 1, dmax
+            ld = sps%ll(d)
+            jd = sps%jj(d)
+            ed = sps%nshell(d)
+
+            if(ec+ed > e2max) cycle
+            if((-1)**(la+lb+lc+ld) /= 1) cycle
+            Jmin = max(abs(ja-jb), abs(jc-jd))/2
+            Jmax = min(   (ja+jb),    (jc+jd))/2
+            if(Jmin > Jmax) cycle
+            do J = Jmin, Jmax
+              r = r + 4
+            end do
+
+          end do
+        end do
+      end do
+    end do
+
+
   end function count_me2j
 end module ScalarOperator

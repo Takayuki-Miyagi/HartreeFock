@@ -51,6 +51,7 @@ program HartreeFockMain
   ! Three-Body Force
   if(params%thbmefile /= 'None') call isps%init(params%emax_3nf)
   if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
+
   ! Hamiltonian
   call hamil%init(ms)
   call hamil%set(params, sps, ms, 'hamil', params%twbmefile, thbme)
