@@ -60,6 +60,7 @@ module read_3BME
     procedure :: InitiReadScalar
     procedure :: Store3BME
   end type iThreeBodyScalar
+
 #ifdef single_precision
   real(4), allocatable :: vtemp(:)
 #else
@@ -540,7 +541,7 @@ contains
     type(sy) :: sys
     integer :: iunit = 20
     integer :: i
-    integer(8) :: num
+    integer(8) :: num, ii
     real(8) :: st
     logical :: ex
     inquire(file = filename, exist = ex)
@@ -550,6 +551,7 @@ contains
     end if
 
     call Cnt3BME(sps, params, num)
+    write(*,*) 'number of matrix elements: ', num
 #ifdef single_precision
     st = dble(num) * 4.d0 / (1024.d0 ** 3)
 #else
@@ -562,12 +564,28 @@ contains
       open(iunit, file = filename, status = 'old', access = 'stream', form='formatted')
       read(iunit, *) vtemp
       close(iunit)
+
+    elseif(sys%find(filename, '.me3j')) then
+      !call read_3bme_linebyline_txt(sps, params, filename)
+      open(iunit, file = filename, status = 'old')
+      read(iunit, *)
+      do i = 1, num/10
+        read(iunit, *) vtemp( (i-1)*10+1 : i*10)
+      end do
+      if(mod(num,10) /= 0) read(iunit,*) vtemp( (num/10)*10 : num)
+      close(iunit)
+
     elseif(sys%find(filename, '.bin')) then
       !call read_3bme_linebyline(sps, params, filename)
       open(iunit, form = 'unformatted', file = filename, status = 'old', access='stream')
-      !open(iunit, form = 'unformatted', file = filename, status = 'old') ! old version
       !read(iunit)  i ! old version
       read(iunit) vtemp
+      close(iunit)
+    elseif(sys%find(filename, '.binline')) then
+      open(iunit, form = 'unformatted', file = filename, status = 'old') ! old version
+      do ii = 1, num
+        read(iunit) vtemp(ii)
+      end do
       close(iunit)
     else
       write(*,'(2a)') 'The file format cannot be detected: ', trim(filename)
@@ -670,7 +688,7 @@ contains
     integer :: p123, p456
     integer :: j12, j45, t12, t45
     integer :: j, t
-    integer :: total_num
+    integer(8) :: total_num
     integer :: emax, e2max, e3max
     emax = params%emax_3nf
     e2max = params%e2max_3nf
