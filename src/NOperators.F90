@@ -1930,7 +1930,7 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(OrbitsIsospin) :: spsf
     real(8), allocatable :: v(:)
-    integer :: nelm, n
+    integer(8) :: nelm, n
     integer :: runit = 22, io
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
@@ -1958,7 +1958,7 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(OrbitsIsospin) :: spsf
     real(8), allocatable :: v(:)
-    integer :: nelm, n
+    integer(8) :: nelm, n
     integer :: runit = 22, io
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
@@ -2005,7 +2005,7 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(OrbitsIsospin) :: spsf
     real(4), allocatable :: v(:)
-    integer :: nelm, n
+    integer(8) :: nelm, n
     integer :: runit = 22, io
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
@@ -2033,7 +2033,7 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(OrbitsIsospin) :: spsf
     real(4), allocatable :: v(:)
-    integer :: nelm
+    integer(8) :: nelm
     integer :: runit = 22, io
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
@@ -2056,7 +2056,7 @@ contains
   function count_scalar_3bme(spsf, e2max, e3max) result(r)
     type(OrbitsIsospin), intent(in) :: spsf
     integer, intent(in) :: e2max, e3max
-    integer :: r
+    integer(8) :: r
     integer :: i1, l1, j1, e1
     integer :: i2, l2, j2, e2
     integer :: i3, l3, j3, e3
@@ -2150,7 +2150,7 @@ contains
     type(OrbitsIsospin), intent(in) :: spsf,sps
     real(8), intent(in) :: v(:)
     integer, intent(in) :: e2max, e3max
-    integer :: cnt
+    integer(8) :: cnt
     integer :: i1, l1, j1, e1
     integer :: i2, l2, j2, e2
     integer :: i3, l3, j3, e3
@@ -2285,7 +2285,7 @@ contains
     type(OrbitsIsospin), intent(in) :: spsf,sps
     real(4), intent(in) :: v(:)
     integer, intent(in) :: e2max, e3max
-    integer :: cnt
+    integer(8) :: cnt
     integer :: i1, l1, j1, e1
     integer :: i2, l2, j2, e2
     integer :: i3, l3, j3, e3

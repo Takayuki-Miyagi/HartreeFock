@@ -42,7 +42,7 @@ contains
     zb = ib(4)
 
     select case(optr)
-    case("Hamil", "hamil")
+    case("Hamil", "hamil", 'kinetic', 'Kinetic')
       if(la /= lb) return
       if(ja /= jb) return
       if(za /= zb) return
