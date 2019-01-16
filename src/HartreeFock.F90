@@ -25,21 +25,31 @@ module HartreeFock
   type :: HFSolver
     logical :: is_three_body
     integer :: n_iter_max
-    real(8) :: tol
+    real(8) :: tol, diff
+    real(8) :: e0  ! cm term
+    real(8) :: e1  ! kinetic term
+    real(8) :: e2  ! nn int. term
+    real(8) :: e3  ! 3n int. term
+    real(8) :: ehf ! hf energy
+
     type(NBodyPart) :: F   ! Fock opeartor
     type(NBodyPart) :: T   ! kinetic term
     type(NBodyPart) :: V   ! one-body filed from 2body interaction
     type(NBOdyPart) :: W   ! one-body filed form 3body interaction
     type(NBodyPart) :: rho ! density matrix
     type(NBodyPart) :: C   ! F's diagonalization coefficient, (HO|HF)
-    type(NBodyPart) :: Occ ! diagonal Occupation matrix (HO|HO)
+    type(NBodyPart) :: Occ ! diagonal Occupation matrix
     type(Monopole) :: V2, V3
   contains
     procedure :: fin => FinHFSolver
     procedure :: init => InitHFSolver
+    procedure :: solve => SolveHFSolver
+    procedure :: DiagonalizeFockMatrix
     procedure :: SetOccupationMatrix
     procedure :: UpdateDensityMatrix
     procedure :: UpdateFockMatrix
+    procedure :: CalcEnergy
+    procedure :: TransformHF
   end type HFSolver
 
 contains
@@ -70,6 +80,12 @@ contains
       return
     end if
 
+    this%e0 = hamil%zero
+    this%e1 = 0.d0
+    this%e2 = 0.d0
+    this%e3 = 0.d0
+    this%diff = 1.d2
+
     this%n_iter_max = n_iter_max
     this%tol = tol
     this%is_three_body = hamil%is_three_body
@@ -87,6 +103,7 @@ contains
     call timer%cmemory()
     call this%V2%InitMonopole2(ms, hamil%two)
     call timer%countup_memory('Monople 2Body int.')
+    call timer%Add("Construct Monopole 2Body int.", omp_get_wtime() - ti)
 
     if(this%is_three_body) then
 
@@ -104,11 +121,94 @@ contains
     call this%UpdateDensityMatrix()
     call this%UpdateFockMatrix(ms%sps, ms%one)
 
+
   end subroutine InitHFSolver
 
-  !subroutine SolveHFSolver(this, ms)
+  subroutine SolveHFSolver(this, sps, one)
+    use Profiler, only: timer
+    class(HFSolver), intent(inout) :: this
+    type(Orbits), intent(in) :: sps
+    type(OneBodySpace), intent(in) :: one
+    integer :: iter
+    real(8) :: ti
 
-  !end subroutine SolveHFSolver
+    ti = omp_get_wtime()
+    write(*,'(2x,a,1x,a,1x,a,1x,a,1x,a,1x,a)') "iter", "zero-body", &
+        & "one-body kinetic", "two-body interaction", &
+        & "three-body interaction", "Hartree-Fock energy"
+
+    call this%CalcEnergy(one)
+    write(*,'(6x,5f18.6)') this%e0, this%e1, &
+        &  this%e2, this%e3,this%ehf
+    do iter = 1, this%n_iter_max
+
+      call this%DiagonalizeFockMatrix()
+      call this%UpdateDensityMatrix()
+      call this%UpdateFockMatrix(sps, one)
+
+      call this%CalcEnergy(one)
+
+      write(*,'(2x,i4,5f18.6)') iter, this%e0, this%e1, &
+          &  this%e2, this%e3,this%ehf
+
+      if(this%tol > this%diff) exit
+
+      if(iter == this%n_iter_max) then
+        write(*,'(a,i5,a)') "Hartree-Fock iteration does not converge after ", &
+            & this%n_iter_max, " iterations"
+        write(*,'(es14.6)') this%diff
+      end if
+    end do
+
+    call timer%Add("Hartree-Fock interation",omp_get_wtime() - ti)
+
+  end subroutine SolveHFSolver
+
+  subroutine TransformHF(HF,ms,Op)
+    class(HFSolver), intent(in) :: HF
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(inout) :: Op
+
+    if(Op%optr == 'hamil' .or. Op%optr == 'Hamil') then
+
+    else
+
+    end if
+
+  end subroutine TransformHF
+
+  subroutine CalcEnergy(this,one)
+    class(HFSolver), intent(inout) :: this
+    type(OneBodySpace), intent(in) :: one
+    integer :: ch, bra, ket, j
+
+    this%e1 = 0.d0
+    this%e2 = 0.d0
+    this%e3 = 0.d0
+    do ch = 1, this%F%NChan
+      j = one%jpz(ch)%j
+      do bra = 1, this%F%MatCh(ch,ch)%ndims(1)
+        do ket = 1, this%F%MatCh(ch,ch)%ndims(1)
+          this%e1 = this%e1 + this%rho%MatCh(ch,ch)%m(bra,ket) * this%T%MatCh(ch,ch)%m(bra,ket) * dble(j+1)
+          this%e2 = this%e2 + this%rho%MatCh(ch,ch)%m(bra,ket) * this%V%MatCh(ch,ch)%m(bra,ket) * dble(j+1) * 0.5d0
+          this%e3 = this%e3 + this%rho%MatCh(ch,ch)%m(bra,ket) * this%W%MatCh(ch,ch)%m(bra,ket) * dble(j+1) / 6.d0
+        end do
+      end do
+    end do
+    this%ehf = this%e0 + this%e1 + this%e2 + this%e3
+  end subroutine CalcEnergy
+
+  subroutine DiagonalizeFockMatrix(this)
+    class(HFSolver), intent(inout) :: this
+    type(EigenSolSymD) :: sol
+    integer :: ch
+
+    do ch = 1, this%F%NChan
+      call sol%init(this%F%MatCh(ch,ch)%DMat)
+      call sol%DiagSym(this%F%MatCh(ch,ch)%DMat)
+      this%C%MatCh(ch,ch)%DMat = sol%vec
+    end do
+  end subroutine DiagonalizeFockMatrix
 
   subroutine SetOccupationMatrix(this,one,NOcoef)
     class(HFSolver), intent(inout) :: this
@@ -118,7 +218,7 @@ contains
 
     do ich = 1, one%NChan
       do i = 1, one%jpz(ich)%nst
-        io = one%jpz(ich)%spi2n(i)
+        io = one%jpz(ich)%n2spi(i)
         this%Occ%MatCh(ich,ich)%m(i,i) = NOcoef(io)
       end do
     end do
@@ -131,8 +231,8 @@ contains
 
     do ich = 1, this%rho%NChan
       this%rho%MatCh(ich,ich)%DMat = &
-          & this%C%MatCh(ich,ich)%DMat%T() * this%Occ%MatCh(ich,ich)%DMat * &
-          & this%C%MatCh(ich,ich)%DMat
+          & this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
+          & this%C%MatCh(ich,ich)%DMat%T()
     end do
 
   end subroutine UpdateDensityMatrix
@@ -141,9 +241,17 @@ contains
     class(HFSolver), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     type(OneBodySpace), intent(in) :: one
+    type(NBodyPart) :: Fold
     integer(8) :: i1, i2, i3, i4, i5, i6, idx
     integer :: num, ch1, ch2, ch3
     integer :: ii1, ii2, ii3, ii4, ii5, ii6
+    integer :: bra, ket
+
+    Fold = this%F
+    do ch1 = 1, this%F%NChan
+      this%V%Match(ch1,ch1)%m = 0.d0
+      this%W%Match(ch1,ch1)%m = 0.d0
+    end do
 
     do num = 1, this%V2%nidx
       idx = this%V2%idx(num)
@@ -158,28 +266,43 @@ contains
           & this%rho%MatCh(ch2,ch2)%m(ii2,ii4) * this%V2%v(num)
     end do
 
-    do num = 1, this%V3%nidx
-      idx = this%V2%idx(num)
-      call GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)
-      ch1 = one%jpz2ch(sps%orb(i1)%j, (-1)**sps%orb(i1)%l, sps%orb(i1)%z)
-      ch2 = one%jpz2ch(sps%orb(i2)%j, (-1)**sps%orb(i2)%l, sps%orb(i2)%z)
-      ch3 = one%jpz2ch(sps%orb(i3)%j, (-1)**sps%orb(i3)%l, sps%orb(i3)%z)
-      ii1 = one%jpz(ch1)%spi2n(i1)
-      ii2 = one%jpz(ch2)%spi2n(i2)
-      ii3 = one%jpz(ch3)%spi2n(i3)
-      ii4 = one%jpz(ch1)%spi2n(i4)
-      ii5 = one%jpz(ch2)%spi2n(i5)
-      ii6 = one%jpz(ch3)%spi2n(i6)
-      this%W%MatCh(ch1,ch1)%m(ii1,ii4) = this%V%MatCh(ch1,ch1)%m(ii1,ii4) + &
-          & this%rho%MatCh(ch2,ch2)%m(ii2,ii5) * &
-          & this%rho%MatCh(ch3,ch3)%m(ii3,ii6) * &
-          & this%V3%v(num)
+    if(this%is_three_body) then
+      do num = 1, this%V3%nidx
+        idx = this%V2%idx(num)
+        call GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)
+        ch1 = one%jpz2ch(sps%orb(i1)%j, (-1)**sps%orb(i1)%l, sps%orb(i1)%z)
+        ch2 = one%jpz2ch(sps%orb(i2)%j, (-1)**sps%orb(i2)%l, sps%orb(i2)%z)
+        ch3 = one%jpz2ch(sps%orb(i3)%j, (-1)**sps%orb(i3)%l, sps%orb(i3)%z)
+        ii1 = one%jpz(ch1)%spi2n(i1)
+        ii2 = one%jpz(ch2)%spi2n(i2)
+        ii3 = one%jpz(ch3)%spi2n(i3)
+        ii4 = one%jpz(ch1)%spi2n(i4)
+        ii5 = one%jpz(ch2)%spi2n(i5)
+        ii6 = one%jpz(ch3)%spi2n(i6)
+        this%W%MatCh(ch1,ch1)%m(ii1,ii4) = this%V%MatCh(ch1,ch1)%m(ii1,ii4) + &
+            & this%rho%MatCh(ch2,ch2)%m(ii2,ii5) * &
+            & this%rho%MatCh(ch3,ch3)%m(ii3,ii6) * &
+            & this%V3%v(num)
+      end do
+    end if
+
+    do ch1 = 1, this%F%NChan
+      do bra = 1, this%F%MatCh(ch1,ch1)%ndims(1)
+        do ket = 1, bra
+          this%V%MatCh(ch1,ch1)%m(ket,bra) = this%V%MatCh(ch1,ch1)%m(bra,ket)
+          this%W%MatCh(ch1,ch1)%m(ket,bra) = this%W%MatCh(ch1,ch1)%m(bra,ket)
+        end do
+      end do
     end do
 
+    this%diff = 0.d0
     do ch1 = 1, this%F%NChan
       this%F%Match(ch1,ch1)%DMat = this%T%Match(ch1,ch1)%DMat + &
           & this%V%MatCh(ch1,ch1)%DMat + this%W%MatCh(ch1,ch1)%DMat * 0.5d0
+      this%diff = max(maxval(this%F%MatCh(ch1,ch1)%m - Fold%MatCh(ch1,ch1)%m), this%diff)
     end do
+    call Fold%fin()
+
   end subroutine UpdateFockMatrix
 
 
@@ -224,6 +347,7 @@ contains
         if(j3 /= j1) cycle
         if((-1)**l3 /= (-1)**l1) cycle
         if(z3 /= z1) cycle
+        if(i3 > i1) cycle
 
         do i2 = 1, ms%sps%norbs
           l2 = ms%sps%orb(i2)%l
@@ -251,6 +375,7 @@ contains
     end do
     this%nidx = n
     allocate(this%idx(n))
+    allocate(this%v(n))
 
     n = 0
     do i1 = 1, ms%sps%norbs
@@ -267,6 +392,7 @@ contains
         if(j3 /= j1) cycle
         if((-1)**l3 /= (-1)**l1) cycle
         if(z3 /= z1) cycle
+        if(i3 > i1) cycle
 
         do i2 = 1, ms%sps%norbs
           l2 = ms%sps%orb(i2)%l
@@ -288,7 +414,6 @@ contains
 
             n = n + 1
             this%idx(n) = GetIndex2(i1,i2,i3,i4)
-
           end do
         end do
       end do
@@ -301,10 +426,11 @@ contains
       call GetSpLabels2(num,i1,i2,i3,i4)
       j1 = ms%sps%orb(i1)%j
       j2 = ms%sps%orb(i2)%j
-      v = 0.d0
+
       norm = 1.d0
       if(i1 == i2) norm = norm * dsqrt(2.d0)
       if(i3 == i4) norm = norm * dsqrt(2.d0)
+      v = 0.d0
       do JJ = abs(j1-j2)/2, (j1+j2)/2
         v = v + dble(2*JJ+1) * &
             & vnn%GetTwBME(ms%sps,ms%two,&
@@ -332,7 +458,7 @@ contains
     integer :: l4, j4, z4, e4
     integer :: l5, j5, z5, e5
     integer :: l6, j6, z6, e6
-    real(8) :: v, norm
+    real(8) :: v
 
     if(this%constructed) return
     n = 0
@@ -351,6 +477,7 @@ contains
         if(j4 /= j1) cycle
         if((-1)**l4 /= (-1)**l1) cycle
         if(z4 /= z1) cycle
+        if(i4 > i1) cycle
 
         do i2 = 1, ms%sps%norbs
           l2 = ms%sps%orb(i2)%l
@@ -421,6 +548,7 @@ contains
         if(j4 /= j1) cycle
         if((-1)**l4 /= (-1)**l1) cycle
         if(z4 /= z1) cycle
+        if(i4 > i1) cycle
 
         do i2 = 1, ms%sps%norbs
           l2 = ms%sps%orb(i2)%l
@@ -486,7 +614,7 @@ contains
           v = v + dble(JJJ+1) * &
               & v3n%GetThBME(ms,&
               & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
-              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ) * norm
+              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
           ! need to convert integer(8) -> integer(4)
         end do
       end do
@@ -500,7 +628,7 @@ contains
   function GetIndex2(i1,i2,i3,i4) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4
     integer(8) :: r
-    r = i1 + rshift(i2,10) + rshift(i3,20) + rshift(i4,30)
+    r = i1 + lshift(i2,10) + lshift(i3,20) + lshift(i4,30)
   end function GetIndex2
 
   subroutine GetSpLabels2(idx,i1,i2,i3,i4)
@@ -515,8 +643,8 @@ contains
   function GetIndex3(i1,i2,i3,i4,i5,i6) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4, i5, i6
     integer(8) :: r
-    r = i1 + rshift(i2,10) + rshift(i3,20) + rshift(i4,30) + &
-        &    rshift(i5,40) + rshift(i6,50)
+    r = i1 + lshift(i2,10) + lshift(i3,20) + lshift(i4,30) + &
+        &    lshift(i5,40) + lshift(i6,50)
   end function GetIndex3
 
   subroutine GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)
@@ -533,27 +661,47 @@ end module HartreeFock
 
 program test
   use Profiler, only: timer
+  use ClassSys, only: sys
   use CommonLibrary, only: &
       &init_dbinomial_triangle, fin_dbinomial_triangle
   use ModelSpace, only: MSpace
   use Operators
-
+  use HartreeFock, only: HFSolver
   implicit none
 
   type(MSpace) :: ms
   type(Op) :: h
   character(:), allocatable :: file_nn, file_3n
+  type(HFsolver) :: HF
+  type(sys) :: s
+
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax6_e2max12.txt.myg'
+  !file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax6_e2max12.bin.myg'
+  file_3n = 'none'
+  if(.not. s%isfile(file_nn)) then
+    write(*,*) "File does not exist: ", trim(file_nn)
+    stop
+  end if
+
+  if(file_3n /= 'None' .and. file_nn /= 'none') then
+    if(.not. s%isfile(file_3n)) then
+      write(*,*) "File does not exist: ", trim(file_3n)
+      stop
+    end if
+  end if
 
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('O16', 35.d0, 2, 4, e3max=2)
+  call ms%init('O16', 25.d0, 6, 12, e3max=6)
   call h%init('hamil',ms,.false.)
 
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.txt.me2j'
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.bin.me2j'
-  file_3n = 'none'
-  call h%set(ms,file_nn,file_3n,[6,12,6],[2,2,2,2])
+  call h%set(ms,file_nn,file_3n,[6,12,6],[6,6,6,6])
+
+  call HF%init(ms,h,1000,1.d-6)
+  call HF%solve(ms%sps,ms%one)
+
+  call HF%fin()
 
   call h%fin()
   call ms%fin()
