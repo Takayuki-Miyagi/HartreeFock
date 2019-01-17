@@ -158,6 +158,8 @@ contains
     type(ReadFiles) :: rd
 
     if(file_nn == 'none' .and. file_3n == 'none') return
+
+    write(*,'(3a)') "Set ", trim(this%optr), " operator from files"
     ! -- boundary for two-body file
     rd%file_nn = file_nn
     rd%emax2 = ms%emax
@@ -175,7 +177,7 @@ contains
     rd%e2max3 = ms%e2max
     rd%e3max3 = ms%e3max
     rd%lmax3 = ms%lmax
-    if(present(bound_2b_file)) then
+    if(present(bound_3b_file)) then
       rd%emax3 = bound_3b_file(1)
       rd%e2max3= bound_3b_file(2)
       rd%e3max3= bound_3b_file(3)
@@ -183,8 +185,10 @@ contains
     end if
 
     call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
+    write(*,'(2a)') "2B file: ", trim(file_nn)
     call this%two%ReadFile(ms%sps, ms%two, rd)
     if(this%is_three_body) then
+      write(*,'(2a)') "3B file: ", trim(file_3n)
       call this%thr%ReadFile(ms%isps,ms%thr, rd)
     end if
 

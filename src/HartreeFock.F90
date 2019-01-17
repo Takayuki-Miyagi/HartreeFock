@@ -97,7 +97,7 @@ contains
     call this%V%init(ms%one, .true., 'NNint', 0, 1, 0)
     call this%W%init(ms%one, .true., 'NNNint', 0, 1, 0)
 
-    call this%T%set(ms%one,ms%sps,ms%hw,ms%A,ms%Z,ms%N)
+    this%T = hamil%one
 
     ti = omp_get_wtime()
     call timer%cmemory()
@@ -161,15 +161,18 @@ contains
     end do
 
     call timer%Add("Hartree-Fock interation",omp_get_wtime() - ti)
-
   end subroutine SolveHFSolver
 
-  subroutine TransformHF(HF,ms,Op)
+  subroutine TransformHF(HF,ms,Optr,NO2B)
     class(HFSolver), intent(in) :: HF
     type(MSpace), intent(in) :: ms
-    type(Op), intent(inout) :: Op
+    type(Op), intent(inout) :: Optr
+    logical, intent(in), optional :: NO2B
+    logical :: is_NO2B = .true.
 
-    if(Op%optr == 'hamil' .or. Op%optr == 'Hamil') then
+    if(present(NO2B)) is_NO2B = NO2B
+
+    if(Optr%optr == 'hamil' .or. Optr%optr == 'Hamil') then
 
     else
 
@@ -268,7 +271,7 @@ contains
 
     if(this%is_three_body) then
       do num = 1, this%V3%nidx
-        idx = this%V2%idx(num)
+        idx = this%V3%idx(num)
         call GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)
         ch1 = one%jpz2ch(sps%orb(i1)%j, (-1)**sps%orb(i1)%l, sps%orb(i1)%z)
         ch2 = one%jpz2ch(sps%orb(i2)%j, (-1)**sps%orb(i2)%l, sps%orb(i2)%z)
@@ -279,7 +282,7 @@ contains
         ii4 = one%jpz(ch1)%spi2n(i4)
         ii5 = one%jpz(ch2)%spi2n(i5)
         ii6 = one%jpz(ch3)%spi2n(i6)
-        this%W%MatCh(ch1,ch1)%m(ii1,ii4) = this%V%MatCh(ch1,ch1)%m(ii1,ii4) + &
+        this%W%MatCh(ch1,ch1)%m(ii1,ii4) = this%W%MatCh(ch1,ch1)%m(ii1,ii4) + &
             & this%rho%MatCh(ch2,ch2)%m(ii2,ii5) * &
             & this%rho%MatCh(ch3,ch3)%m(ii3,ii6) * &
             & this%V3%v(num)
@@ -419,8 +422,9 @@ contains
       end do
     end do
 
+    this%v(:) = 0.d0
     !$omp parallel
-    !$omp do private(idx,num,i1,i2,i3,i4,j1,j2,v,JJ)
+    !$omp do private(idx,num,i1,i2,i3,i4,j1,j2,norm,v,JJ)
     do idx = 1, this%nidx
       num = this%idx(idx)
       call GetSpLabels2(num,i1,i2,i3,i4)
@@ -432,6 +436,8 @@ contains
       if(i3 == i4) norm = norm * dsqrt(2.d0)
       v = 0.d0
       do JJ = abs(j1-j2)/2, (j1+j2)/2
+        if(i1 == i2 .and. mod(JJ,2) == 1) cycle
+        if(i3 == i4 .and. mod(JJ,2) == 1) cycle
         v = v + dble(2*JJ+1) * &
             & vnn%GetTwBME(ms%sps,ms%two,&
             & int(i1,kind(JJ)), int(i2,kind(JJ)), int(i3,kind(JJ)), int(i4,kind(JJ)),JJ)
@@ -441,7 +447,6 @@ contains
     end do
     !$omp end do
     !$omp end parallel
-
     this%constructed = .true.
   end subroutine InitMonopole2
 
@@ -610,6 +615,8 @@ contains
       j3 = ms%sps%orb(i3)%j
       v = 0.d0
       do JJ = abs(j1-j2)/2, (j1+j2)/2
+        if(i1 == i2 .and. mod(JJ,2) == 1) cycle
+        if(i4 == i5 .and. mod(JJ,2) == 1) cycle
         do JJJ = abs(2*JJ-j3), (2*JJ+j3), 2
           v = v + dble(JJJ+1) * &
               & v3n%GetThBME(ms,&
@@ -675,9 +682,9 @@ program test
   type(HFsolver) :: HF
   type(sys) :: s
 
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax6_e2max12.txt.myg'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max12.txt.me2j'
   !file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw25_emax6_e2max12.bin.myg'
-  file_3n = 'none'
+  file_3n = '/home/takayuki/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max8_hw25_NNN-full.txt'
   if(.not. s%isfile(file_nn)) then
     write(*,*) "File does not exist: ", trim(file_nn)
     stop
@@ -693,10 +700,11 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('O16', 25.d0, 6, 12, e3max=6)
-  call h%init('hamil',ms,.false.)
+  call ms%init('He4', 25.d0, 6, 12, e3max=6)
+  call h%init('hamil',ms,.false.) ! nn-only
+  !call h%init('hamil',ms,.true.)  ! nn+3n
 
-  call h%set(ms,file_nn,file_3n,[6,12,6],[6,6,6,6])
+  call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
 
   call HF%init(ms,h,1000,1.d-6)
   call HF%solve(ms%sps,ms%one)

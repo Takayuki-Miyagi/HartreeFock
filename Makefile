@@ -20,7 +20,7 @@ ifeq ($(HOST),other)
 	FF2C= -ff2c
 	FDFLAGS=
 	#FDFLAGS+=-DModelSpaceDebug
-	FDFLAGS+=-DNOperatorsDebug
+	#FDFLAGS+=-DNOperatorsDebug
 	FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 endif
 
