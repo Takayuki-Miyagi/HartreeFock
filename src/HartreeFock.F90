@@ -121,7 +121,6 @@ contains
     call this%UpdateDensityMatrix()
     call this%UpdateFockMatrix(ms%sps, ms%one)
 
-
   end subroutine InitHFSolver
 
   subroutine SolveHFSolver(this, sps, one)
@@ -700,11 +699,13 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('He4', 25.d0, 6, 12, e3max=6)
-  call h%init('hamil',ms,.false.) ! nn-only
-  !call h%init('hamil',ms,.true.)  ! nn+3n
+  call ms%init('O16', 25.d0, 2, 4, e3max=8)
+  !call h%init('hamil',ms,.false.) ! nn-only
+  call h%init('hamil',ms,.true.)  ! nn+3n
 
   call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
+  write(*,*) h%thr%GetThBME(ms,1,1,7,0, 1,1,7,0, 1)
+  stop
 
   call HF%init(ms,h,1000,1.d-6)
   call HF%solve(ms%sps,ms%one)

@@ -1132,12 +1132,13 @@ contains
     z5 = ms%sps%orb(i5)%z
     z6 = ms%sps%orb(i6)%z
 
-    a = ms%isps%nlj2idx( ms%sps%orb(i1)%n, ms%sps%orb(i1)%l, ms%sps%orb(i1)%j )
-    b = ms%isps%nlj2idx( ms%sps%orb(i2)%n, ms%sps%orb(i2)%l, ms%sps%orb(i2)%j )
-    c = ms%isps%nlj2idx( ms%sps%orb(i3)%n, ms%sps%orb(i3)%l, ms%sps%orb(i3)%j )
-    d = ms%isps%nlj2idx( ms%sps%orb(i4)%n, ms%sps%orb(i4)%l, ms%sps%orb(i4)%j )
-    e = ms%isps%nlj2idx( ms%sps%orb(i5)%n, ms%sps%orb(i5)%l, ms%sps%orb(i5)%j )
-    f = ms%isps%nlj2idx( ms%sps%orb(i6)%n, ms%sps%orb(i6)%l, ms%sps%orb(i6)%j )
+    a = ms%sps%pn2iso( ms%isps, i1 )
+    b = ms%sps%pn2iso( ms%isps, i2 )
+    c = ms%sps%pn2iso( ms%isps, i3 )
+    d = ms%sps%pn2iso( ms%isps, i4 )
+    e = ms%sps%pn2iso( ms%isps, i5 )
+    f = ms%sps%pn2iso( ms%isps, i6 )
+    if(a*b*c*d*e*f == 0) return
 
     P = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
     Z = z1 + z2 + z3
@@ -1154,6 +1155,7 @@ contains
               & d,e,f,J45,T45,J,T) * &
               & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
               & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
+          write(*,*) r
         end do
       end do
     end do

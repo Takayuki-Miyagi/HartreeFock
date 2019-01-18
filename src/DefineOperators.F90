@@ -114,7 +114,7 @@ contains
       if(Jab /= Jcd) then
         write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
       end if
-      r = p_dot_p(ia,ib,ic,id,Jab) * hw / dble(hw)
+      r = p_dot_p(ia,ib,ic,id,Jab) * hw / dble(A)
       return
 
     case("CMHamil","CMhamil")
