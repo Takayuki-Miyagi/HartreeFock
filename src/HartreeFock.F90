@@ -463,6 +463,7 @@ contains
     integer :: l5, j5, z5, e5
     integer :: l6, j6, z6, e6
     real(8) :: v
+    real(8) :: norm
 
     if(this%constructed) return
     n = 0
@@ -699,13 +700,11 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('O16', 25.d0, 2, 4, e3max=8)
+  call ms%init('He4', 25.d0, 0, 0, e3max=0)
   !call h%init('hamil',ms,.false.) ! nn-only
   call h%init('hamil',ms,.true.)  ! nn+3n
 
   call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
-  write(*,*) h%thr%GetThBME(ms,1,1,7,0, 1,1,7,0, 1)
-  stop
 
   call HF%init(ms,h,1000,1.d-6)
   call HF%solve(ms%sps,ms%one)

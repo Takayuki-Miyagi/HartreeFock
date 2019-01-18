@@ -955,9 +955,9 @@ contains
     P = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
     Z = z1 + z2 + z3
     do T12 = 0, 1
-      if(abs(z1+z2) > T12) cycle
+      if(abs(z1+z2) > 2*T12) cycle
       do T45 = 0, 1
-        if(abs(z4+z5) > T45) cycle
+        if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
           ch = ms%thr%jpt2ch(J,P,T)
@@ -1007,9 +1007,9 @@ contains
     Zbra = z1 + z2 + z3
     Zket = z4 + z5 + z6
     do T12 = 0, 1
-      if(abs(z1+z2) > T12) cycle
+      if(abs(z1+z2) > 2*T12) cycle
       do T45 = 0, 1
-        if(abs(z4+z5) > T45) cycle
+        if(abs(z4+z5) > 2*T45) cycle
         do Tbra = abs(2*T12-1), 2*T12+1, 2
             if(abs(Zbra) > Tbra) cycle
           do Tket = abs(2*T45-1), 2*T45+1, 2
@@ -1143,9 +1143,9 @@ contains
     P = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
     Z = z1 + z2 + z3
     do T12 = 0, 1
-      if(abs(z1+z2) > T12) cycle
+      if(abs(z1+z2) > 2*T12) cycle
       do T45 = 0, 1
-        if(abs(z4+z5) > T45) cycle
+        if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
           ch = ms%thr%jpt2ch(J,P,T)
@@ -1155,7 +1155,6 @@ contains
               & d,e,f,J45,T45,J,T) * &
               & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
               & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
-          write(*,*) r
         end do
       end do
     end do
@@ -1197,9 +1196,9 @@ contains
     Zbra = z1 + z2 + z3
     Zket = z4 + z5 + z6
     do T12 = 0, 1
-      if(abs(z1+z2) > T12) cycle
+      if(abs(z1+z2) > 2*T12) cycle
       do T45 = 0, 1
-        if(abs(z4+z5) > T45) cycle
+        if(abs(z4+z5) > 2*T45) cycle
         do Tbra = abs(2*T12-1), 2*T12+1, 2
             if(abs(Zbra) > Tbra) cycle
           do Tket = abs(2*T45-1), 2*T45+1, 2
