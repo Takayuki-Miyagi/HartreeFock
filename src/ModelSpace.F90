@@ -1415,6 +1415,7 @@ contains
             end select
           end if
         end do
+        !write(*,'(5i3,a,3i3)') i1,i2,i3,j12,t12, ", ", a,b,c
         !write(*,'(10f10.4)') this%jt(j12,t12)%TrnsCoef
 
       end do

@@ -19,6 +19,7 @@ ifeq ($(HOST),other)
 	CFLAGS=-O3
 	FF2C= -ff2c
 	FDFLAGS=
+	#FDFLAGS+=-DSingleParticleStateDebug
 	#FDFLAGS+=-DModelSpaceDebug
 	#FDFLAGS+=-DNOperatorsDebug
 	FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized

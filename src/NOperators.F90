@@ -93,7 +93,7 @@ module NOperators
 
   type :: NBodyPartSp
     type(NBodyChannelSp), allocatable :: MatCh(:,:)
-    character(32) :: optr
+    character(32) :: optr='none'
     integer :: NChan
     logical :: Scalar
     integer :: jr, pr, tr, zr
@@ -460,8 +460,8 @@ contains
     integer :: chbra, chket
 
     if(allocated(a%MatCh)) call a%fin()
-    a%optr = b%optr
     a%NChan = b%NChan
+    a%optr = b%optr
     a%Scalar = b%Scalar
     a%jr = b%jr
     a%pr = b%pr
@@ -484,8 +484,8 @@ contains
     integer :: chbra, chket
 
     if(allocated(a%MatCh)) call a%fin()
-    a%optr = b%optr
     a%NChan = b%NChan
+    a%optr = b%optr
     a%Scalar = b%Scalar
     a%jr = b%jr
     a%pr = b%pr
@@ -937,7 +937,7 @@ contains
     if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
     if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
-    if(i3 == i4 .and. mod(J45, 2) == 1) return
+    if(i4 == i5 .and. mod(J45, 2) == 1) return
     z1 = ms%sps%orb(i1)%z
     z2 = ms%sps%orb(i2)%z
     z3 = ms%sps%orb(i3)%z
@@ -987,7 +987,7 @@ contains
     if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
     if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
-    if(i3 == i4 .and. mod(J45, 2) == 1) return
+    if(i4 == i5 .and. mod(J45, 2) == 1) return
     z1 = ms%sps%orb(i1)%z
     z2 = ms%sps%orb(i2)%z
     z3 = ms%sps%orb(i3)%z
@@ -1042,6 +1042,8 @@ contains
     real(8) :: r
 
     r = 0.d0
+    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
+    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
     P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
     if(P123 * P456 /= 1) stop 'Error in GetThBMEIso_scalar: P'
@@ -1050,8 +1052,6 @@ contains
     idxbra = ms%jpt(ch)%sorting(i1,i2,i3)
     idxket = ms%jpt(ch)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
-    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
-    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     isorted_bra = ms%jpt(ch)%sort(idxbra)%idx_sorted
     isorted_ket = ms%jpt(ch)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
@@ -1082,6 +1082,8 @@ contains
     real(8) :: r
 
     r = 0.d0
+    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
+    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
     P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
     if(P123 * P456 * this%pr /= 1) stop 'Error in GetThBMEIso_general: P'
@@ -1092,8 +1094,6 @@ contains
     idxbra = ms%jpt(chbra)%sorting(i1,i2,i3)
     idxket = ms%jpt(chket)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
-    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
-    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     isorted_bra = ms%jpt(chbra)%sort(idxbra)%idx_sorted
     isorted_ket = ms%jpt(chket)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
@@ -1124,7 +1124,7 @@ contains
     if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
     if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
-    if(i3 == i4 .and. mod(J45, 2) == 1) return
+    if(i4 == i5 .and. mod(J45, 2) == 1) return
     z1 = ms%sps%orb(i1)%z
     z2 = ms%sps%orb(i2)%z
     z3 = ms%sps%orb(i3)%z
@@ -1176,7 +1176,7 @@ contains
     if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
     if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
-    if(i3 == i4 .and. mod(J45, 2) == 1) return
+    if(i4 == i5 .and. mod(J45, 2) == 1) return
     z1 = ms%sps%orb(i1)%z
     z2 = ms%sps%orb(i2)%z
     z3 = ms%sps%orb(i3)%z
@@ -1732,6 +1732,11 @@ contains
               me_pp = v(icnt+4)
               icnt = icnt + 4
 
+              if(a == b .and. mod(J,2) == 1 .and. abs(me_nn) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(c == d .and. mod(J,2) == 1 .and. abs(me_nn) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(a == b .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(c == d .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+
               if(ap == 0) cycle
               if(bp == 0) cycle
               if(cp == 0) cycle
@@ -1776,6 +1781,12 @@ contains
     call sps_me2j%fin()
     return
   end subroutine read_scalar_me2j_txt
+
+  subroutine me2j_read_warning(a,b,c,d,J,me)
+    integer, intent(in) :: a, b, c, d, J
+    real(8), intent(in) :: me
+    write(*,'(a,5i3,f12.6)') "Warning: this TBME should be zero: ", a, b, c, d, J, me
+  end subroutine me2j_read_warning
 
   subroutine read_scalar_me2j_bin(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this
@@ -1850,6 +1861,11 @@ contains
               me_10 = v(icnt+3)
               me_pp = v(icnt+4)
               icnt = icnt + 4
+
+              if(a == b .and. mod(J,2) == 1 .and. abs(me_nn) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(c == d .and. mod(J,2) == 1 .and. abs(me_nn) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(a == b .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(c == d .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
 
               if(ap == 0) cycle
               if(bp == 0) cycle
@@ -2506,6 +2522,7 @@ contains
                             ket = ms%jpt(ch)%idxqn(idxk)%JT2n(J45,T45)
                             if(bra*ket == 0) cycle
                             thr%MatCh(ch,ch)%m(bra,ket) = v(cnt)
+                            thr%MatCh(ch,ch)%m(ket,bra) = v(cnt)
                           end do
 
                         end do
@@ -2640,6 +2657,7 @@ contains
                             ket = ms%jpt(ch)%idxqn(idxk)%JT2n(J45,T45)
                             if(bra*ket == 0) cycle
                             thr%MatCh(ch,ch)%m(bra,ket) = v(cnt)
+                            thr%MatCh(ch,ch)%m(ket,bra) = v(cnt)
                           end do
 
                         end do
