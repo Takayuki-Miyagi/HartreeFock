@@ -24,10 +24,16 @@ module HartreeFock
     procedure :: FinMonopole
   end type Monopole
 
+  ! Note:
+  ! alpha is parameter controlling
+  ! density matrix mixing ratio
+  ! (has to be 0.d0 < alpha <= 1.d0, alpha = 1.d0 means direct iteration)
   type :: HFSolver
     logical :: is_three_body
-    integer :: n_iter_max
-    real(8) :: tol, diff
+    integer :: n_iter_max = 1000
+    real(8) :: alpha = 1.d0
+    real(8) :: tol = 1.d-8
+    real(8) :: diff
     real(8) :: e0  ! cm term
     real(8) :: e1  ! kinetic term
     real(8) :: e2  ! nn int. term
@@ -68,13 +74,13 @@ contains
     call this%V3%FinMonopole()
   end subroutine FinHFSolver
 
-  subroutine InitHFSolver(this,ms,hamil,n_iter_max,tol)
+  subroutine InitHFSolver(this,ms,hamil,n_iter_max,tol,alpha)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     type(Op), intent(in) :: hamil
-    integer, intent(in) :: n_iter_max
-    real(8), intent(in) :: tol
+    integer, intent(in), optional :: n_iter_max
+    real(8), intent(in), optional :: tol, alpha
     real(8) :: ti
     integer :: ich
 
@@ -88,9 +94,9 @@ contains
     this%e2 = 0.d0
     this%e3 = 0.d0
     this%diff = 1.d2
-
-    this%n_iter_max = n_iter_max
-    this%tol = tol
+    if(present(n_iter_max)) this%n_iter_max = n_iter_max
+    if(present(tol)) this%tol = tol
+    if(present(alpha)) this%alpha = alpha
     this%is_three_body = hamil%is_three_body
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occ',     0, 1, 0)
@@ -166,7 +172,7 @@ contains
       end if
     end do
 
-    call timer%Add("Hartree-Fock interation",omp_get_wtime() - ti)
+    call timer%Add("Hartree-Fock iteration",omp_get_wtime() - ti)
   end subroutine SolveHFSolver
 
   subroutine TransformToHF(HF,ms,Optr)
@@ -333,9 +339,12 @@ contains
 
     do ich = 1, this%rho%NChan
       this%rho%MatCh(ich,ich)%DMat = &
-          & this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
-          & this%C%MatCh(ich,ich)%DMat%T()
+          & this%rho%MatCh(ich,ich)%DMat * (1.d0-this%alpha) + &
+          & (this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
+          & this%C%MatCh(ich,ich)%DMat%T()) * this%alpha
     end do
+
+
 
   end subroutine UpdateDensityMatrix
 
@@ -979,13 +988,13 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('O16', 25.d0, 4, 8, e3max=8)
+  call ms%init('Pb208', 25.d0, 6, 12, e3max=6)
   !call h%init('hamil',ms,.false.) ! nn-only
   call h%init('hamil',ms,.true.)  ! nn+3n
 
   call h%set(ms,file_nn,file_3n,[8,16,8],[8,8,8,8])
 
-  call HF%init(ms,h,1000,1.d-8)
+  call HF%init(ms,h,alpha=0.7d0)
   call HF%solve(ms%sps,ms%one)
 
   call HF%TransformToHF(ms,H)
