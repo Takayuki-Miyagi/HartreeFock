@@ -17,6 +17,7 @@ module NOperators
   private :: InitNonOrthIsospinThreeBodyPart
   private :: InitNonOrthIsospinThreeBodyPartSp
 
+  private :: GetOBME
   private :: SetOneBOdyPart
   private :: GetTwBME_general
   private :: GetTwBME_scalar
@@ -146,6 +147,7 @@ module NOperators
     generic :: init => InitOneBodyPart, InitTwoBodyPart, InitThreeBodyPart, &
         & InitNonOrthIsospinThreeBodyPart
 
+    procedure :: GetOBME
     procedure :: GetTwBME_general
     procedure :: GetTwBME_scalar
     generic :: GetTwBME => GetTwBME_general, GetTwBME_scalar
@@ -601,6 +603,24 @@ contains
     end do
   end function ScaleNBodyPartSp
 
+  function GetOBME(this,sps,ms,i1,i2) result(r)
+    class(NBodyPart), intent(in) :: this
+    type(Orbits), intent(in) :: sps
+    type(OneBodySpace), intent(in) :: ms
+    integer, intent(in) :: i1, i2
+    integer :: chbra, chket, bra, ket
+    real(8) :: r
+
+    r = 0.d0
+    chbra = ms%jpz2ch(sps%orb(i1)%j, (-1)**sps%orb(i1)%l, sps%orb(i1)%z)
+    chket = ms%jpz2ch(sps%orb(i2)%j, (-1)**sps%orb(i2)%l, sps%orb(i2)%z)
+    if(.not. this%MatCh(chbra,chket)%is) return
+    bra = ms%jpz(chbra)%spi2n(i1)
+    ket = ms%jpz(chket)%spi2n(i2)
+    r = this%MatCh(chbra,chket)%m(bra,ket)
+
+  end function GetOBME
+
   subroutine SetOneBodyPart(this, ms, sps, hw, A, Z, N)
     class(NBodyPart), intent(inout) :: this
     type(OneBodySpace), intent(in) :: ms
@@ -636,9 +656,20 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z)/2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z)/2
 
-    if(triag(J12, J34, this%jr)) stop "Error, in GetTwBME_general: J"
-    if(P12 * P34 * this%pr /= 1) stop "Error, in GetTwBME_general: P"
-    if(Z12 - Z34 - this%zr /= 0) stop "Error, in GetTwBME_general: Tz"
+    if(triag(J12, J34, this%jr)) then
+      write(*,*) "Warning: in GetTwBME_general: J"
+      return
+    end if
+
+    if(P12 * P34 * this%pr /= 1) then
+      write(*,*) "Warning: in GetTwBME_general: P"
+      return
+    end if
+
+    if(Z12 - Z34 - this%zr /= 0) then
+      write(*,*) "Warning: in GetTwBME_general: Tz"
+      return
+    end if
 
     chbra = ms%jpz2ch(J12,P12,Z12)
     chket = ms%jpz2ch(J34,P34,Z34)
@@ -671,8 +702,15 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z)/2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z)/2
 
-    if(P12 * P34 /= 1) stop "Error, in GetTwBME_scalar: P"
-    if(Z12 - Z34 /= 0) stop "Error, in GetTwBME_scalar: Tz"
+    if(P12 * P34 /= 1) then
+      write(*,*) "Warning: in GetTwBME_scalar: P"
+      return
+    end if
+
+    if(Z12 - Z34 /= 0) then
+      write(*,*) "Warning: in GetTwBME_scalar: Tz"
+      return
+    end if
 
     ch = ms%jpz2ch(J,P12,Z12)
     if(ch == 0) return
@@ -703,9 +741,20 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
 
-    if(triag(J12, J34, this%jr)) stop "Error, in SetTwBME_general: J"
-    if(P12 * P34 * this%pr /= 1) stop "Error, in SetTwBME_general: P"
-    if(Z12 - Z34 - this%zr /= 0) stop "Error, in SetTwBME_general: Tz"
+    if(triag(J12, J34, this%jr)) then
+      write(*,*) "Warning: in SetTwBME_general: J"
+      return
+    end if
+
+    if(P12 * P34 * this%pr /= 1) then
+      write(*,*) "Warning: in SetTwBME_general: P"
+      return
+    end if
+
+    if(Z12 - Z34 - this%zr /= 0) then
+      write(*,*) "Warning: in SetTwBME_general: Tz"
+      return
+    end if
 
     chbra = ms%jpz2ch(J12,P12,Z12)
     chket = ms%jpz2ch(J34,P34,Z34)
@@ -737,8 +786,15 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
 
-    if(P12 * P34 /= 1) stop "Error, in SetTwBME_general: P"
-    if(Z12 - Z34 /= 0) stop "Error, in SetTwBME_general: Tz"
+    if(P12 * P34 /= 1) then
+      write(*,*) "Warning: in SetTwBME_general: P"
+      return
+    end if
+
+    if(Z12 - Z34 /= 0) then
+      write(*,*) "Warning: in SetTwBME_general: Tz"
+      return
+    end if
 
     ch = ms%jpz2ch(J,P12,Z12)
     if(ch == 0) return
@@ -770,9 +826,20 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
 
-    if(triag(J12, J34, this%jr)) stop "Error, in AddToTwBME_general: J"
-    if(P12 * P34 * this%pr /= 1) stop "Error, in AddToTwBME_general: P"
-    if(Z12 - Z34 - this%zr /= 0) stop "Error, in AddToTwBME_general: Tz"
+    if(triag(J12, J34, this%jr)) then
+      write(*,*)"Warning: in AddToTwBME_general: J"
+      return
+    end if
+
+    if(P12 * P34 * this%pr /= 1) then
+      write(*,*) "Warning: in AddToTwBME_general: P"
+      return
+    end if
+
+    if(Z12 - Z34 - this%zr /= 0) then
+      write(*,*) "Warning: in AddToTwBME_general: Tz"
+      return
+    end if
 
     chbra = ms%jpz2ch(J12,P12,Z12)
     chket = ms%jpz2ch(J34,P34,Z34)
@@ -805,8 +872,15 @@ contains
     Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
     Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
 
-    if(P12 * P34 /= 1) stop "Error, in AddToTwBME_general: P"
-    if(Z12 - Z34 /= 0) stop "Error, in AddToTwBME_general: Tz"
+    if(P12 * P34 /= 1) then
+      write(*,*) "Warning: in AddToTwBME_general: P"
+      return
+    end if
+
+    if(Z12 - Z34 /= 0) then
+      write(*,*) "Warning: in AddToTwBME_general: Tz"
+      return
+    end if
 
     ch = ms%jpz2ch(J,P12,Z12)
     if(ch == 0) return
@@ -857,7 +931,10 @@ contains
     r = 0.d0
     P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
     P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
-    if(P123 * P456 /= 1) stop 'Error in GetThBMEIso_scalar: P'
+    if(P123 * P456 /= 1) then
+      write(*,*) 'Warning: in GetThBMEIso_scalar: P'
+      return
+    end if
     ch = ms%jpt2ch(J,P123,T)
     if(ch == 0) return
     idxbra = ms%jpt(ch)%sorting(i1,i2,i3)
@@ -897,8 +974,14 @@ contains
     r = 0.d0
     P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
     P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
-    if(P123 * P456 * this%pr /= 1) stop 'Error in GetThBMEIso_general: P'
-    if(triag(Tbra,Tket,2*this%zr)) stop 'Error in GetThBMEIso_general: T'
+    if(P123 * P456 * this%pr /= 1) then
+      write(*,*) 'Warning: in GetThBMEIso_general: P'
+      return
+    end if
+    if(triag(Tbra,Tket,2*this%zr)) then
+      write(*,*) 'Warning: in GetThBMEIso_general: T'
+      return
+    end if
     chbra = ms%jpt2ch(Jbra,P123,Tbra)
     chket = ms%jpt2ch(Jket,P456,Tket)
     if(chbra*chket == 0) return
@@ -1063,6 +1146,9 @@ contains
         r = r + dble(this%MatCh(ch,ch)%m(bra,ket) * &
             & ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
             & ms%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
+        !write(*,*) this%MatCh(ch,ch)%m(bra,ket), &
+        !    & ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra), &
+        !    & ms%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket)
       end do
     end do
   end function GetThBMEIso_scalar_sp
@@ -1086,8 +1172,14 @@ contains
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
     P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
-    if(P123 * P456 * this%pr /= 1) stop 'Error in GetThBMEIso_general: P'
-    if(triag(Tbra,Tket,2*this%zr)) stop 'Error in GetThBMEIso_general: T'
+    if(P123 * P456 * this%pr /= 1) then
+      write(*,*) 'Warning: in GetThBMEIso_general: P'
+      return
+    end if
+    if(triag(Tbra,Tket,2*this%zr)) then
+      write(*,*) 'Warning: in GetThBMEIso_general: T'
+      return
+    end if
     chbra = ms%jpt2ch(Jbra,P123,Tbra)
     chket = ms%jpt2ch(Jket,P456,Tket)
     if(chbra*chket == 0) return
@@ -2421,6 +2513,7 @@ contains
     integer :: i6, l6, j6, e6, i6max
     integer :: J12, T12, J45, T45, J, T, P123, P456
     integer :: ch, idxb, idxk, bra, ket
+
 
     cnt = 0
     do i1 = 1, spsf%norbs

@@ -1186,6 +1186,7 @@ contains
             end do
           end do
 
+
           this%sort(idx)%j12min = j12min
           this%sort(idx)%j12max = j12max
           this%sort(idx)%t12min = t12min

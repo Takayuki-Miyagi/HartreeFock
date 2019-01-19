@@ -15,7 +15,8 @@ ifeq ($(HOST),other)
 	FC=gfortran
 	LDFLAGS= -llapack -lblas -lgsl
 	OMP = -fopenmp
-	FFLAGS=-O3 -Dsingle_precision
+	FFLAGS=-O3
+	FFLAGS+=-Dsingle_precision
 	CFLAGS=-O3
 	FF2C= -ff2c
 	FDFLAGS=

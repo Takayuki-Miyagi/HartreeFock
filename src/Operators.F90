@@ -37,6 +37,11 @@ module Operators
     generic :: operator(+) => SumOp
     generic :: operator(-) => SubtractOp
     generic :: operator(*) => ScaleOp
+
+    procedure :: NormalOrdering
+    procedure :: UnNormalOrdering
+    procedure :: DiscardThreeBodyPart
+    procedure :: NO2BApproximation
   end type Op
 
 contains
@@ -261,7 +266,11 @@ contains
     end if
 
     if(this%is_three_body) then
+#ifdef single_precision
       op2from3 = this%thr%NormalOrderingFromSp3To2(ms)
+#else
+      op2from3 = this%thr%NormalOrderingFrom3To2(ms)
+#endif
     end if
 
     op1from3 = op2from3%NormalOrderingFrom2To1(ms)
@@ -285,6 +294,10 @@ contains
     type(NBodyPart) :: op1from2
     real(8) :: op0from1, op0from2
 
+    if(this%is_three_body) then
+      write(*,'(a)') "Warning: this unnormal ordering process is only for the NO2B approximated Operators."
+    end if
+
     if(.not. this%is_normal_ordered) then
       write(*,*) "Operator ", trim(this%optr), " is already unnormal ordered!"
       return
@@ -295,13 +308,43 @@ contains
     op0from2 = op1from2%NormalOrderingFrom1To0(ms)
     op0from1 = this%one%NormalOrderingFrom1To0(ms)
 
-    ! this%two is unchanged
+    ! this%two  is unchanged
     this%one = this%one - op1from2
     this%zero = this%zero - op0from1 + op0from2 * 0.5d0
 
     this%is_normal_ordered = .false.
 
   end subroutine UnNormalOrdering
+
+  subroutine DiscardThreeBodyPart(this)
+    class(Op), intent(inout) :: this
+    if(.not. this%is_three_body) then
+      write(*,'(a)') "This operator does not include three-body part."
+      write(*,'(a)') "No need to discard three-body part."
+      return
+    end if
+    call this%thr%fin()
+    this%is_three_body = .false.
+  end subroutine DiscardThreeBodyPart
+
+  subroutine NO2BApproximation(this,ms)
+    class(Op), intent(inout) :: this
+    type(MSpace), intent(in) :: ms
+    if(.not. this%is_three_body) then
+      write(*,'(a)') "This operator does not include three-body part."
+      write(*,'(a)') "No need to do NO2B approximation."
+      return
+    end if
+
+    if(this%is_normal_ordered) then
+      call this%DiscardThreeBodyPart()
+      return
+    end if
+    call this%NormalOrdering(ms)
+    call this%DiscardThreeBodyPart()
+
+  end subroutine NO2BApproximation
+
 end module Operators
 
 !program test
