@@ -112,11 +112,11 @@ contains
 
       ti = omp_get_wtime()
       call timer%cmemory()
-#ifdef single_precision
+!#ifdef single_precision
       call this%V3%InitMonopole3_sp(ms, hamil%thr)
-#else
-      call this%V3%InitMonopole3(ms, hamil%thr)
-#endif
+!#else
+!      call this%V3%InitMonopole3(ms, hamil%thr)
+!#endif
       call timer%countup_memory('Monople 3Body int.')
       call timer%Add("Construct Monopole 3Body int.", omp_get_wtime() - ti)
     end if
@@ -139,12 +139,12 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
-    write(*,'(2x,a,1x,a,1x,a,1x,a,1x,a,1x,a)') "iter", "zero-body", &
-        & "one-body kinetic", "two-body interaction", &
-        & "three-body interaction", "Hartree-Fock energy"
+    write(*,'(2x,a,9x,a,10x,a,9x,a,7x,a,14x,a)') "iter", "zero-body", &
+        & "one-body ", "two-body ", &
+        & "three-body ", "Ehf"
 
     call this%CalcEnergy(one)
-    write(*,'(6x,5f18.6)') this%e0, this%e1, &
+    write(*,'(4x,a,5f18.6)') "HO", this%e0, this%e1, &
         &  this%e2, this%e3,this%ehf
     do iter = 1, this%n_iter_max
 
@@ -210,7 +210,7 @@ contains
       J = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%nst
       call UT%zeros(n,n)
-      call V3%ini(n,n)
+      call V3%zeros(n,n)
       V2 = H%two%MatCh(ch,ch)%DMat
 
       !$omp parallel
@@ -230,11 +230,12 @@ contains
 
           UT%m(bra,ket) = HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
-              & HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
+              & HF%C%GetOBME(ms%sps,ms%one,a,d) * HF%C%GetOBME(ms%sps,ms%one,b,c)
           if(a==b) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
+          if(.not. H%is_three_body) cycle
           do e = 1, ms%sps%norbs
             je = ms%sps%orb(e)%j
             le = ms%sps%orb(e)%l
@@ -951,6 +952,7 @@ program test
   use ModelSpace, only: MSpace
   use Operators
   use HartreeFock, only: HFSolver
+  use MBPT
   implicit none
 
   type(MSpace) :: ms
@@ -958,7 +960,7 @@ program test
   character(:), allocatable :: file_nn, file_3n
   type(HFsolver) :: HF
   type(sys) :: s
-  real(8) :: ti
+  type(MBPTEnergy) :: PT
 
   file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max16.txt.me2j'
   file_3n = '/home/takayuki/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max8_hw25_NNN-full.txt'
@@ -975,11 +977,9 @@ program test
   end if
 
   call timer%init()
-  ti = omp_get_wtime()
   call init_dbinomial_triangle()
-  call timer%Add("Initialization Rotation group", omp_get_wtime()-ti)
 
-  call ms%init('O16', 25.d0, 6, 12, e3max=6)
+  call ms%init('O16', 25.d0, 4, 8, e3max=8)
   !call h%init('hamil',ms,.false.) ! nn-only
   call h%init('hamil',ms,.true.)  ! nn+3n
 
@@ -989,6 +989,7 @@ program test
   call HF%solve(ms%sps,ms%one)
 
   call HF%TransformToHF(ms,H)
+  call PT%calc(ms,H)
 
   call HF%fin()
 

@@ -8,11 +8,11 @@ module Operators
     character(32) :: optr
     real(8) :: zero
     type(NBodyPart) :: one, two
-#ifdef single_precision
+!#ifdef single_precision
     type(NBodyPartSp) :: thr
-#else
-    type(NBodyPart) :: thr
-#endif
+!#else
+!    type(NBodyPart) :: thr
+!#endif
     logical :: is_normal_ordered = .false.
     logical :: Scalar
     logical :: is_three_body = .false.
@@ -266,11 +266,11 @@ contains
     end if
 
     if(this%is_three_body) then
-#ifdef single_precision
+!#ifdef single_precision
       op2from3 = this%thr%NormalOrderingFromSp3To2(ms)
-#else
-      op2from3 = this%thr%NormalOrderingFrom3To2(ms)
-#endif
+!#else
+!      op2from3 = this%thr%NormalOrderingFrom3To2(ms)
+!#endif
     end if
 
     op1from3 = op2from3%NormalOrderingFrom2To1(ms)

@@ -2240,10 +2240,14 @@ contains
   end subroutine ReadIsospinThreeBodyFile
 
   subroutine ReadIsospinThreeBodyFileSp(this, sps, ms, rd)
+    use Profiler, only: timer
     class(NBodyPartSp), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(ReadFiles), intent(in) :: rd
+    real(8) :: ti
+
+    ti = omp_get_wtime()
 
     select case(rd%file_3n)
     case('None', 'NONE', 'none')
@@ -2255,6 +2259,7 @@ contains
       if(.not. this%Scalar) call rd%ReadTensor3BFileSp(this,sps,ms)
     end select
 
+    call timer%Add('Read from file', omp_get_wtime()-ti)
   end subroutine ReadIsospinThreeBodyFileSp
 
   subroutine ReadScalar3BFile(this,thr,sps,ms)

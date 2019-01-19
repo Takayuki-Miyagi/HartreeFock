@@ -1,13 +1,14 @@
 obj/CommonLibrary.o : src/CommonLibrary.f90 obj/ClassSys.o 
 obj/ClassSys.o : src/ClassSys.f90 
+obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/NOperators.o obj/ModelSpace.o 
 obj/NOperators.o : src/NOperators.F90 obj/Profiler.o obj/ClassSys.o obj/DefineOperators.o obj/CommonLibrary.o obj/ModelSpace.o obj/LinAlgLib.o 
-obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o 
 obj/MPIFunction.o : src/MPIFunction.F90 
+obj/MBPT.o : src/MBPT.F90 obj/CommonLibrary.o obj/Profiler.o obj/Operators.o obj/ModelSpace.o 
+obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o 
 obj/ModelSpace.o : src/ModelSpace.F90 obj/LinAlgLib.o obj/CommonLibrary.o obj/ClassSys.o obj/Profiler.o obj/SingleParticleState.o 
-obj/Operators.o : src/Operators.F90 obj/CommonLibrary.o obj/Profiler.o obj/DefineOperators.o obj/NOperators.o obj/ModelSpace.o 
 obj/SingleParticleState.o : src/SingleParticleState.F90 
 obj/DefineOperators.o : src/DefineOperators.F90 obj/CommonLibrary.o 
-obj/HartreeFock.o : src/HartreeFock.F90 obj/CommonLibrary.o obj/Operators.o obj/LinAlgLib.o 
+obj/HartreeFock.o : src/HartreeFock.F90 obj/MBPT.o obj/ModelSpace.o obj/ClassSys.o obj/CommonLibrary.o obj/Profiler.o obj/Operators.o obj/LinAlgLib.o 
 obj/SingleDouble.o : LinAlgf90/src/SingleDouble.f90 obj/MatrixDouble.o obj/VectorDouble.o obj/MatrixSingle.o obj/VectorSingle.o 
 obj/LinAlgLib.o : LinAlgf90/src/LinAlgLib.f90 obj/MatVecComplex.o obj/MatVecDouble.o obj/MatVecSingle.o obj/MatrixComplex.o obj/MatrixDouble.o obj/MatrixSingle.o obj/VectorComplex.o obj/VectorDouble.o obj/VectorSingle.o obj/SingleDouble.o obj/LinAlgParameters.o 
 obj/MatVecDouble.o : LinAlgf90/src/MatVecDouble.f90 obj/MatrixDouble.o obj/VectorDouble.o obj/LinAlgParameters.o 
