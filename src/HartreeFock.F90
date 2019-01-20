@@ -274,6 +274,7 @@ contains
       !$omp end do
       !$omp end parallel
       H%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
+      call H%two%MatCh(ch,ch)%prt()
       call UT%fin()
       call V2%fin()
       call V3%fin()
@@ -971,7 +972,7 @@ program test
   type(sys) :: s
   type(MBPTEnergy) :: PT
 
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max16.txt.me2j'
+  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max12.txt.me2j'
   file_3n = '/home/takayuki/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max8_hw25_NNN-full.txt'
   if(.not. s%isfile(file_nn)) then
     write(*,*) "File does not exist: ", trim(file_nn)
@@ -988,16 +989,17 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('Pb208', 25.d0, 6, 12, e3max=6)
-  !call h%init('hamil',ms,.false.) ! nn-only
-  call h%init('hamil',ms,.true.)  ! nn+3n
+  call ms%init('4He', 25.d0, 2, 4, e3max=6)
+  call h%init('hamil',ms,.false.) ! nn-only
+  !call h%init('hamil',ms,.true.)  ! nn+3n
 
-  call h%set(ms,file_nn,file_3n,[8,16,8],[8,8,8,8])
+  call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
 
-  call HF%init(ms,h,alpha=0.7d0)
+  call HF%init(ms,h,alpha=1.0d0)
   call HF%solve(ms%sps,ms%one)
 
   call HF%TransformToHF(ms,H)
+
   call PT%calc(ms,H)
 
   call HF%fin()

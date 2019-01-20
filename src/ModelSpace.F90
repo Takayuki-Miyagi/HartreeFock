@@ -83,6 +83,8 @@ module ModelSpace
     integer, allocatable :: n2spi2(:)
     integer, allocatable :: spis2n(:,:)
     integer, allocatable :: iphase(:,:)
+    integer, allocatable :: holes(:)
+    integer, allocatable :: particles(:)
   contains
     procedure :: init => InitTwoBodyChannel
     procedure :: fin => FinTwoBodyChannel
@@ -391,6 +393,17 @@ contains
       write(*,'(a,i4,a,i3,a,i3)') "A = ", this%A, ", Z = ", this%Z, ", N = ", this%N
       stop
     end if
+
+    do l = 1, this%sps%norbs
+      call this%sps%orb(l)%SetOccupation(this%NOcoef(l))
+      if(this%NOcoef(l) < 1.d-6) then
+        call this%sps%orb(l)%SetParticleHole(1)
+      elseif(abs(1.d0 - this%NOCoef(l)) < 1.d-6) then
+        call this%sps%orb(l)%SetParticleHole(0)
+      else
+        call this%sps%orb(l)%SetParticleHole(2)
+      end if
+    end do
 
 #ifdef ModelSpaceDebug
     write(*,'(a)') "In GetNOCoef:"
@@ -739,6 +752,7 @@ contains
     type(Orbits), intent(in) :: sps
     integer :: i1, j1, l1, z1, e1
     integer :: i2, j2, l2, z2, e2
+    integer :: a, b
     integer :: cnt
 
     this%j = j
@@ -770,15 +784,21 @@ contains
         if(z1 + z2 /= 2*z) cycle
         if(i1 == i2 .and. mod(j,2) == 1) cycle
 
+        a = i1; b = i2
+        if( sps%orb(i1)%occ > sps%orb(i2)%occ ) then
+          ! hp -> ph
+          a = i2; b = i1
+        end if
+
         cnt = cnt + 1
-        this%n2spi1(cnt) = i1
-        this%n2spi2(cnt) = i2
-        this%spis2n(i1,i2) = cnt
-        this%spis2n(i2,i1) = cnt
-        this%iphase(i1,i2) = 1
-        this%iphase(i2,i1) = -(-1) ** ((j1+j2)/2 - j)
+        this%n2spi1(cnt) = a
+        this%n2spi2(cnt) = b
+        this%spis2n(a,b) = cnt
+        this%spis2n(b,a) = cnt
+        this%iphase(a,b) = 1
+        this%iphase(b,a) = -(-1) ** ((j1+j2)/2 - j)
 #ifdef ModelSpaceDebug
-        write(*,'(a,i3,a,i3,a,i6)') "i1=",i1,", i2=",i2,", Num=",cnt
+        write(*,'(a,i3,a,i3,a,i6)') "i1=",a,", i2=",b,", Num=",cnt
 #endif
       end do
     end do

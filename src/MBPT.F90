@@ -65,95 +65,52 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    ! <ij||ab> <ab||ij> / 4 denominator
+    ! \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
     use Profiler, only: timer
     class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
-    integer, allocatable :: p1(:), p2(:), h1(:), h2(:)
+    integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
-    integer :: ja, jb, ji, jj, J2
-    integer :: nidx, idx
-    integer :: cnt
     real(8) :: vsum, v, norm, ti
 
     ti = omp_get_wtime()
-    cnt = 0
-    do a = 1, size(ms%particles)
-      do b = 1, size(ms%particles)
-        do i = 1, size(ms%holes)
-          do j= 1, size(ms%holes)
-            if(Pari(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                & Pari(ms%sps,ms%holes(i),ms%holes(j))) cycle
-            if(Tz(ms%sps,  ms%particles(a),ms%particles(b)) /= &
-                & Tz(ms%sps,ms%holes(i),ms%holes(j))) cycle
-            if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-            if(Eket(ms%sps,ms%holes(    i),ms%holes(    j)) > ms%e2max) cycle
-            cnt = cnt+1
-          end do
-        end do
-      end do
-    end do
-    nidx = cnt
-    allocate(p1(nidx))
-    allocate(p2(nidx))
-    allocate(h1(nidx))
-    allocate(h2(nidx))
-    cnt = 0
-    do a = 1, size(ms%particles)
-      do b = 1, size(ms%particles)
-        do i = 1, size(ms%holes)
-          do j= 1, size(ms%holes)
-            if(Pari(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                & Pari(ms%sps,ms%holes(i),ms%holes(j))) cycle
-            if(Tz(ms%sps,  ms%particles(a),ms%particles(b)) /= &
-                & Tz(ms%sps,ms%holes(i),ms%holes(j))) cycle
-            if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-            if(Eket(ms%sps,ms%holes(    i),ms%holes(    j)) > ms%e2max) cycle
-            cnt = cnt+1
-            p1(cnt) = ms%particles(a)
-            p2(cnt) = ms%particles(b)
-            h1(cnt) = ms%holes(    i)
-            h2(cnt) = ms%holes(    j)
-          end do
-        end do
-      end do
-    end do
-
-
-
 
     vsum = 0.d0
-    !$omp parallel
-    !$omp do private(idx, a, b, i, j, ja, jb, ji, jj, norm, &
-    !$omp &  v, J2) reduction(+:vsum)
-    do idx = 1, nidx
-      a = p1(idx)
-      b = p2(idx)
-      i = h1(idx)
-      j = h2(idx)
-      ja = ms%sps%orb(a)%j
-      jb = ms%sps%orb(b)%j
-      ji = ms%sps%orb(i)%j
-      jj = ms%sps%orb(j)%j
-
-      norm = 1.d0
-      if(a==b) norm = norm * 2.d0
-      if(i==j) norm = norm * 2.d0
+    do ch = 1, ms%two%NChan
+      J2 = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
-      do J2 = max(abs(ja-jb),abs(ji-jj))/2, min(ja+jb,ji+jj)/2
-        if(a==b .and. mod(J2,2)==1) cycle
-        if(i==j .and. mod(J2,2)==1) cycle
-        v = v + dble(2*J2+1) * h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) **2
+      !$omp parallel
+      !$omp do private(ab,a,b,ij,i,j,norm) reduction(+:v)
+      do ab = 1, n
+        a = ms%two%jpz(ch)%n2spi1(ab)
+        b = ms%two%jpz(ch)%n2spi2(ab)
+        if( ms%sps%orb(a)%ph /= 1 ) cycle
+        if( ms%sps%orb(b)%ph /= 1 ) cycle
+        do ij = 1, n
+          i = ms%two%jpz(ch)%n2spi1(ij)
+          j = ms%two%jpz(ch)%n2spi2(ij)
+          if( ms%sps%orb(i)%ph /= 0 ) cycle
+          if( ms%sps%orb(j)%ph /= 0 ) cycle
+
+          norm = 1.d0
+          if(a==b) norm = norm*2.d0
+          if(i==j) norm = norm*2.d0
+
+          v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2)**2 * &
+              & norm / denom(ms%sps,ms%one,h%one,i,j,a,b)
+
+        end do
       end do
-      vsum = vsum + v * norm * 0.25d0 / denom(ms%sps,ms%one,h%one,i,j,a,b)
+      !$omp end do
+      !$omp end parallel
+      vsum = vsum + v * dble(2*J2+1)
     end do
-    !$omp end do
-    !$omp end parallel
+
     this%e_2 = vsum
 
-    deallocate(p1,p2,h1,h2)
     call timer%Add("Second order MBPT",omp_get_wtime()-ti)
   end subroutine energy_second
 
@@ -218,135 +175,53 @@ contains
     class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
-    integer, allocatable :: p1(:), p2(:), p3(:), p4(:)
-    integer, allocatable :: h1(:), h2(:)
-    integer :: np, nh, nidx, idx, cnt
-    integer :: a, b, c, d, i, j
-    integer :: ja, jb, jc, jd, ji, jj
-    integer :: J2
+    integer :: ch, J2, n, ab, cd, ij
+    integer :: i, j, a, b, c, d
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
-    call timer%cmemory()
-
-    nh = size(ms%holes)
-    np = size(ms%particles)
-
-    nidx = nh**2 * np**4
-    cnt = 0
-    do a = 1, np
-      do b = 1, np
-        do c = 1, np
-          do d = 1, np
-            do i = 1, nh
-              do j = 1, nh
-                if(Pari(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Pari(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Pari(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Pari(ms%sps,ms%particles(c),ms%particles(d))) cycle
-                if(Pari(ms%sps,ms%particles(c),ms%particles(d)) /= &
-                    & Pari(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Tz(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Tz(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Tz(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Tz(ms%sps,ms%particles(c),ms%particles(d))) cycle
-                if(Tz(ms%sps,ms%particles(c),ms%particles(d)) /= &
-                    & Tz(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Eket(ms%sps,ms%holes(i),ms%holes(j)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%particles(c),ms%particles(d)) > ms%e2max) cycle
-                cnt = cnt + 1
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-    nidx = cnt
-    allocate(p1(nidx))
-    allocate(p2(nidx))
-    allocate(p3(nidx))
-    allocate(p4(nidx))
-    allocate(h1(nidx))
-    allocate(h2(nidx))
-    cnt = 0
-    do a = 1, np
-      do b = 1, np
-        do c = 1, np
-          do d = 1, np
-            do i = 1, nh
-              do j = 1, nh
-                if(Pari(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Pari(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Pari(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Pari(ms%sps,ms%particles(c),ms%particles(d))) cycle
-                if(Pari(ms%sps,ms%particles(c),ms%particles(d)) /= &
-                    & Pari(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Tz(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Tz(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Tz(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Tz(ms%sps,ms%particles(c),ms%particles(d))) cycle
-                if(Tz(ms%sps,ms%particles(c),ms%particles(d)) /= &
-                    & Tz(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Eket(ms%sps,ms%holes(i),ms%holes(j)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%particles(c),ms%particles(d)) > ms%e2max) cycle
-                cnt = cnt + 1
-                p1(cnt) = ms%particles(a)
-                p2(cnt) = ms%particles(b)
-                p3(cnt) = ms%particles(c)
-                p4(cnt) = ms%particles(d)
-                h1(cnt) = ms%holes(    i)
-                h2(cnt) = ms%holes(    j)
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-
     !$omp parallel
-    !$omp do private(idx, a, b, c, d, i, j, &
-    !$omp &  ja, jb, jc, jd, ji, jj, norm, v, J2) reduction(+:vsum)
-    do idx = 1, nidx
-      a = p1(idx)
-      b = p2(idx)
-      c = p3(idx)
-      d = p4(idx)
-      i = h1(idx)
-      j = h2(idx)
-
-      ja = ms%sps%orb(a)%j
-      jb = ms%sps%orb(b)%j
-      jc = ms%sps%orb(c)%j
-      jd = ms%sps%orb(d)%j
-      ji = ms%sps%orb(i)%j
-      jj = ms%sps%orb(j)%j
-      norm = 1.d0
-      if(a==b) norm = norm * 2.d0
-      if(c==d) norm = norm * 2.d0
-      if(i==j) norm = norm * 2.d0
+    !$omp do private(ch,J2,n,v,ij,i,j,ab,a,b,cd,c,d,&
+    !$omp &  norm) reduction(+:vsum)
+    do ch = 1, ms%two%NChan
+      J2 = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
-      do J2 = max(abs(ja-jb),abs(jc-jd),abs(ji-jj))/2, &
-            & min(   (ja+jb),   (jc+jd),   (ji+jj))/2
-        if(a==b .and. mod(J2,2)==1) cycle
-        if(c==d .and. mod(J2,2)==1) cycle
-        if(i==j .and. mod(J2,2)==1) cycle
-        v = v + dble(2*J2+1) * h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
-            & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
-            & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2)
+      do ab = 1, n
+        a = ms%two%jpz(ch)%n2spi1(ab)
+        b = ms%two%jpz(ch)%n2spi2(ab)
+        if( ms%sps%orb(a)%ph /= 1 ) cycle
+        if( ms%sps%orb(b)%ph /= 1 ) cycle
+        do cd = 1, n
+          c = ms%two%jpz(ch)%n2spi1(cd)
+          d = ms%two%jpz(ch)%n2spi2(cd)
+          if( ms%sps%orb(c)%ph /= 1 ) cycle
+          if( ms%sps%orb(d)%ph /= 1 ) cycle
+          do ij = 1, n
+            i = ms%two%jpz(ch)%n2spi1(ij)
+            j = ms%two%jpz(ch)%n2spi2(ij)
+            if( ms%sps%orb(i)%ph /= 0 ) cycle
+            if( ms%sps%orb(j)%ph /= 0 ) cycle
+
+            norm = 1.d0
+            if(i==j) norm = norm*2.d0
+            if(a==b) norm = norm*2.d0
+            if(c==d) norm = norm*2.d0
+            v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) * &
+                & norm / ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
+                & denom(ms%sps,ms%one,h%one,i,j,c,d) )
+          end do
+        end do
       end do
-      vsum = vsum + v * norm * 0.125d0 / &
-          & ( denom(ms%sps,ms%one,h%one,i,j,a,b) * denom(ms%sps,ms%one,h%one,i,j,c,d) )
+
+      vsum = vsum + v * dble(2*J2+1)
     end do
     !$omp end do
     !$omp end parallel
-
     this%e_3_pp = vsum
-
-    call timer%countup_memory('temporary array for MBPT pp ladder')
-    deallocate(p1,p2,p3,p4,h1,h2)
     call timer%Add("Third order MBPT pp ladder",omp_get_wtime()-ti)
   end subroutine energy_third_pp
 
@@ -368,135 +243,54 @@ contains
     class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
-    integer, allocatable :: p1(:), p2(:)
-    integer, allocatable :: h1(:), h2(:), h3(:), h4(:)
-    integer :: np, nh, nidx, idx, cnt
+    integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
-    integer :: ja, jb, ji, jj, jk, jl
-    integer :: J2
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
-    call timer%cmemory()
-
-    nh = size(ms%holes)
-    np = size(ms%particles)
-
-    cnt = 0
-    do a = 1, np
-      do b = 1, np
-        do i = 1, nh
-          do j = 1, nh
-            do k = 1, nh
-              do l = 1, nh
-                if(Pari(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Pari(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Pari(ms%sps,ms%holes(k),ms%holes(l)) /= &
-                    & Pari(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Pari(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Pari(ms%sps,ms%holes(k),ms%holes(l))) cycle
-                if(Tz(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Tz(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Tz(ms%sps,ms%holes(k),ms%holes(l)) /= &
-                    & Tz(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Tz(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Tz(ms%sps,ms%holes(k),ms%holes(l))) cycle
-                if(Eket(ms%sps,a,b) > ms%e2max) cycle
-                if(Eket(ms%sps,i,j) > ms%e2max) cycle
-                if(Eket(ms%sps,k,l) > ms%e2max) cycle
-                cnt = cnt + 1
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-
-    nidx = cnt
-    allocate(p1(nidx))
-    allocate(p2(nidx))
-    allocate(h1(nidx))
-    allocate(h2(nidx))
-    allocate(h3(nidx))
-    allocate(h4(nidx))
-    cnt = 0
-    do a = 1, np
-      do b = 1, np
-        do i = 1, nh
-          do j = 1, nh
-            do k = 1, nh
-              do l = 1, nh
-                if(Pari(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Pari(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Pari(ms%sps,ms%holes(k),ms%holes(l)) /= &
-                    & Pari(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Pari(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Pari(ms%sps,ms%holes(k),ms%holes(l))) cycle
-                if(Tz(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Tz(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Tz(ms%sps,ms%holes(k),ms%holes(l)) /= &
-                    & Tz(ms%sps,ms%holes(i),ms%holes(j))) cycle
-                if(Tz(ms%sps,ms%particles(a),ms%particles(b)) /= &
-                    & Tz(ms%sps,ms%holes(k),ms%holes(l))) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(i),ms%holes(j)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(k),ms%holes(l)) > ms%e2max) cycle
-                cnt = cnt + 1
-                p1(cnt) = ms%particles(a)
-                p2(cnt) = ms%particles(b)
-                h1(cnt) = ms%holes(    i)
-                h2(cnt) = ms%holes(    j)
-                h3(cnt) = ms%holes(    k)
-                h4(cnt) = ms%holes(    l)
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
 
     !$omp parallel
-    !$omp do private(idx, a, b, i, j, k, l, &
-    !$omp &  ja, jb, ji, jj, jk, jl, norm, v, J2) reduction(+:vsum)
-    do idx = 1, nidx
-      a = p1(idx)
-      b = p2(idx)
-      i = h1(idx)
-      j = h2(idx)
-      k = h3(idx)
-      l = h4(idx)
-
-      ja = ms%sps%orb(a)%j
-      jb = ms%sps%orb(b)%j
-      ji = ms%sps%orb(i)%j
-      jj = ms%sps%orb(j)%j
-      jk = ms%sps%orb(k)%j
-      jl = ms%sps%orb(l)%j
-      norm = 1.d0
-      if(a==b) norm = norm * 2.d0
-      if(i==j) norm = norm * 2.d0
-      if(k==l) norm = norm * 2.d0
+    !$omp do private(ch,J2,n,ab,a,b,ij,i,j,kl,k,l, &
+    !$omp &  norm, v) reduction(+:vsum)
+    do ch = 1, ms%two%NChan
+      J2 = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
-      do J2 = max(abs(ja-jb),abs(ji-jj),abs(jk-jl))/2, &
-            & min(   (ja+jb),   (ji+jj),   (jk+jl))/2
-        if(a==b .and. mod(J2,2)==1) cycle
-        if(i==j .and. mod(J2,2)==1) cycle
-        if(k==l .and. mod(J2,2)==1) cycle
-        v = v + dble(2*J2+1) * h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
-            & h%two%GetTwBME(ms%sps,ms%two,k,l,i,j,J2) * &
-            & h%two%GetTwBME(ms%sps,ms%two,a,b,k,l,J2)
+      do ab = 1, n
+        a = ms%two%jpz(ch)%n2spi1(ab)
+        b = ms%two%jpz(ch)%n2spi2(ab)
+        if( ms%sps%orb(a)%ph /= 1 ) cycle
+        if( ms%sps%orb(b)%ph /= 1 ) cycle
+        do ij = 1, n
+          i = ms%two%jpz(ch)%n2spi1(ij)
+          j = ms%two%jpz(ch)%n2spi2(ij)
+          if( ms%sps%orb(i)%ph /= 0 ) cycle
+          if( ms%sps%orb(j)%ph /= 0 ) cycle
+          do kl = 1, n
+            k = ms%two%jpz(ch)%n2spi1(kl)
+            l = ms%two%jpz(ch)%n2spi2(kl)
+            if( ms%sps%orb(k)%ph /= 0 ) cycle
+            if( ms%sps%orb(l)%ph /= 0 ) cycle
+            norm = 1.d0
+            if(a==b) norm = norm*2.d0
+            if(i==j) norm = norm*2.d0
+            if(k==l) norm = norm*2.d0
+            v = v + h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,i,j,k,l,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,k,l,a,b,J2) * &
+                & norm / ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
+                & denom(ms%sps,ms%one,h%one,k,l,a,b) )
+          end do
+        end do
       end do
-      vsum = vsum + v * norm * 0.125d0 / &
-          & ( denom(ms%sps,ms%one,h%one,i,j,a,b) * denom(ms%sps,ms%one,h%one,k,l,a,b) )
+
+      vsum = vsum + dble(2*J2+1) * v
     end do
     !$omp end do
     !$omp end parallel
 
     this%e_3_hh = vsum
-
-    call timer%countup_memory('temporary array for MBPT hh ladder')
-    deallocate(p1,p2,h1,h2,h3,h4)
     call timer%Add("Third order MBPT hh ladder",omp_get_wtime()-ti)
   end subroutine energy_third_hh
 
@@ -521,141 +315,60 @@ contains
     class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
-    integer, allocatable :: p1(:), p2(:), p3(:)
-    integer, allocatable :: h1(:), h2(:), h3(:)
-    integer :: np, nh, nidx, idx, cnt
+    integer :: ch, J2, n, bi, aj, ck
     integer :: a, b, c, i, j, k
-    integer :: ja, jb, jc, ji, jj, jk
-    integer :: J2
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
-    call timer%cmemory()
 
-    nh = size(ms%holes)
-    np = size(ms%particles)
-
-    cnt = 0
-    do a = 1, np
-      do b = 1, np
-        do c = 1, np
-          do i = 1, nh
-            do j = 1, nh
-              do k = 1, nh
-                if(Pari(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Pari(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Pari(ms%sps,ms%holes(k),ms%particles(b)) /= &
-                    & Pari(ms%sps,ms%holes(i),ms%particles(c))) cycle
-                if(Pari(ms%sps,ms%particles(a),ms%particles(c)) /= &
-                    & Pari(ms%sps,ms%holes(k),ms%holes(j))) cycle
-                if(Tz(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Tz(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Tz(ms%sps,ms%holes(k),ms%particles(b)) /= &
-                    & Tz(ms%sps,ms%holes(i),ms%particles(c))) cycle
-                if(Tz(ms%sps,ms%particles(a),ms%particles(c)) /= &
-                    & Tz(ms%sps,ms%holes(k),ms%holes(j))) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    i),ms%holes(    j)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    k),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    i),ms%particles(c)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(c)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    k),ms%holes(    j)) > ms%e2max) cycle
-                cnt = cnt + 1
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-
-    nidx = cnt
-    allocate(p1(nidx))
-    allocate(p2(nidx))
-    allocate(p3(nidx))
-    allocate(h1(nidx))
-    allocate(h2(nidx))
-    allocate(h3(nidx))
-
-    cnt = 0
-    do a = 1, np
-      do b = 1, np
-        do c = 1, np
-          do i = 1, nh
-            do j = 1, nh
-              do k = 1, nh
-                if(Pari(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Pari(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Pari(ms%sps,ms%holes(k),ms%particles(b)) /= &
-                    & Pari(ms%sps,ms%holes(i),ms%particles(c))) cycle
-                if(Pari(ms%sps,ms%particles(a),ms%particles(c)) /= &
-                    & Pari(ms%sps,ms%holes(k),ms%holes(j))) cycle
-                if(Tz(ms%sps,ms%holes(i),ms%holes(j)) /= &
-                    & Tz(ms%sps,ms%particles(a),ms%particles(b))) cycle
-                if(Tz(ms%sps,ms%holes(k),ms%particles(b)) /= &
-                    & Tz(ms%sps,ms%holes(i),ms%particles(c))) cycle
-                if(Tz(ms%sps,ms%particles(a),ms%particles(c)) /= &
-                    & Tz(ms%sps,ms%holes(k),ms%holes(j))) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    i),ms%holes(    j)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    k),ms%particles(b)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    i),ms%particles(c)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%particles(a),ms%particles(c)) > ms%e2max) cycle
-                if(Eket(ms%sps,ms%holes(    k),ms%holes(    j)) > ms%e2max) cycle
-                cnt = cnt + 1
-                p1(cnt) = ms%particles(a)
-                p2(cnt) = ms%particles(b)
-                p3(cnt) = ms%particles(c)
-                h1(cnt) = ms%holes(    i)
-                h2(cnt) = ms%holes(    j)
-                h3(cnt) = ms%holes(    k)
-              end do
-            end do
-          end do
-        end do
-      end do
-    end do
-
+    vsum = 0.d0
     !$omp parallel
-    !$omp do private(idx, a, b, c, i, j, k, &
-    !$omp &  ja, jb, jc, ji, jj, jk, norm, v, J2) reduction(+:vsum)
-    do idx = 1, nidx
-      a = p1(idx)
-      b = p2(idx)
-      c = p3(idx)
-      i = h1(idx)
-      j = h2(idx)
-      k = h3(idx)
-
-      ja = ms%sps%orb(a)%j
-      jb = ms%sps%orb(b)%j
-      jc = ms%sps%orb(c)%j
-      ji = ms%sps%orb(i)%j
-      jj = ms%sps%orb(j)%j
-      jk = ms%sps%orb(k)%j
-
-      norm = 1.d0
-      if(i==j) norm = norm * sqrt(2.d0)
-      if(j==k) norm = norm * sqrt(2.d0)
-      if(a==b) norm = norm * sqrt(2.d0)
-      if(a==c) norm = norm * sqrt(2.d0)
+    !$omp do private(ch,J2,n,aj,a,j,bi,b,i,ck,c,k,&
+    !$omp &  norm, v) reduction(+:vsum)
+    do ch = 1, ms%two%NChan
+      J2 = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
-      do J2 = max(abs(ji-jb),abs(ja-jj),abs(jk-jc))/2, &
-            & min(   (ji+jb),   (ja+jj),   (jk+jc))/2
-        v = v + dble(2*J2+1) * &
-            & cross_couple(ms%sps,ms%two,h%two,i,j,a,b,J2) * &
-            & cross_couple(ms%sps,ms%two,h%two,k,b,i,c,J2) * &
-            & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2)
+      do aj = 1, n
+        a = ms%two%jpz(ch)%n2spi1(aj)
+        j = ms%two%jpz(ch)%n2spi2(aj)
+        if( ms%sps%orb(a)%ph /= 1 ) cycle
+        if( ms%sps%orb(j)%ph /= 0 ) cycle
+
+        do bi = 1, n
+          b = ms%two%jpz(ch)%n2spi1(bi)
+          i = ms%two%jpz(ch)%n2spi2(bi)
+          if( ms%sps%orb(b)%ph /= 1 ) cycle
+          if( ms%sps%orb(i)%ph /= 0 ) cycle
+
+          do ck = 1, n
+            c = ms%two%jpz(ch)%n2spi1(ck)
+            k = ms%two%jpz(ch)%n2spi2(ck)
+            if( ms%sps%orb(c)%ph /= 1 ) cycle
+            if( ms%sps%orb(k)%ph /= 0 ) cycle
+
+            norm = 1.d0
+            if(i==j) norm = norm * sqrt(2.d0)
+            if(j==k) norm = norm * sqrt(2.d0)
+            if(a==b) norm = norm * sqrt(2.d0)
+            if(a==c) norm = norm * sqrt(2.d0)
+
+            v = v + norm * &
+                & cross_couple(ms%sps,ms%two,h%two,i,j,a,b,J2) * &
+                & cross_couple(ms%sps,ms%two,h%two,k,b,i,c,J2) * &
+                & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2) / &
+                & ( denom(ms%sps,ms%one,h%one,k,j,a,c) * denom(ms%sps,ms%one,h%one,i,j,a,b) )
+
+          end do
+        end do
       end do
-      vsum = vsum - v *  norm / &
-          & ( denom(ms%sps,ms%one,h%one,k,j,a,c) * denom(ms%sps,ms%one,h%one,i,j,a,b) )
+
+      vsum = vsum + v * dble(2*J2+1)
     end do
     !$omp end do
     !$omp end parallel
-
-    this%e_3_ph = vsum
-    call timer%countup_memory('temporary array for MBPT ph ladder')
-    deallocate(p1,p2,p3,h1,h2,h3)
+    this%e_3_ph = - vsum
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
   end subroutine energy_third_ph
 
@@ -670,6 +383,11 @@ contains
     real(8) :: r
 
     r = 0.d0
+
+    if(Eket(sps,i,j) > two%emax) return
+    if(Eket(sps,a,b) > two%emax) return
+    if(Pari(sps,i,j) /= Pari(sps,a,b)) return
+    if(  Tz(sps,i,j) /=   Tz(sps,a,b)) return
 
     ji = sps%orb(i)%j
     jj = sps%orb(j)%j

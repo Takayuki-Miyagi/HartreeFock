@@ -32,8 +32,12 @@ module SingleParticleState
     integer :: z =  0
     integer :: e = -1
     integer :: idx = -1
+    real(8) :: occ = -1.d0
+    integer :: ph = -1 ! 0:hole,1:particle,2:partial occ
   contains
     procedure :: set => SetSingleParticleOrbit
+    procedure :: SetOccupation
+    procedure :: SetParticleHole
   end type SingleParticleOrbit
 
   type :: OrbitsIsospin
@@ -202,6 +206,18 @@ contains
         & 'indx=',idx,', n=', n, ', l=', l, ', j=', j, ', z=', z, ', e=', 2*n+l
 #endif
   end subroutine SetSingleParticleOrbit
+
+  subroutine SetOccupation(this,occ)
+    class(SingleParticleOrbit), intent(inout) :: this
+    real(8), intent(in) :: occ
+    this%occ = occ
+  end subroutine SetOccupation
+
+  subroutine SetParticleHole(this,ph_label)
+    class(SingleParticleOrbit), intent(inout) :: this
+    integer, intent(in) :: ph_label
+    this%ph = ph_label
+  end subroutine SetParticleHole
 
   function iso2pn(this, sps, idx, z) result(r)
     class(OrbitsIsospin), intent(in) :: this
