@@ -651,7 +651,7 @@ contains
     allocate(this%jpz2ch(0:min(2*sps%lmax,e2max)+1,-1:1,-1:1))
     this%jpz2ch(:,:,:) = 0
     ich = 0
-    do j = 0, 2*sps%lmax+1
+    do j = 0, min(2*sps%lmax,e2max)+1
       do p = 1, -1, -2
         do z = -1, 1
           n = 0
@@ -666,7 +666,7 @@ contains
               j2 = sps%orb(i2)%j
               l2 = sps%orb(i2)%l
               z2 = sps%orb(i2)%z
-              e2 = sps%orb(i1)%e
+              e2 = sps%orb(i2)%e
 
               if(e1 + e2 > e2max) cycle
               if(triag(j1, j2, 2*j)) cycle
@@ -695,7 +695,7 @@ contains
     allocate(nn(this%NChan))
 
     ich = 0
-    do j = 0, 2*sps%lmax+1
+    do j = 0, min(2*sps%lmax,e2max)+1
       do p = 1, -1, -2
         do z = -1, 1
           n = 0
@@ -710,7 +710,7 @@ contains
               j2 = sps%orb(i2)%j
               l2 = sps%orb(i2)%l
               z2 = sps%orb(i2)%z
-              e2 = sps%orb(i1)%e
+              e2 = sps%orb(i2)%e
 
               if(e1 + e2 > e2max) cycle
               if(triag(j1, j2, 2*j)) cycle
@@ -763,10 +763,10 @@ contains
     allocate(this%n2spi2(n))
     allocate(this%spis2n(sps%norbs,sps%norbs))
     allocate(this%iphase(sps%norbs,sps%norbs))
-    cnt = 0
 #ifdef ModelSpaceDebug
     write(*,'(a,i3,a,i3,a,i3)') "Two-body channel: J=", j, ", P=", p, ", Tz=", z
 #endif
+    cnt = 0
     do i1 = 1, sps%norbs
       j1 = sps%orb(i1)%j
       l1 = sps%orb(i1)%l

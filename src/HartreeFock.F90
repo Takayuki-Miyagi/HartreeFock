@@ -237,7 +237,7 @@ contains
           UT%m(bra,ket) = HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
               & HF%C%GetOBME(ms%sps,ms%one,a,d) * HF%C%GetOBME(ms%sps,ms%one,b,c)
-          if(a==b) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
+          if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
@@ -274,7 +274,6 @@ contains
       !$omp end do
       !$omp end parallel
       H%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
-      call H%two%MatCh(ch,ch)%prt()
       call UT%fin()
       call V2%fin()
       call V3%fin()
@@ -344,8 +343,6 @@ contains
           & (this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
           & this%C%MatCh(ich,ich)%DMat%T()) * this%alpha
     end do
-
-
 
   end subroutine UpdateDensityMatrix
 
@@ -989,9 +986,9 @@ program test
   call timer%init()
   call init_dbinomial_triangle()
 
-  call ms%init('4He', 25.d0, 2, 4, e3max=6)
-  call h%init('hamil',ms,.false.) ! nn-only
-  !call h%init('hamil',ms,.true.)  ! nn+3n
+  call ms%init('O16', 25.d0, 6, 12, e3max=6)
+  !call h%init('hamil',ms,.false.) ! nn-only
+  call h%init('hamil',ms,.true.)  ! nn+3n
 
   call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
 

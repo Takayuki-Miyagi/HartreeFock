@@ -44,12 +44,12 @@ contains
 
     this%e_0 = hamil%zero
     call this%energy_second(ms,hamil)
-    write(*,'(a,f18.8)') "Second order correction: ", this%e_2
+    write(*,'(a,f16.8)') "Second order correction: ", this%e_2
 
     call this%energy_third(ms,hamil)
-    write(*,'(a,4f18.8)') "Third order corrections pp, hh, ph, and total: ", &
+    write(*,'(a,4f16.8)') "Third order corrections pp, hh, ph, and total: ", &
         & this%e_3_pp, this%e_3_hh, this%e_3_ph, this%e_3
-    write(*,'(a,f18.8)') "Third order MBPT energy: ", this%e_0 + this%e_2 + this%e_3
+    write(*,'(a,f16.8)') "Third order MBPT energy: ", this%e_0 + this%e_2 + this%e_3
 
   end subroutine CalcEnergyCorr
 
@@ -72,7 +72,7 @@ contains
     type(Op), intent(in) :: h
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
-    real(8) :: vsum, v, norm, ti
+    real(8) :: vsum, v, ti
 
     ti = omp_get_wtime()
 
@@ -83,7 +83,7 @@ contains
 
       v = 0.d0
       !$omp parallel
-      !$omp do private(ab,a,b,ij,i,j,norm) reduction(+:v)
+      !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)
@@ -95,13 +95,8 @@ contains
           if( ms%sps%orb(i)%ph /= 0 ) cycle
           if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-          norm = 1.d0
-          if(a==b) norm = norm*2.d0
-          if(i==j) norm = norm*2.d0
-
-          v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2)**2 * &
-              & norm / denom(ms%sps,ms%one,h%one,i,j,a,b)
-
+          v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2)**2 / &
+              & denom(ms%sps,ms%one,h%one,i,j,a,b)
         end do
       end do
       !$omp end do
@@ -177,17 +172,17 @@ contains
     type(Op), intent(in) :: h
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
-    real(8) :: v, vsum, norm, ti
+    real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
-    !$omp parallel
-    !$omp do private(ch,J2,n,v,ij,i,j,ab,a,b,cd,c,d,&
-    !$omp &  norm) reduction(+:vsum)
+    vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%nst
 
       v = 0.d0
+      !$omp parallel
+      !$omp do private(ij,i,j,ab,a,b,cd,c,d) reduction(+:v)
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)
@@ -204,23 +199,19 @@ contains
             if( ms%sps%orb(i)%ph /= 0 ) cycle
             if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-            norm = 1.d0
-            if(i==j) norm = norm*2.d0
-            if(a==b) norm = norm*2.d0
-            if(c==d) norm = norm*2.d0
             v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
                 & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
-                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) * &
-                & norm / ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
+                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) / &
+                & ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
                 & denom(ms%sps,ms%one,h%one,i,j,c,d) )
           end do
         end do
       end do
+      !$omp end do
+      !$omp end parallel
 
       vsum = vsum + v * dble(2*J2+1)
     end do
-    !$omp end do
-    !$omp end parallel
     this%e_3_pp = vsum
     call timer%Add("Third order MBPT pp ladder",omp_get_wtime()-ti)
   end subroutine energy_third_pp
@@ -245,18 +236,18 @@ contains
     type(Op), intent(in) :: h
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
-    real(8) :: v, vsum, norm, ti
+    real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
 
-    !$omp parallel
-    !$omp do private(ch,J2,n,ab,a,b,ij,i,j,kl,k,l, &
-    !$omp &  norm, v) reduction(+:vsum)
+    vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%nst
 
       v = 0.d0
+      !$omp parallel
+      !$omp do private(ab,a,b,ij,i,j,kl,k,l) reduction(+:v)
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)
@@ -272,23 +263,19 @@ contains
             l = ms%two%jpz(ch)%n2spi2(kl)
             if( ms%sps%orb(k)%ph /= 0 ) cycle
             if( ms%sps%orb(l)%ph /= 0 ) cycle
-            norm = 1.d0
-            if(a==b) norm = norm*2.d0
-            if(i==j) norm = norm*2.d0
-            if(k==l) norm = norm*2.d0
             v = v + h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
                 & h%two%GetTwBME(ms%sps,ms%two,i,j,k,l,J2) * &
-                & h%two%GetTwBME(ms%sps,ms%two,k,l,a,b,J2) * &
-                & norm / ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
+                & h%two%GetTwBME(ms%sps,ms%two,k,l,a,b,J2) / &
+                & ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
                 & denom(ms%sps,ms%one,h%one,k,l,a,b) )
           end do
         end do
       end do
+      !$omp end do
+      !$omp end parallel
 
       vsum = vsum + dble(2*J2+1) * v
     end do
-    !$omp end do
-    !$omp end parallel
 
     this%e_3_hh = vsum
     call timer%Add("Third order MBPT hh ladder",omp_get_wtime()-ti)
@@ -312,68 +299,96 @@ contains
     ! <ij|X|ab>_{L} = \sum_{A} [A] {i j A} <ij:A|X|ab:A>
     !                              {a b L}
     use Profiler, only: timer
+    use CommonLibrary, only: triag
     class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
-    integer :: ch, J2, n, bi, aj, ck
+    integer :: J2
     integer :: a, b, c, i, j, k
+    integer :: ia, ib, ic, ii, ij, ik
+    integer :: ja, jb, jc, ji, jj, jk
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
 
     vsum = 0.d0
     !$omp parallel
-    !$omp do private(ch,J2,n,aj,a,j,bi,b,i,ck,c,k,&
-    !$omp &  norm, v) reduction(+:vsum)
-    do ch = 1, ms%two%NChan
-      J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%nst
+    !$omp do private(ia,ib,ic,ii,ij,ik, &
+    !$omp &  a,b,c,i,j,k,ja,jb,jc,ji,jj,jk,norm,v) reduction(+:vsum)
+    do ia = 1, size(ms%particles)
+      do ib = 1, size(ms%particles)
+        a = ms%particles(ia)
+        b = ms%particles(ib)
+        if(Eket(ms%sps,a,b) > ms%two%e2max) cycle
+        do ii = 1, size(ms%holes)
+          do ij = 1, size(ms%holes)
+            i = ms%holes(ii)
+            j = ms%holes(ij)
+            if(Eket(ms%sps,i,j) > ms%two%e2max) cycle
+            if(Pari(ms%sps,i,j) /= Pari(ms%sps,a,b)) cycle
+            if(  Tz(ms%sps,i,j) /=   Tz(ms%sps,a,b)) cycle
 
-      v = 0.d0
-      do aj = 1, n
-        a = ms%two%jpz(ch)%n2spi1(aj)
-        j = ms%two%jpz(ch)%n2spi2(aj)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(j)%ph /= 0 ) cycle
+            do ic = 1, size(ms%particles)
+              do ik = 1, size(ms%holes)
+                c = ms%particles(ic)
+                k = ms%holes(ik)
 
-        do bi = 1, n
-          b = ms%two%jpz(ch)%n2spi1(bi)
-          i = ms%two%jpz(ch)%n2spi2(bi)
-          if( ms%sps%orb(b)%ph /= 1 ) cycle
-          if( ms%sps%orb(i)%ph /= 0 ) cycle
 
-          do ck = 1, n
-            c = ms%two%jpz(ch)%n2spi1(ck)
-            k = ms%two%jpz(ch)%n2spi2(ck)
-            if( ms%sps%orb(c)%ph /= 1 ) cycle
-            if( ms%sps%orb(k)%ph /= 0 ) cycle
+                if(Eket(ms%sps,k,b) > ms%two%e2max) cycle
+                if(Eket(ms%sps,i,c) > ms%two%e2max) cycle
+                if(Eket(ms%sps,a,c) > ms%two%e2max) cycle
+                if(Eket(ms%sps,k,j) > ms%two%e2max) cycle
 
-            norm = 1.d0
-            if(i==j) norm = norm * sqrt(2.d0)
-            if(j==k) norm = norm * sqrt(2.d0)
-            if(a==b) norm = norm * sqrt(2.d0)
-            if(a==c) norm = norm * sqrt(2.d0)
+                if(Pari(ms%sps,k,b) /= Pari(ms%sps,i,c)) cycle
+                if(Pari(ms%sps,a,c) /= Pari(ms%sps,k,j)) cycle
 
-            v = v + norm * &
-                & cross_couple(ms%sps,ms%two,h%two,i,j,a,b,J2) * &
-                & cross_couple(ms%sps,ms%two,h%two,k,b,i,c,J2) * &
-                & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2) / &
-                & ( denom(ms%sps,ms%one,h%one,k,j,a,c) * denom(ms%sps,ms%one,h%one,i,j,a,b) )
+                if(  Tz(ms%sps,k,b) /=   Tz(ms%sps,i,c)) cycle
+                if(  Tz(ms%sps,a,c) /=   Tz(ms%sps,k,j)) cycle
 
+
+                norm = 1.d0
+                if(i==j) norm = norm * sqrt(2.d0)
+                if(j==k) norm = norm * sqrt(2.d0)
+                if(a==b) norm = norm * sqrt(2.d0)
+                if(a==c) norm = norm * sqrt(2.d0)
+
+                ja = ms%sps%orb(a)%j
+                jb = ms%sps%orb(b)%j
+                jc = ms%sps%orb(c)%j
+                ji = ms%sps%orb(i)%j
+                jj = ms%sps%orb(j)%j
+                jk = ms%sps%orb(k)%j
+
+                v = 0.d0
+                do J2 = max(abs(ja-jj),abs(jb-ji),abs(jc-jk))/2, &
+                      & min(   (ja+jj),   (jb+ji),   (jc+jk))/2
+                  v = v + dble(2*J2+1) * &
+                    & cross_couple(ms%sps,ms%two,h%two,i,j,a,b,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,k,b,i,c,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2)
+
+                end do
+
+                vsum = vsum + norm * v / &
+                    & ( denom(ms%sps,ms%one,h%one,k,j,a,c) * &
+                    &   denom(ms%sps,ms%one,h%one,i,j,a,b) )
+
+              end do
+            end do
           end do
+
         end do
       end do
-
-      vsum = vsum + v * dble(2*J2+1)
     end do
     !$omp end do
     !$omp end parallel
+
     this%e_3_ph = - vsum
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
   end subroutine energy_third_ph
 
   function cross_couple(sps,two,v,i,j,a,b,L) result(r)
-    use CommonLibrary, only: sjs
+    use CommonLibrary, only: triag,sjs
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
     type(NBodyPart), intent(in) :: v
@@ -384,8 +399,8 @@ contains
 
     r = 0.d0
 
-    if(Eket(sps,i,j) > two%emax) return
-    if(Eket(sps,a,b) > two%emax) return
+    if(Eket(sps,i,j) > two%e2max) return
+    if(Eket(sps,a,b) > two%e2max) return
     if(Pari(sps,i,j) /= Pari(sps,a,b)) return
     if(  Tz(sps,i,j) /=   Tz(sps,a,b)) return
 
@@ -394,7 +409,12 @@ contains
     ja = sps%orb(a)%j
     jb = sps%orb(b)%j
 
-    do J2 = max(abs(ji-jb),abs(ja-jj))/2, min((ji+jb),(ja+jj))/2
+    if(triag(ji,jb,2*L)) return
+    if(triag(ja,jj,2*L)) return
+
+    do J2 = max( abs(ji-jj),abs(ja-jb) )/2, min( (ji+jj),(ja+jb) )/2
+      if(i==j .and. mod(J2,2)==1) cycle
+      if(a==b .and. mod(J2,2)==1) cycle
       r = r + dble(2*J2+1) * &
           & sjs(ji, jj, 2*J2, ja, jb, 2*L) * &
           & v%GetTwBME(sps,two,i,j,a,b,J2)
