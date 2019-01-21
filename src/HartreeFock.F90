@@ -951,60 +951,46 @@ contains
   end subroutine GetSpLabels3
 end module HartreeFock
 
-program test
-  use Profiler, only: timer
-  use ClassSys, only: sys
-  use CommonLibrary, only: &
-      &init_dbinomial_triangle, fin_dbinomial_triangle
-  use ModelSpace, only: MSpace
-  use Operators
-  use HartreeFock, only: HFSolver
-  use MBPT
-  implicit none
-
-  type(MSpace) :: ms
-  type(Op) :: h
-  character(:), allocatable :: file_nn, file_3n
-  type(HFsolver) :: HF
-  type(sys) :: s
-  type(MBPTEnergy) :: PT
-
-  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max12.txt.me2j'
-  file_3n = '/home/takayuki/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max8_hw25_NNN-full.txt'
-  if(.not. s%isfile(file_nn)) then
-    write(*,*) "File does not exist: ", trim(file_nn)
-    stop
-  end if
-
-  if(file_3n /= 'None' .and. file_nn /= 'none') then
-    if(.not. s%isfile(file_3n)) then
-      write(*,*) "File does not exist: ", trim(file_3n)
-      stop
-    end if
-  end if
-
-  call timer%init()
-  call init_dbinomial_triangle()
-
-  call ms%init('O16', 25.d0, 6, 12, e3max=6)
-  !call h%init('hamil',ms,.false.) ! nn-only
-  call h%init('hamil',ms,.true.)  ! nn+3n
-
-  call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
-
-  call HF%init(ms,h,alpha=1.0d0)
-  call HF%solve(ms%sps,ms%one)
-
-  call HF%TransformToHF(ms,H)
-
-  call PT%calc(ms,H)
-
-  call HF%fin()
-
-  call h%fin()
-  call ms%fin()
-
-  call fin_dbinomial_triangle()
-  call timer%fin()
-
-end program test
+!program test
+!  use Profiler, only: timer
+!  use ClassSys, only: sys
+!  use CommonLibrary, only: &
+!      &init_dbinomial_triangle, fin_dbinomial_triangle
+!  use ModelSpace, only: MSpace
+!  use Operators
+!  use HartreeFock, only: HFSolver
+!  use MBPT
+!  implicit none
+!
+!  type(MSpace) :: ms
+!  type(Op) :: h
+!  character(:), allocatable :: file_nn, file_3n
+!  type(HFsolver) :: HF
+!  type(sys) :: s
+!  type(MBPTEnergy) :: PT
+!
+!  call timer%init()
+!  call init_dbinomial_triangle()
+!
+!  call ms%init('O16', 25.d0, 6, 12, e3max=6)
+!  !call h%init('hamil',ms,.false.) ! nn-only
+!  call h%init('hamil',ms,.true.)  ! nn+3n
+!
+!  call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
+!
+!  call HF%init(ms,h,alpha=1.0d0)
+!  call HF%solve(ms%sps,ms%one)
+!
+!  call HF%TransformToHF(ms,H)
+!
+!  call PT%calc(ms,H)
+!
+!  call HF%fin()
+!
+!  call h%fin()
+!  call ms%fin()
+!
+!  call fin_dbinomial_triangle()
+!  call timer%fin()
+!
+!end program test

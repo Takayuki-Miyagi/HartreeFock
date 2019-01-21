@@ -1,0 +1,16 @@
+&input
+emax=2
+e2max=4
+e3max=6
+lmax=2
+Nucl="4He"
+files_nn="/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max12.txt.me2j,/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw25_emax8_e2max12.txt.me2j"
+emaxs_nn="8,8"
+lmaxs_nn="8,8"
+e2maxs_nn="12,12"
+files_3n="file_3n = '/home/takayuki/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max8_hw25_NNN-full.txt,file_3n = '/home/takayuki/ThBME-srg2.00_cD-0.20cE0.098_lam400_e3max8_hw25_NNN-full.txt"
+emaxs_3n="8,8"
+lmaxs_3n="8,8"
+e2maxs_3n="8,8"
+e3maxs_3n="8,8"
+&end

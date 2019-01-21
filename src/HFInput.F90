@@ -6,52 +6,55 @@ module HFInput
     integer :: e2max
     integer :: e3max
     real(8) :: hw
+    real(8) :: alpha
     character(32), allocatable :: Ops(:)
     character(:), allocatable :: Nucl
     ! two-body file
-    character(512), allocatable :: files_nn(:)
-    integer, allocatable :: emaxs_nn(:)
-    integer, allocatable :: e2maxs_nn(:)
-    integer, allocatable :: lmaxs_nn(:)
+    character(256), allocatable :: files_nn(:)
+    integer :: emax_nn
+    integer :: e2max_nn
+    integer :: lmax_nn
     ! three-body file
-    character(512), allocatable :: files_3n(:)
-    integer, allocatable :: emaxs_3n(:)
-    integer, allocatable :: e2maxs_3n(:)
-    integer, allocatable :: e3maxs_3n(:)
-    integer, allocatable :: lmaxs_3n(:)
+    character(256), allocatable :: files_3n(:)
+    integer :: emax_3n
+    integer :: e2max_3n
+    integer :: e3max_3n
+    integer :: lmax_3n
   contains
     procedure :: init => InitInputParameters
+    procedure :: PrintInputParameters
   end type InputParameters
 contains
-  subroutine InitInputParameters(this)
+  subroutine InitInputParameters(this, inputfile)
+    use ClassSys, only: sys
     class(InputParameters), intent(inout) :: this
+    character(*), intent(in) :: inputfile
     integer :: emax=6
     integer :: e2max=12
     integer :: e3max=6
     integer :: lmax=6
     real(8) :: hw=20.d0
+    real(8) :: alpha=1.d0
     character(20) :: Nucl='O16'
-    character(:), allocatable :: Operators
-    ! two-body file
-    character(:), allocatable :: files_nn
-    character(:), allocatable :: emaxs_nn
-    character(:), allocatable :: e2maxs_nn
-    character(:), allocatable :: lmaxs_nn
-    ! three-body file
-    character(:), allocatable :: files_3n(:)
-    character(:), allocatable :: emaxs_3n(:)
-    character(:), allocatable :: e2maxs_3n(:)
-    character(:), allocatable :: e3maxs_3n(:)
-    character(:), allocatable :: lmaxs_3n(:)
 
-    character(:), allocatable :: inputfile
+    character(1024) :: files_nn
+    integer :: emax_nn
+    integer :: e2max_nn
+    integer :: lmax_nn
+    ! three-body file
+    character(1024) :: files_3n
+    integer :: emax_3n
+    integer :: e2max_3n
+    integer :: e3max_3n
+    integer :: lmax_3n
+
+    type(sys) :: s
     integer :: io
     namelist /input/ emax, e2max, e3max, lmax, hw, &
-        & Nucl, Operators, files_nn, emaxs_nn, &
-        & e2maxs_nn, lmaxs_nn, files_3n, &
-        & emaxs_3n, e2maxs_3n, e3maxs_3n, lmaxs_3n
+        & Nucl, files_nn, emax_nn, &
+        & e2max_nn, lmax_nn, files_3n, &
+        & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha
 
-    call getarg(1,inputfile)
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
       write(*,'(2a)') 'File opening error: ', trim(inputfile)
@@ -65,10 +68,55 @@ contains
     this%e3max = e3max
     this%lmax = lmax
     this%hw = hw
+    this%alpha = alpha
     this%Nucl = Nucl
 
+    this%emax_nn = emax_nn
+    this%e2max_nn = e2max_nn
+    this%lmax_nn = lmax_nn
 
+    this%emax_3n = emax_3n
+    this%e2max_3n = e2max_3n
+    this%e3max_3n = e3max_3n
+    this%lmax_3n = lmax_3n
 
+    call s%split(files_nn, ',', this%files_nn)
+    call s%split(files_3n, ',', this%files_3n)
 
   end subroutine InitInputParameters
+
+  subroutine PrintInputParameters(this,iunit)
+    class(InputParameters), intent(in) :: this
+    integer, intent(in), optional :: iunit
+    integer :: iut = 6
+    integer :: n
+
+    if(present(iunit)) iut = iunit
+
+    write(iut,'(a)') "######  Input parameters  ####  "
+    write(iut,'(2a)') "#  Target nuclide is ", trim(this%Nucl)
+    write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  Model space: emax =", &
+        & this%emax, ", e2max =", this%e2max, &
+        & ", e3max =", this%e3max, ", lmax =", this%lmax
+    write(iut,'(a,f8.3,a)') "#  HO basis parameter hw = ", this%hw, " MeV"
+
+    write(iut,'(a)') "#"
+    write(iut,'(a)') "#  NN files:"
+    do n = 1, size(this%files_nn)
+      write(iut,'(2a)') "#  ", trim(this%files_nn(n))
+    end do
+    write(iut,'(a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_nn, &
+        & ", e2max =",this%e2max_nn, ", lmax =",this%lmax_nn
+
+    write(iut,'(a)') "#"
+    write(iut,'(a)') "#  3N files:"
+    do n = 1, size(this%files_3n)
+      write(*,'(2a)') "#  ", trim(this%files_3n(n))
+    end do
+    write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_3n, &
+        & ", e2max =",this%e2max_3n, ", e3max =", this%e3max_3n, &
+        & ", lmax =",this%lmax_3n
+
+
+  end subroutine PrintInputParameters
 end module HFInput
