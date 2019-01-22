@@ -75,7 +75,8 @@ module ModelSpace
   contains
     procedure :: init => InitOneBodySpace
     procedure :: fin => FinOneBodySpace
-    procedure :: GetOneBodyChannel, GetOneBodyChannelJPZ
+    procedure :: GetOneBodyChannel
+    procedure :: GetOneBodyChannelJPZ
     generic :: get => GetOneBodyChannel, GetOneBodyChannelJPZ
   end type OneBodySpace
 
@@ -100,7 +101,8 @@ module ModelSpace
   contains
     procedure :: init => InitTwoBodySpace
     procedure :: fin => FinTwoBodySpace
-    procedure :: GetTwoBodyChannel, GetTwoBodyChannelJPZ
+    procedure :: GetTwoBodyChannel
+    procedure :: GetTwoBodyChannelJPZ
     generic :: get => GetTwoBodyChannel, GetTwoBodyChannelJPZ
   end type TwoBodySpace
 
@@ -138,7 +140,8 @@ module ModelSpace
   contains
     procedure :: init => InitThreeBodySpace
     procedure :: fin => FinThreeBodySpace
-    procedure :: GetThreeBodyChannel, GetThreeBodyChannelJPZ
+    procedure :: GetThreeBodyChannel
+    procedure :: GetThreeBodyChannelJPZ
     generic :: get => GetThreeBodyChannel, GetThreeBodyChannelJPZ
   end type ThreeBodySpace
 
@@ -1057,7 +1060,6 @@ contains
     this%t = t
     this%nst = n
     this%n_idx = nidx
-    this%spis2idx = spis2idx
 #ifdef ModelSpaceDebug
     write(*,'(a,i3,a,i3,a,i3,a)') "Three-body channel: J=", j, "/2, P=", p, ", T=", t, "/2"
 #endif
@@ -1067,6 +1069,8 @@ contains
     allocate(this%n2spi3(n))
     allocate(this%n2J12( n))
     allocate(this%n2T12( n))
+    allocate(this%spis2idx(sps%norbs,sps%norbs,sps%norbs))
+    this%spis2idx = spis2idx
 
     idx = 0
     do i1 = 1, sps%norbs

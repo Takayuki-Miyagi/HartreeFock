@@ -3,7 +3,11 @@
 #--------------------------------------------------
 TARGET=HartreeFock
 INSTLDIR=~/Desktop/HFtest/
-HOST= $(shell if hostname|grep -q apt1; then echo apt; else echo other; fi)
+Host= $(shell if hostname|grep -q apt1; then echo apt; \
+  elif hostname|grep -q oak; then echo oak; \
+  elif hostname|grep -q cedar; then echo cedar; \
+  else echo other; fi)
+HOST=$(strip $(Host))
 $(info Host:$(HOST))
 
 #--------------------------------------------------
@@ -15,14 +19,12 @@ ifeq ($(HOST),other)
 	FC=gfortran
 	LDFLAGS= -llapack -lblas -lgsl
 	OMP = -fopenmp
-	FFLAGS=-O3
-	FFLAGS+=-Dsingle_precision
+	FFLAGS=-O3 -Dsingle_precision
 	CFLAGS=-O3
 	FF2C= -ff2c
 	FDFLAGS=
-	#FDFLAGS+=-DSingleParticleStateDebug
 	#FDFLAGS+=-DModelSpaceDebug
-	#FDFLAGS+=-DNOperatorsDebug
+	FDFLAGS+=-DNOperatorsDebug
 	FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 endif
 
@@ -37,6 +39,24 @@ ifeq ($(HOST),apt)
 	FF2C=
 	#FDFLAGS=-Ddebug
 	#FDFLAGS+=-check-all
+endif
+
+#-----------------------------
+# oak (oak.arc.ubc.ca)
+#-----------------------------
+ifeq ($(strip $(HOST)),oak)
+  FDEP=
+  CC=icc
+  FC=ifort
+  MKL=-L$(MKLROOT)/lib/ -L$(MKLROOT)/lib/intel64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -Wl,-rpath,$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/../compiler/lib/
+  LDFLAGS=$(MKL)
+  OMP = -qopenmp
+  FFLAGS=-O3 -heap-arrays
+  CFLAGS=-O3
+  LINT = -i8
+  FF2C=
+  #FDFLAGS=-check all
+  FFLAGS+= -Dsingle_precision
 endif
 
 #--------------------------------------------------
@@ -82,6 +102,10 @@ ifeq ($(HOST),other)
 endif
 
 ifeq ($(HOST),apt)
+	MODOUT=-module $(MODDIR)
+endif
+
+ifeq ($(HOST),oak)
 	MODOUT=-module $(MODDIR)
 endif
 
