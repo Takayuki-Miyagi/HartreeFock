@@ -31,8 +31,23 @@ module MBPT
     procedure :: energy_third_pp
     procedure :: energy_third_hh
     procedure :: energy_third_ph
+    procedure :: write_summary
   end type MBPTEnergy
 contains
+
+  subroutine write_summary(this,p)
+    use HFInput
+    class(MBPTEnergy), intent(inout) :: this
+    type(InputParameters), intent(in) :: p
+    integer :: wunit = 33
+
+    open(wunit, file = 'SummaryHFMBPT.txt', action='write')
+    call p%PrintInputParameters(wunit)
+    write(wunit,'(4f18.8)') this%e_0, this%e_2, this%e_3, &
+        &           this%e_0+this%e_2+this%e_3
+    close(wunit)
+  end subroutine write_summary
+
   subroutine CalcEnergyCorr(this,ms,hamil)
     class(MBPTEnergy), intent(inout) :: this
     type(MSpace), intent(in) :: ms

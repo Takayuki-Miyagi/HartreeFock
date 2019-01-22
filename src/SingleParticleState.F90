@@ -48,6 +48,7 @@ module SingleParticleState
   contains
     procedure :: init => InitOrbitsIsospin
     procedure :: fin => FinOrbitsIsospin
+    procedure :: get => GetOrbitIsospin
     procedure :: iso2pn
   end type OrbitsIsospin
 
@@ -59,6 +60,7 @@ module SingleParticleState
   contains
     procedure :: init => InitOrbits
     procedure :: fin => FinOrbits
+    procedure :: get => GetOrbit
     procedure :: pn2iso
   end type Orbits
 
@@ -119,6 +121,13 @@ contains
     this%is_constructed = .true.
   end subroutine InitOrbitsIsospin
 
+  function GetOrbitIsospin(this,idx) result(o)
+    class(OrbitsIsospin), intent(inout) :: this
+    integer, intent(in) :: idx
+    type(SingleParticleOrbitIsospin) :: o
+    o = this%orb(idx)
+  end function GetOrbitIsospin
+
   subroutine FinOrbits(this)
     class(Orbits), intent(inout) :: this
     if(.not. this%is_constructed) return
@@ -177,6 +186,13 @@ contains
     end do
     this%is_constructed = .true.
   end subroutine InitOrbits
+
+  function GetOrbit(this,idx) result(o)
+    class(Orbits), intent(inout) :: this
+    integer, intent(in) :: idx
+    type(SingleParticleOrbit) :: o
+    o = this%orb(idx)
+  end function GetOrbit
 
   subroutine SetSingleParticleOrbitIsospin(this, n, l, j, idx)
     class(SingleParticleOrbitIsospin), intent(inout) :: this

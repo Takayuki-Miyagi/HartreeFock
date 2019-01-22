@@ -7,14 +7,16 @@ module HFInput
     integer :: e3max
     real(8) :: hw
     real(8) :: alpha
-    character(32), allocatable :: Ops(:)
+    character(256), allocatable :: Ops(:)
     character(:), allocatable :: Nucl
     ! two-body file
+    character(256) :: int_nn_file
     character(256), allocatable :: files_nn(:)
     integer :: emax_nn
     integer :: e2max_nn
     integer :: lmax_nn
     ! three-body file
+    character(256) :: int_3n_file
     character(256), allocatable :: files_3n(:)
     integer :: emax_3n
     integer :: e2max_3n
@@ -36,13 +38,16 @@ contains
     real(8) :: hw=20.d0
     real(8) :: alpha=1.d0
     character(20) :: Nucl='O16'
+    character(256) :: int_nn_file
+    character(256) :: int_3n_file
 
-    character(1024) :: files_nn
+    character(1024) :: optrs=""
+    character(1024) :: files_nn=""
     integer :: emax_nn
     integer :: e2max_nn
     integer :: lmax_nn
     ! three-body file
-    character(1024) :: files_3n
+    character(1024) :: files_3n=""
     integer :: emax_3n
     integer :: e2max_3n
     integer :: e3max_3n
@@ -51,8 +56,8 @@ contains
     type(sys) :: s
     integer :: io
     namelist /input/ emax, e2max, e3max, lmax, hw, &
-        & Nucl, files_nn, emax_nn, &
-        & e2max_nn, lmax_nn, files_3n, &
+        & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
+        & e2max_nn, lmax_nn, int_3n_file, files_3n, &
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha
 
     open(118, file=inputfile, action='read', iostat=io)
@@ -70,6 +75,8 @@ contains
     this%hw = hw
     this%alpha = alpha
     this%Nucl = Nucl
+    this%int_nn_file = int_nn_file
+    this%int_3n_file = int_3n_file
 
     this%emax_nn = emax_nn
     this%e2max_nn = e2max_nn
@@ -80,6 +87,7 @@ contains
     this%e3max_3n = e3max_3n
     this%lmax_3n = lmax_3n
 
+    call s%split(optrs, ',', this%Ops)
     call s%split(files_nn, ',', this%files_nn)
     call s%split(files_3n, ',', this%files_3n)
 
@@ -102,7 +110,9 @@ contains
 
     write(iut,'(a)') "#"
     write(iut,'(a)') "#  NN files:"
+    write(iut,'(2a)') "#  ", trim(this%int_nn_file)
     do n = 1, size(this%files_nn)
+      if( this%files_nn(n) == 'none' .or. this%files_nn(n) == '') cycle
       write(iut,'(2a)') "#  ", trim(this%files_nn(n))
     end do
     write(iut,'(a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_nn, &
@@ -110,13 +120,17 @@ contains
 
     write(iut,'(a)') "#"
     write(iut,'(a)') "#  3N files:"
+    write(iut,'(2a)') "#  ", trim(this%int_3n_file)
     do n = 1, size(this%files_3n)
-      write(*,'(2a)') "#  ", trim(this%files_3n(n))
+      if( this%files_3n(n) == 'none' .or. this%files_3n(n) == '') cycle
+      write(iut,'(2a)') "#  ", trim(this%files_3n(n))
     end do
     write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_3n, &
         & ", e2max =",this%e2max_3n, ", e3max =", this%e3max_3n, &
         & ", lmax =",this%lmax_3n
-
-
+    do n = 1, size(this%Ops)
+      if( this%Ops(n) == 'none' .or. this%Ops(n) == '') cycle
+      write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))
+    end do
   end subroutine PrintInputParameters
 end module HFInput

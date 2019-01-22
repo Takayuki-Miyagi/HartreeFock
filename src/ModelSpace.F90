@@ -75,6 +75,8 @@ module ModelSpace
   contains
     procedure :: init => InitOneBodySpace
     procedure :: fin => FinOneBodySpace
+    procedure :: GetOneBodyChannel, GetOneBodyChannelJPZ
+    generic :: get => GetOneBodyChannel, GetOneBodyChannelJPZ
   end type OneBodySpace
 
   type, extends(jpz) :: TwoBodyChannel
@@ -98,6 +100,8 @@ module ModelSpace
   contains
     procedure :: init => InitTwoBodySpace
     procedure :: fin => FinTwoBodySpace
+    procedure :: GetTwoBodyChannel, GetTwoBodyChannelJPZ
+    generic :: get => GetTwoBodyChannel, GetTwoBodyChannelJPZ
   end type TwoBodySpace
 
   type :: AdditionalQN
@@ -134,6 +138,8 @@ module ModelSpace
   contains
     procedure :: init => InitThreeBodySpace
     procedure :: fin => FinThreeBodySpace
+    procedure :: GetThreeBodyChannel, GetThreeBodyChannelJPZ
+    generic :: get => GetThreeBodyChannel, GetThreeBodyChannelJPZ
   end type ThreeBodySpace
 
   type :: coef
@@ -590,6 +596,22 @@ contains
 
   end subroutine InitOneBodySpace
 
+  function GetOneBodyChannel(this,ch) result(one)
+    class(OneBodySpace), intent(in) :: this
+    integer, intent(in) :: ch
+    type(OneBodyChannel) :: one
+    one = this%jpz(ch)
+  end function GetOneBodyChannel
+
+  function GetOneBodyChannelJPZ(this,J,P,Z) result(one)
+    class(OneBodySpace), intent(in) :: this
+    integer, intent(in) :: J,P,Z
+    integer :: ch
+    type(OneBodyChannel) :: one
+    ch = this%jpz2ch(J,P,Z)
+    one = this%jpz(ch)
+  end function GetOneBodyChannelJPZ
+
   subroutine FinOneBodyChannel(this)
     class(OneBodyChannel), intent(inout) :: this
     deallocate(this%n2spi)
@@ -736,6 +758,23 @@ contains
       call this%jpz(ich)%init(jj(ich),pp(ich),zz(ich),nn(ich),sps,e2max)
     end do
   end subroutine InitTwoBodySpace
+
+  function GetTwoBodyChannel(this,ch) result(two)
+    class(TwoBodySpace), intent(in) :: this
+    integer, intent(in) :: ch
+    type(TwoBodyChannel) :: two
+    two = this%jpz(ch)
+  end function GetTwoBodyChannel
+
+  function GetTwoBodyChannelJPZ(this,J,P,Z) result(two)
+    class(TwoBodySpace), intent(in) :: this
+    integer, intent(in) :: J,P,Z
+    integer :: ch
+    type(TwoBodyChannel) :: two
+    ch = this%jpz2ch(J,P,Z)
+    two = this%jpz(ch)
+  end function GetTwoBodyChannelJPZ
+
 
   subroutine FinTwoBodyChannel(this)
     class(TwoBodyChannel), intent(inout) :: this
@@ -1586,6 +1625,22 @@ contains
     end do
     deallocate(ch)
   end subroutine InitThreeBodySpace
+
+  function GetThreeBodyChannel(this,ch) result(thr)
+    class(ThreeBodySpace), intent(in) :: this
+    integer, intent(in) :: ch
+    type(ThreeBodyChannel) :: thr
+    thr = this%jpz(ch)
+  end function GetThreeBodyChannel
+
+  function GetThreeBodyChannelJPZ(this,J,P,Z) result(thr)
+    class(ThreeBodySpace), intent(in) :: this
+    integer, intent(in) :: J,P,Z
+    integer :: ch
+    type(ThreeBodyChannel) :: thr
+    ch = this%jpz2ch(J,P,Z)
+    thr = this%jpz(ch)
+  end function GetThreeBodyChannelJPZ
 
   subroutine FinThreeBodyChannel(this)
     class(ThreeBodyChannel), intent(inout) :: this
