@@ -76,6 +76,7 @@ module NOperators
   private :: read_scalar_3bme_txt_sp
   private :: read_scalar_3bme_bin_sp
   private :: read_scalar_3bme_bin_stream_sp
+  private :: read_scalar_3bme_bin_comp_sp
   private :: count_scalar_3bme
   private :: store_scalar_3bme
   private :: store_scalar_3bme_sp
@@ -218,6 +219,7 @@ module NOperators
     procedure :: read_tensor_3bme_txt_sp
     procedure :: read_tensor_3bme_bin_sp
     procedure :: read_scalar_3bme_bin_stream_sp
+    procedure :: read_scalar_3bme_bin_comp_sp
 
   end type ReadFiles
 
@@ -2353,13 +2355,18 @@ contains
       return
     end if
 
-    if(s%find(this%file_3n,'.bin')) then
+    if(s%find(this%file_3n,'.bin') .and. .not.s%fild(this%file_3n,'.stream')) then
       call this%read_scalar_3bme_bin_sp(thr,sps,ms)
       return
     end if
 
-    if(s%find(this%file_3n,'.bin_stream')) then
+    if(s%find(this%file_3n,'.bin') .and. s%fild(this%file_3n,'.stream')) then
       call this%read_scalar_3bme_bin_stream_sp(thr,sps,ms)
+      return
+    end if
+
+    if(s%find(this%file_3n,'.bin') .and. s%fild(this%file_3n,'_comp')) then
+      call this%read_scalar_3bme_bin_comp_sp(thr,sps,ms)
       return
     end if
   end subroutine ReadScalar3BFileSp
@@ -2406,7 +2413,6 @@ contains
     integer :: runit = 22, io
 
     write(*,'(a)') "Reading three-body scalar line-by-line from binary file"
-
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
     write(*,*) "Number of three-body matrix element: ", nelm
@@ -2427,6 +2433,35 @@ contains
     deallocate(v)
     call spsf%fin()
   end subroutine read_scalar_3bme_bin_sp
+
+  subroutine read_scalar_3bme_bin_comp_sp(this,thr,sps,ms)
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPartSp), intent(inout) :: thr
+    type(OrbitsIsospin), intent(in) :: sps
+    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: spsf
+    real(4), allocatable :: v(:)
+    integer(8) :: nelm
+    integer :: runit = 22, io
+
+    write(*,'(a)') "Reading three-body scalar stream from binary file"
+    call spsf%init(this%emax3, this%lmax3)
+    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    allocate(v(nelm))
+    open(runit, file=this%file_3n, action='read', iostat=io, &
+        & form='unformatted')
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+      return
+    end if
+    read(runit) v
+    close(runit)
+
+    call store_scalar_3bme_sp(thr,sps,ms,v,spsf,this%e2max3,this%e3max3)
+
+    deallocate(v)
+    call spsf%fin()
+  end subroutine read_scalar_3bme_bin_comp_sp
 
   subroutine read_scalar_3bme_bin_stream_sp(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this

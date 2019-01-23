@@ -50,7 +50,7 @@ program HFMain
 
   call PT%calc(ms,H)
   call PT%write_summary(p)
-  call w%writef(p,ms,h)
+  !call w%writef(p,ms,h)
   call h%fin()
   ! Hamiltonian -----
 
