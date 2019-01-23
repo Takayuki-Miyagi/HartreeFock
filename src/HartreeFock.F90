@@ -59,6 +59,8 @@ module HartreeFock
     procedure :: CalcEnergy
     procedure :: TransformToHF
     procedure :: HFBasisHamiltonian
+    procedure :: HFBasisScalar
+    !procedure :: HFBasisTensor
   end type HFSolver
 
 contains
@@ -182,12 +184,25 @@ contains
     type(MSpace), intent(in) :: ms
     type(Op), intent(inout) :: Optr
 
-    if(Optr%optr == 'hamil' .or. Optr%optr == 'Hamil') then
+    if(Optr%is_normal_ordered) then
+      write(*,'(a)') "In TransformToHF, input operator should not be normal ordered wrt target nucleus."
+      return
+    end if
+
+    if(Optr%optr=='hamil' .or. Optr%optr=='Hamil') then
       call HF%HFBasisHamiltonian(ms,Optr)
-    else
+      return
+    end if
+
+    if(Optr%Scalar) then
+      call HF%HFBasisScalar(ms,Optr)
+      return
+    end if
+
+    if(.not. Optr%Scalar) then
       write(*,*) "Not implemented yet."
       return
-      !call HF%HFBasisOperator(ms,Optr)
+      !call HF%HFBasisTensor(ms,Optr)
     end if
 
   end subroutine TransformToHF
@@ -280,9 +295,236 @@ contains
     end do
     call H%DiscardThreeBodyPart()
 
-    call timer%Add("HFBasisHamiltonian",omp_get_wtime() - ti)
+    call timer%Add("HFBasisHamltonian",omp_get_wtime() - ti)
 
   end subroutine HFBasisHamiltonian
+
+  subroutine HFBasisScalar(HF,ms,Opr)
+    use Profiler, only: timer
+    class(HFSolver), intent(in) :: HF
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(inout) :: Opr
+    type(NBodyPart) :: o2from3, o1from3, o1from2
+    integer :: ch, J, n, bra, ket, a, b, c, d, e, f, JJJ
+    integer :: ea, eb, ec, ed
+    integer :: je, le, ze, ee
+    integer :: jf, lf, zf, ef
+    real(8) :: ph, ti, o0from1, o0from2, o0from3
+    type(DMat) :: UT, V2, V3
+
+    ti = omp_get_wtime()
+    Opr%zero = 0.d0
+    do ch = 1, ms%one%NChan
+      Opr%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+          &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
+    end do
+
+    call o2from3%init(ms%two, .true., Opr%optr, 0, 1, 0)
+    do ch = 1, ms%two%NChan
+      J = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
+      call UT%zeros(n,n)
+      call V3%zeros(n,n)
+
+      !$omp parallel
+      !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
+      !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef,JJJ)
+      do bra = 1, n
+        a = ms%two%jpz(ch)%n2spi1(bra)
+        b = ms%two%jpz(ch)%n2spi2(bra)
+        ea = ms%sps%orb(a)%e
+        eb = ms%sps%orb(b)%e
+        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-J)
+        do ket = 1, n
+          c = ms%two%jpz(ch)%n2spi1(ket)
+          d = ms%two%jpz(ch)%n2spi2(ket)
+          ec = ms%sps%orb(c)%e
+          ed = ms%sps%orb(d)%e
+
+          UT%m(bra,ket) = HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
+          if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
+              & HF%C%GetOBME(ms%sps,ms%one,a,d) * HF%C%GetOBME(ms%sps,ms%one,b,c)
+          if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
+          if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
+
+          if(ket > bra) cycle
+          if(.not. Opr%is_three_body) cycle
+          do e = 1, ms%sps%norbs
+            je = ms%sps%orb(e)%j
+            le = ms%sps%orb(e)%l
+            ze = ms%sps%orb(e)%z
+            ee = ms%sps%orb(e)%e
+            if(ea+eb+ee > ms%e3max) cycle
+            do f = 1, ms%sps%norbs
+              jf = ms%sps%orb(f)%j
+              lf = ms%sps%orb(f)%l
+              zf = ms%sps%orb(f)%z
+              ef = ms%sps%orb(f)%e
+              if(je /= jf) cycle
+              if(le /= lf) cycle
+              if(ze /= zf) cycle
+              if(ec+ed+ef > ms%e3max) cycle
+
+              do JJJ = abs(2*J-je), (2*J+je), 2
+                o2from3%MatCh(ch,ch)%m(bra,ket) = &
+                    & o2from3%MatCh(ch,ch)%m(bra,ket) + &
+                    & HF%rho%GetOBME(ms%sps,ms%one,e,f) * &
+                    & dble(JJJ+1) * Opr%thr%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
+              end do
+
+            end do
+          end do
+          o2from3%MatCh(ch,ch)%m(bra,ket) = &
+              & o2from3%MatCh(ch,ch)%m(bra,ket) / dble(2*J+1)
+          if(a==b) o2from3%MatCh(ch,ch)%m(bra,ket) = &
+              &    o2from3%MatCh(ch,ch)%m(bra,ket) / dsqrt(2.d0)
+          if(c==d) o2from3%MatCh(ch,ch)%m(bra,ket) = &
+              &    o2from3%MatCh(ch,ch)%m(bra,ket) / dsqrt(2.d0)
+          o2from3%MatCh(ch,ch)%m(ket,bra) = &
+              & o2from3%MatCh(ch,ch)%m(bra,ket)
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      Opr%two%MatCh(ch,ch)%DMat = &
+          & UT%T() * Opr%two%MatCh(ch,ch)%DMat * UT
+      o2from3%MatCh(ch,ch)%DMat = &
+          & UT%T() * o2from3%MatCh(ch,ch)%DMat * UT
+      call UT%fin()
+      call V2%fin()
+    end do
+    call Opr%DiscardThreeBodyPart()
+
+    o1from3 = o2from3%NormalOrderingFrom2To1(ms)
+    o1from2 = Opr%two%NormalOrderingFrom2To1(ms)
+
+    o0from3 = o1from3%NormalOrderingFrom1To0(ms)
+    o0from2 = o1from2%NormalOrderingFrom1To0(ms)
+    o0from1 = Opr%one%NormalOrderingFrom1To0(ms)
+
+    Opr%zero = o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+    Opr%one = Opr%one + o1from2 + o1from3 * 0.5d0
+    Opr%two = Opr%two + o2from3
+
+    call timer%Add("HFBasisScalar",omp_get_wtime() - ti)
+
+  end subroutine HFBasisScalar
+
+  !subroutine HFBasisTensor(HF,ms,Opr)
+  !  use Profiler, only: timer
+  !  class(HFSolver), intent(in) :: HF
+  !  type(MSpace), intent(in) :: ms
+  !  type(Op), intent(inout) :: Opr
+  !  type(NBodyPart) :: o2from3, o1from3, o1from2
+  !  integer :: chbra, chket, Jbra, Jket, nbra, nket
+  !  integer :: bra, ket, a, b, c, d, e, f, JJJ
+  !  integer :: ea, eb, ec, ed
+  !  integer :: je, le, ze, ee
+  !  integer :: jf, lf, zf, ef
+  !  real(8) :: ph, ti, o0from1, o0from2, o0from3
+  !  type(DMat) :: UT, V2, V3
+
+  !  ti = omp_get_wtime()
+  !  Opr%zero = 0.d0
+  !  do ch = 1, ms%one%NChan
+  !    Opr%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+  !        &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
+  !  end do
+
+  !  call o2from3%init(ms%two, .true., Opr%optr, 0, 1, 0)
+  !  do chbra = 1, ms%two%NChan
+  !    Jbra = ms%two%jpz(chbra)%j
+  !    nbra = ms%two%jpz(chbra)%nst
+  !    do chket = 1, ms%two%NChan
+  !      Jket = ms%two%jpz(chket)%j
+  !      nket = ms%two%jpz(chket)%nst
+  !      call UT%zeros(nbra,nket)
+  !      call V3%zeros(nbra,nket)
+
+  !      !$omp parallel
+  !      !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
+  !      !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef,JJJ)
+  !      do bra = 1, nbra
+  !        a = ms%two%jpz(ch)%n2spi1(bra)
+  !        b = ms%two%jpz(ch)%n2spi2(bra)
+  !        ea = ms%sps%orb(a)%e
+  !        eb = ms%sps%orb(b)%e
+  !        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-J)
+  !        do ket = 1, nket
+  !          c = ms%two%jpz(ch)%n2spi1(ket)
+  !          d = ms%two%jpz(ch)%n2spi2(ket)
+  !          ec = ms%sps%orb(c)%e
+  !          ed = ms%sps%orb(d)%e
+
+  !          UT%m(bra,ket) = HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
+  !          if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
+  !              & HF%C%GetOBME(ms%sps,ms%one,a,d) * HF%C%GetOBME(ms%sps,ms%one,b,c)
+  !          if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
+  !          if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
+
+  !          if(ket > bra) cycle
+  !          if(.not. H%is_three_body) cycle
+  !          do e = 1, ms%sps%norbs
+  !            je = ms%sps%orb(e)%j
+  !            le = ms%sps%orb(e)%l
+  !            ze = ms%sps%orb(e)%z
+  !            ee = ms%sps%orb(e)%e
+  !            if(ea+eb+ee > ms%e3max) cycle
+  !            do f = 1, ms%sps%norbs
+  !              jf = ms%sps%orb(f)%j
+  !              lf = ms%sps%orb(f)%l
+  !              zf = ms%sps%orb(f)%z
+  !              ef = ms%sps%orb(f)%e
+  !              if(je /= jf) cycle
+  !              if(le /= lf) cycle
+  !              if(ze /= zf) cycle
+  !              if(ec+ed+ef > ms%e3max) cycle
+
+  !              do JJJ = abs(2*J-je), (2*J+je), 2
+  !                o2from3%MatCh(ch,ch)%m(bra,ket) = &
+  !                    & o2from3%MatCh(ch,ch)%m(bra,ket) + &
+  !                    & HF%rho%GetOBME(ms%sps,ms%one,e,f) * &
+  !                    & dble(JJJ+1) * Opr%thr%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
+  !              end do
+
+  !            end do
+  !          end do
+  !          o2from3%MatCh(ch,ch)%m(bra,ket) = &
+  !              & o2from3%MatCh(ch,ch)%m(bra,ket) / dble(2*J+1)
+  !          if(a==b) o2from3%MatCh(ch,ch)%m(bra,ket) = &
+  !              &    o2from3%MatCh(ch,ch)%m(bra,ket) / dsqrt(2.d0)
+  !          if(c==d) o2from3%MatCh(ch,ch)%m(bra,ket) = &
+  !              &    o2from3%MatCh(ch,ch)%m(bra,ket) / dsqrt(2.d0)
+  !          o2from3%MatCh(ch,ch)%m(ket,bra) = &
+  !              & o2from3%MatCh(ch,ch)%m(bra,ket)
+  !        end do
+  !      end do
+  !      !$omp end do
+  !      !$omp end parallel
+  !      Opr%two%MatCh(ch,ch)%DMat = &
+  !          & UT%T() * Opr%two%MatCh(ch,ch)%DMat * UT
+  !      o2from3%MatCh(ch,ch)%m(ket,bra) = &
+  !          & UT%T() * o2from3%MatCh(ch,ch)%m(bra,ket) * UT
+  !      call UT%fin()
+  !      call V2%fin()
+  !    end do
+  !  end do
+  !  call H%DiscardThreeBodyPart()
+
+  !  o1from3 = o2from3%NormalOrdering2To1(ms)
+  !  o1from2 = Opr%two%NormalOrdering2To1(ms)
+
+  !  o0from3 = o1from3%NormalOrdering1To0(ms)
+  !  o0from2 = o1from2%NormalOrdering1To0(ms)
+  !  o0from1 = Opr%one%NormalOrdering1To0(ms)
+
+  !  Opr%zero = o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+  !  Opr%one = Opr%one + o1from2 + o1from3 * 0.5d0
+  !  Opr%two = Opr%two + o2from3
+
+  !  call timer%Add("HFBasisTensor",omp_get_wtime() - ti)
+
+  !end subroutine HFBasisTensor
 
   subroutine CalcEnergy(this,one)
     class(HFSolver), intent(inout) :: this

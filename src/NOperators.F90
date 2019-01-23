@@ -2355,17 +2355,17 @@ contains
       return
     end if
 
-    if(s%find(this%file_3n,'.bin') .and. .not.s%fild(this%file_3n,'.stream')) then
+    if(s%find(this%file_3n,'.bin') .and. .not.s%find(this%file_3n,'.stream')) then
       call this%read_scalar_3bme_bin_sp(thr,sps,ms)
       return
     end if
 
-    if(s%find(this%file_3n,'.bin') .and. s%fild(this%file_3n,'.stream')) then
+    if(s%find(this%file_3n,'.bin') .and. s%find(this%file_3n,'.stream')) then
       call this%read_scalar_3bme_bin_stream_sp(thr,sps,ms)
       return
     end if
 
-    if(s%find(this%file_3n,'.bin') .and. s%fild(this%file_3n,'_comp')) then
+    if(s%find(this%file_3n,'.bin') .and. s%find(this%file_3n,'_comp')) then
       call this%read_scalar_3bme_bin_comp_sp(thr,sps,ms)
       return
     end if

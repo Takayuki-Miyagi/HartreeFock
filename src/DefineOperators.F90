@@ -17,7 +17,7 @@ contains
       pr = 1
       zr = 0
     case default
-
+      write(*,'(2a)') 'Unknown operator: ', trim(optr)
     end select
   end subroutine GetOperatorRank
 
@@ -92,7 +92,7 @@ contains
       return
 
     case default
-      write(*,'(3a)') "In SetOneBodyChannel, ", &
+      write(*,'(3a)') "In one_body_element, ", &
           & trim(optr), " is not implemented"
       return
     end select
@@ -132,7 +132,7 @@ contains
       return
 
     case default
-      write(*,'(3a)') "In SetTwoBodyChannel, ", &
+      write(*,'(3a)') "In two_body_element, ", &
           & trim(optr), " is not implemented"
       return
     end select
@@ -166,31 +166,6 @@ contains
     r = r * fact
   end function r_dot_r
 
-  function red_r_j(a, b) result(r)
-    use CommonLibrary, only: red_r_l, sjs
-    real(8) :: r
-    integer, intent(in) :: a(4), b(4)
-    integer :: na, la, ja, za
-    integer :: nb, lb, jb, zb
-
-    r = 0.d0
-
-    na = a(1)
-    la = a(2)
-    ja = a(3)
-    za = a(4)
-
-    nb = b(1)
-    lb = b(2)
-    jb = b(3)
-    zb = b(4)
-
-    if(za /= zb) return
-
-    r = (-1.d0) ** ((3+2*la+jb)/2) * dsqrt(dble(ja + 1) * dble(jb + 1)) * &
-        &  sjs(ja, 2, jb, 2 * lb, 1, 2 * la) * red_r_l(na, la, nb, lb)
-  end function red_r_j
-
   !
   !  (1/2m) * p_{i} \cdot p_{j} / hw
   !
@@ -219,6 +194,33 @@ contains
     r = r * fact
   end function p_dot_p
 
+  ! < a || r || b >
+  function red_r_j(a, b) result(r)
+    use CommonLibrary, only: red_r_l, sjs
+    real(8) :: r
+    integer, intent(in) :: a(4), b(4)
+    integer :: na, la, ja, za
+    integer :: nb, lb, jb, zb
+
+    r = 0.d0
+
+    na = a(1)
+    la = a(2)
+    ja = a(3)
+    za = a(4)
+
+    nb = b(1)
+    lb = b(2)
+    jb = b(3)
+    zb = b(4)
+
+    if(za /= zb) return
+
+    r = (-1.d0) ** ((3+2*la+jb)/2) * dsqrt(dble(ja + 1) * dble(jb + 1)) * &
+        &  sjs(ja, 2, jb, 2 * lb, 1, 2 * la) * red_r_l(na, la, nb, lb)
+  end function red_r_j
+
+  ! < a || \nabra || b >
   function red_nab_j(a, b) result(r)
     use CommonLibrary, only: red_nab_l, sjs
     real(8) :: r

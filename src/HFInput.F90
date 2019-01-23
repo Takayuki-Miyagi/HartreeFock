@@ -10,13 +10,13 @@ module HFInput
     character(256), allocatable :: Ops(:)
     character(:), allocatable :: Nucl
     ! two-body file
-    character(256) :: int_nn_file
+    character(256) :: int_nn_file='none'
     character(256), allocatable :: files_nn(:)
     integer :: emax_nn
     integer :: e2max_nn
     integer :: lmax_nn
     ! three-body file
-    character(256) :: int_3n_file
+    character(256) :: int_3n_file='none'
     character(256), allocatable :: files_3n(:)
     integer :: emax_3n
     integer :: e2max_3n
@@ -34,24 +34,24 @@ contains
     integer :: emax=6
     integer :: e2max=12
     integer :: e3max=6
-    integer :: lmax=6
+    integer :: lmax=-1
     real(8) :: hw=20.d0
     real(8) :: alpha=1.d0
     character(20) :: Nucl='O16'
     character(256) :: int_nn_file
     character(256) :: int_3n_file
 
-    character(1024) :: optrs=""
-    character(1024) :: files_nn=""
-    integer :: emax_nn
-    integer :: e2max_nn
-    integer :: lmax_nn
+    character(1024) :: optrs="none"
+    character(1024) :: files_nn="none"
+    integer :: emax_nn=6
+    integer :: e2max_nn=12
+    integer :: lmax_nn=-1
     ! three-body file
-    character(1024) :: files_3n=""
-    integer :: emax_3n
-    integer :: e2max_3n
-    integer :: e3max_3n
-    integer :: lmax_3n
+    character(1024) :: files_3n="none"
+    integer :: emax_3n=6
+    integer :: e2max_3n=6
+    integer :: e3max_3n=6
+    integer :: lmax_3n=-1
 
     type(sys) :: s
     integer :: io
@@ -71,7 +71,6 @@ contains
     this%emax = emax
     this%e2max = e2max
     this%e3max = e3max
-    this%lmax = lmax
     this%hw = hw
     this%alpha = alpha
     this%Nucl = Nucl
@@ -80,12 +79,14 @@ contains
 
     this%emax_nn = emax_nn
     this%e2max_nn = e2max_nn
-    this%lmax_nn = lmax_nn
 
     this%emax_3n = emax_3n
     this%e2max_3n = e2max_3n
     this%e3max_3n = e3max_3n
-    this%lmax_3n = lmax_3n
+
+    if(lmax == -1) this%lmax = emax
+    if(lmax_nn == -1) this%lmax_nn = lmax_nn
+    if(lmax_3n == -1) this%lmax_3n = lmax_3n
 
     call s%split(optrs, ',', this%Ops)
     call s%split(files_nn, ',', this%files_nn)
