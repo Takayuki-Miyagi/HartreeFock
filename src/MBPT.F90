@@ -197,7 +197,7 @@ contains
 
       v = 0.d0
       !$omp parallel
-      !$omp do private(ij,i,j,ab,a,b,cd,c,d) reduction(+:v)
+      !$omp do private(a,b,cd,c,d,ij,i,j) reduction(+:v)
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)
@@ -219,12 +219,19 @@ contains
                 & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) / &
                 & ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
                 & denom(ms%sps,ms%one,h%one,i,j,c,d) )
+            if(abs(v) > 1.d2) then
+            write(*,'(5f18.8)') h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2), &
+                & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) , &
+                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) , &
+                & denom(ms%sps,ms%one,h%one,i,j,a,b) , &
+                & denom(ms%sps,ms%one,h%one,i,j,c,d)
+
+            end if
           end do
         end do
       end do
       !$omp end do
       !$omp end parallel
-
       vsum = vsum + v * dble(2*J2+1)
     end do
     this%e_3_pp = vsum
@@ -262,7 +269,7 @@ contains
 
       v = 0.d0
       !$omp parallel
-      !$omp do private(ab,a,b,ij,i,j,kl,k,l) reduction(+:v)
+      !$omp do private(a,b,ij,i,j,kl,k,l) reduction(+:v)
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)

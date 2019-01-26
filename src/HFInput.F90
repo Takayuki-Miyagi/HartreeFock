@@ -84,9 +84,13 @@ contains
     this%e2max_3n = e2max_3n
     this%e3max_3n = e3max_3n
 
+    this%lmax = lmax
+    this%lmax_nn = lmax_nn
+    this%lmax_3n = lmax_3n
+
     if(lmax == -1) this%lmax = emax
-    if(lmax_nn == -1) this%lmax_nn = lmax_nn
-    if(lmax_3n == -1) this%lmax_3n = lmax_3n
+    if(lmax_nn == -1) this%lmax_nn = emax_nn
+    if(lmax_3n == -1) this%lmax_3n = emax_3n
 
     call s%split(optrs, ',', this%Ops)
     call s%split(files_nn, ',', this%files_nn)

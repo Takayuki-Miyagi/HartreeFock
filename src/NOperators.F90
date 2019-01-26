@@ -2355,11 +2355,6 @@ contains
       return
     end if
 
-    if(s%find(this%file_3n,'.bin') .and. .not.s%find(this%file_3n,'.stream')) then
-      call this%read_scalar_3bme_bin_sp(thr,sps,ms)
-      return
-    end if
-
     if(s%find(this%file_3n,'.bin') .and. s%find(this%file_3n,'.stream')) then
       call this%read_scalar_3bme_bin_stream_sp(thr,sps,ms)
       return
@@ -2369,6 +2364,12 @@ contains
       call this%read_scalar_3bme_bin_comp_sp(thr,sps,ms)
       return
     end if
+
+    if(s%find(this%file_3n,'.bin')) then
+      call this%read_scalar_3bme_bin_sp(thr,sps,ms)
+      return
+    end if
+
   end subroutine ReadScalar3BFileSp
 
   subroutine read_scalar_3bme_txt_sp(this,thr,sps,ms)
@@ -2444,7 +2445,7 @@ contains
     integer(8) :: nelm
     integer :: runit = 22, io
 
-    write(*,'(a)') "Reading three-body scalar stream from binary file"
+    write(*,'(a)') "Reading three-body scalar from comp format binary file"
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
     allocate(v(nelm))
@@ -2473,7 +2474,7 @@ contains
     integer(8) :: nelm
     integer :: runit = 22, io
 
-    write(*,'(a)') "Reading three-body scalar stream from binary file"
+    write(*,'(a)') "Reading three-body scalar from stream i/o format binary file"
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
     allocate(v(nelm))
