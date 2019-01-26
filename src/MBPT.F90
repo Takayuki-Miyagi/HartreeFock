@@ -218,15 +218,14 @@ contains
                 & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
                 & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) / &
                 & ( denom(ms%sps,ms%one,h%one,i,j,a,b) * &
-                & denom(ms%sps,ms%one,h%one,i,j,c,d) )
-            if(abs(v) > 1.d2) then
-            write(*,'(5f18.8)') h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2), &
-                & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) , &
-                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) , &
-                & denom(ms%sps,ms%one,h%one,i,j,a,b) , &
-                & denom(ms%sps,ms%one,h%one,i,j,c,d)
-
-            end if
+                &   denom(ms%sps,ms%one,h%one,i,j,c,d) )
+            !if(abs(v) > 1.d2) then
+            !  write(*,'(5f18.8)') h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2), &
+            !    & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) , &
+            !    & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) , &
+            !    & denom(ms%sps,ms%one,h%one,i,j,a,b) , &
+            !    & denom(ms%sps,ms%one,h%one,i,j,c,d)
+            !end if
           end do
         end do
       end do
