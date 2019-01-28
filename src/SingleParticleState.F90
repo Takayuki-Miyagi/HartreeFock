@@ -14,6 +14,12 @@ module SingleParticleState
   private :: FinOrbits
   private :: iso2pn
   private :: pn2iso
+  private :: GetOrbit
+  private :: GetOrbitIsospin
+  private :: GetLabelFromIndex
+  private :: GetLabelFromIndexIsospin
+  private :: GetIndexFromLabel
+  private :: GetIndexFromLabelIsospin
 
   type :: SingleParticleOrbitIsospin
     integer :: n = -1
@@ -38,6 +44,7 @@ module SingleParticleState
     procedure :: set => SetSingleParticleOrbit
     procedure :: SetOccupation
     procedure :: SetParticleHole
+
   end type SingleParticleOrbit
 
   type :: OrbitsIsospin
@@ -50,6 +57,8 @@ module SingleParticleState
     procedure :: fin => FinOrbitsIsospin
     procedure :: get => GetOrbitIsospin
     procedure :: iso2pn
+    procedure :: GetLabelFromIndexIsospin
+    procedure :: GetIndexFromLabelIsospin
   end type OrbitsIsospin
 
   type :: Orbits
@@ -62,7 +71,13 @@ module SingleParticleState
     procedure :: fin => FinOrbits
     procedure :: get => GetOrbit
     procedure :: pn2iso
+    procedure :: GetLabelFromIndex
+    procedure :: GetIndexFromLabel
   end type Orbits
+
+  character(1), private :: OrbitalAngMom(21)=['s',&
+      & 'p','d','f','g','h','i','k','l','m','n',&
+      & 'o','q','r','t','u','v','w','x','y','z']
 
 contains
 
@@ -262,6 +277,158 @@ contains
     if(this%orb(idx)%l > sps%lmax) return
     r=sps%nlj2idx(this%orb(idx)%n,this%orb(idx)%l,this%orb(idx)%j)
   end function pn2iso
+
+  function GetLabelFromIndex(this, idx) result(r)
+    use ClassSys, only: sys
+    class(Orbits), intent(in) :: this
+    integer, intent(in) :: idx
+    character(:), allocatable :: r
+    type(sys) :: s
+    integer :: n, l, j, z
+
+    if(idx > this%norbs) then
+      write(*,'(a)') "Warning in GetLabelFromIndex"
+      r = ''
+      return
+    end if
+
+    n = this%orb(idx)%n
+    l = this%orb(idx)%l
+    j = this%orb(idx)%j
+    z = this%orb(idx)%z
+    if(z == -1) then
+      r = 'p' // trim(s%str(n)) // OrbitalAngMom(l+1) // trim(s%str(j)) // '/2'
+      return
+    end if
+
+    if(z ==  1) then
+      r = 'n' // trim(s%str(n)) // OrbitalAngMom(l+1) // trim(s%str(j)) // '/2'
+      return
+    end if
+    write(*,'(a)') 'Error in GetLabelFromIndex'
+  end function GetLabelFromIndex
+
+  function GetLabelFromIndexIsospin(this,idx) result(r)
+    use ClassSys, only: sys
+    class(OrbitsIsospin), intent(in) :: this
+    integer, intent(in) :: idx
+    character(:), allocatable :: r
+    type(sys) :: s
+    integer :: n, l, j
+
+    if(idx > this%norbs) then
+      write(*,'(a)') "Warning in GetLabelFromIndexIsospin"
+      r = ''
+      return
+    end if
+
+    n = this%orb(idx)%n
+    l = this%orb(idx)%l
+    j = this%orb(idx)%j
+    r = trim(s%str(n)) // OrbitalAngMom(l+1) // trim(s%str(j)) // '/2'
+  end function GetLabelFromIndexIsospin
+
+  function GetIndexFromLabel(this, label) result(r)
+    class(Orbits), intent(in) :: this
+    character(*), intent(in) :: label
+    integer :: r
+    character(:), allocatable :: str, str_n, str_l, str_j
+    integer :: n, l, j, z, i
+    r = 0
+    if(label == '') then
+      write(*,'(a)') "Warning in GetIndexFromLabel"
+      return
+    end if
+    if(label(1:1) /= 'p' .and. label(1:1) /= 'n') then
+      write(*,'(a)') 'Error in GetIndexFromLabel: label format error'
+      return
+    end if
+
+    if(label(1:1) == 'p') z = -1
+    if(label(1:1) == 'n') z =  1
+
+    str = label(2:)
+    str_n = ''
+    do
+      if(scan(str,'1234567890') /= 1) exit
+      str_n = trim(str_n) // str(1:1)
+      str = str(2:)
+    end do
+    str_l = str(1:1)
+
+    str = str(2:)
+    str_j = ''
+    do
+      if(scan(str,'1234567890') /= 1) exit
+      str_j = trim(str_j) // str(1:1)
+      str = str(2:)
+    end do
+
+    do i = 1, size(OrbitalAngMom)
+      if(str_l == OrbitalAngMom(i)) then
+        l = i - 1
+        exit
+      end if
+      if(i == size(OrbitalAngMom)) then
+        write(*,'(a)') "Error in GetIndexFromLabel: orbital angular momentum limitation"
+        l = 0
+        exit
+      end if
+    end do
+
+    read(str_n,*) n
+    read(str_j,*) j
+    r = this%nljz2idx(n,l,j,z)
+  end function GetIndexFromLabel
+
+  function GetIndexFromLabelIsospin(this, label) result(r)
+    class(OrbitsIsospin), intent(in) :: this
+    character(*), intent(in) :: label
+    integer :: r
+    character(:), allocatable :: str, str_n, str_l, str_j
+    integer :: n, l, j, i
+    r = 0
+
+    if(label == '') then
+      write(*,'(a)') "Warning in GetIndexFromLabelIsospin"
+      return
+    end if
+
+    str = label(1:)
+    str_n = ''
+    do
+      if(scan(str,'1234567890') /= 1) exit
+      str_n = trim(str_n) // str(1:1)
+      str = str(2:)
+    end do
+    str_l = str(1:1)
+
+    str = str(2:)
+    str_j = ''
+    do
+      if(scan(str,'1234567890') /= 1) exit
+      str_j = trim(str_j) // str(1:1)
+      str = str(2:)
+    end do
+
+    do i = 1, size(OrbitalAngMom)
+      if(str_l == OrbitalAngMom(i)) then
+        l = i - 1
+        exit
+      end if
+      if(i == size(OrbitalAngMom)) then
+        write(*,'(a)') "Error in GetIndexFromLabelIsospin: orbital angular momentum limitation"
+        l = 0
+        exit
+      end if
+    end do
+
+    read(str_n,*) n
+    read(str_j,*) j
+    r = this%nlj2idx(n,l,j)
+  end function GetIndexFromLabelIsospin
+
+
 end module SingleParticleState
 
 ! main program for check
@@ -269,13 +436,27 @@ end module SingleParticleState
 !  use SingleParticleState
 !  type(Orbits) :: o
 !  type(OrbitsIsospin) :: io
+!  character(:), allocatable :: str
 !  call o%init(4)
+!  str = o%GetLabelFromIndex(1)
+!  write(*,*) 1, o%GetIndexFromLabel(str)
+!  str = o%GetLabelFromIndex(20)
+!  write(*,*) 20, o%GetIndexFromLabel(str)
+!  str = o%GetLabelFromIndex(15)
+!  write(*,*) 15, o%GetIndexFromLabel(str)
 !  call o%fin()
+!
 !
 !  call o%init(4,2)
 !  call o%fin()
 !
 !  call io%init(4)
+!  str = io%GetLabelFromIndexIsospin(1)
+!  write(*,*) 1, io%GetIndexFromLabelIsospin(str)
+!  str = io%GetLabelFromIndexIsospin(20)
+!  write(*,*) 20, io%GetIndexFromLabelIsospin(str)
+!  str = io%GetLabelFromIndexIsospin(15)
+!  write(*,*) 15, io%GetIndexFromLabelIsospin(str)
 !  call io%fin()
 !
 !  call io%init(4,2)

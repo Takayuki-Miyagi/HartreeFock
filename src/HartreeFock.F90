@@ -52,6 +52,7 @@ module HartreeFock
     procedure :: fin => FinHFSolver
     procedure :: init => InitHFSolver
     procedure :: solve => SolveHFSolver
+    procedure :: PrintSPEs
     procedure :: DiagonalizeFockMatrix
     procedure :: SetOccupationMatrix
     procedure :: UpdateDensityMatrix
@@ -572,7 +573,6 @@ contains
         this%Occ%MatCh(ich,ich)%m(i,i) = NOcoef(io)
       end do
     end do
-
   end subroutine SetOccupationMatrix
 
   subroutine UpdateDensityMatrix(this)
@@ -657,6 +657,23 @@ contains
     call Fold%fin()
 
   end subroutine UpdateFockMatrix
+
+  subroutine PrintSPEs(this,ms)
+    class(HFSolver), intent(in) :: this
+    type(MSpace), intent(in) :: ms
+    integer :: i, io
+    do i = 1, size(ms%holes)
+      io = ms%holes(i)
+      write(*,'(a,a10,i4,f12.6)') 'hole:     ', trim(ms%sps%GetLabelFromIndex(io)), io, &
+          & this%F%GetOBME(ms%sps,ms%one,io,io)
+    end do
+
+    do i = 1, size(ms%particles)
+      io = ms%particles(i)
+      write(*,'(a,a10,i4,f12.6)') 'particle: ', trim(ms%sps%GetLabelFromIndex(io)), io, &
+          & this%F%GetOBME(ms%sps,ms%one,io,io)
+    end do
+  end subroutine PrintSPEs
 
   subroutine FinMonopole(this)
     class(Monopole), intent(inout) :: this

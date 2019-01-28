@@ -10,18 +10,21 @@ module HFInput
     character(256), allocatable :: Ops(:)
     character(:), allocatable :: Nucl
     ! two-body file
-    character(256) :: int_nn_file='none'
+    character(256) :: int_nn_file
     character(256), allocatable :: files_nn(:)
     integer :: emax_nn
     integer :: e2max_nn
     integer :: lmax_nn
     ! three-body file
-    character(256) :: int_3n_file='none'
+    character(256) :: int_3n_file
     character(256), allocatable :: files_3n(:)
     integer :: emax_3n
     integer :: e2max_3n
     integer :: e3max_3n
     integer :: lmax_3n
+    ! output files
+    character(256) :: summary_file
+    logical :: is_Op_out
   contains
     procedure :: init => InitInputParameters
     procedure :: PrintInputParameters
@@ -53,12 +56,16 @@ contains
     integer :: e3max_3n=6
     integer :: lmax_3n=-1
 
+    character(256) :: summary_file = 'summary.out'
+    logical :: is_Op_out = .false.
+
     type(sys) :: s
     integer :: io
     namelist /input/ emax, e2max, e3max, lmax, hw, &
         & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
-        & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha
+        & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
+        & summary_file, is_Op_out
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -87,6 +94,9 @@ contains
     this%lmax = lmax
     this%lmax_nn = lmax_nn
     this%lmax_3n = lmax_3n
+
+    this%summary_file = summary_file
+    this%is_Op_out = is_Op_out
 
     if(lmax == -1) this%lmax = emax
     if(lmax_nn == -1) this%lmax_nn = emax_nn

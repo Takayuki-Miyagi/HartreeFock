@@ -18,7 +18,7 @@ program HFMain
   type(WriteFiles) :: w
   character(256) :: inputfile
   real(8) :: ti
-  integer :: n
+  integer :: n, wunit=23
 
   call timer%init()
 
@@ -46,11 +46,20 @@ program HFMain
   call HF%init(ms,h,alpha=p%alpha)
   call HF%solve(ms%sps,ms%one)
   call HF%TransformToHF(ms,h)
+  call HF%PrintSPEs(ms)
 
 
   call PT%calc(ms,H)
-  call PT%write_summary(p)
-  !call w%writef(p,ms,h)
+
+  open(wunit, file = p%summary_file, action='write',status='replace')
+  write(wunit,'(a,5x,a,5x,a,5x,a)') &
+      & "# HF energy", "2nd order", "3rd order", "Total"
+  call p%PrintInputParameters(wunit)
+  write(wunit,'(4f18.8)') PT%e_0, PT%e_2, PT%e_3, &
+      &           PT%e_0+PT%e_2+PT%e_3
+  close(wunit)
+
+  if(p%is_Op_out) call w%writef(p,ms,h)
   call h%fin()
   ! Hamiltonian -----
 
@@ -60,7 +69,11 @@ program HFMain
     call opr%init(p%Ops(n),ms,.false.)
     call opr%set(ms)
     call HF%TransformToHF(ms,opr)
-    call w%writef(p,ms,opr)
+    open(wunit, file = p%summary_file, action='write',status='replace',position='append')
+    write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
+    write(wunit,'(f18.8)') opr%zero
+    close(wunit)
+    if(p%is_Op_out) call w%writef(p,ms,h)
   end do
 
   ! -- Ops from NN file (srg evolved or two-body current) --
@@ -70,7 +83,12 @@ program HFMain
     call opr%set(ms, p%files_nn(n), 'none', &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
     call HF%TransformToHF(ms,opr)
-    call w%writef(p,ms,opr)
+    open(wunit, file = p%summary_file, action='write',status='replace',position='append')
+    write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
+    write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
+    write(wunit,'(f18.8)') opr%zero
+    close(wunit)
+    if(p%is_Op_out) call w%writef(p,ms,h)
     call opr%fin()
   end do
 
@@ -82,7 +100,13 @@ program HFMain
         & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
     call HF%TransformToHF(ms,opr)
-    call w%writef(p,ms,opr)
+    open(wunit, file = p%summary_file, action='write',status='replace',position='append')
+    write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
+    write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
+    write(wunit,'(2a)') "# 3B file is ", trim(p%files_3n(n))
+    write(wunit,'(f18.8)') opr%zero
+    close(wunit)
+    if(p%is_Op_out) call w%writef(p,ms,h)
     call opr%fin()
   end do
 
