@@ -235,6 +235,7 @@ contains
         call this%MatCh(chbra,chket)%fin()
       end do
     end do
+    deallocate(this%MatCh)
   end subroutine FinNBodyPart
 
   subroutine FinNBodyPartSp(this)
@@ -247,6 +248,7 @@ contains
         call this%MatCh(chbra,chket)%fin()
       end do
     end do
+    deallocate(this%MatCh)
   end subroutine FinNBodyPartSp
 
   subroutine InitOneBodyPart(this, one, Scalar, optr, jr, pr, zr)
@@ -2058,6 +2060,7 @@ contains
     do i = 1, lines
       read(ut,*) v( (i-1)*10+1 : i*10)
     end do
+    if(mod(nelm,10) == 0) return
     read(ut,*) v(lines*10+1:nelm)
   end subroutine get_vector_me2j_formatted
 

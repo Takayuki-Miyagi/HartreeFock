@@ -137,7 +137,7 @@ contains
   end subroutine InitOrbitsIsospin
 
   function GetOrbitIsospin(this,idx) result(o)
-    class(OrbitsIsospin), intent(inout) :: this
+    class(OrbitsIsospin), intent(in) :: this
     integer, intent(in) :: idx
     type(SingleParticleOrbitIsospin) :: o
     o = this%orb(idx)
@@ -203,7 +203,7 @@ contains
   end subroutine InitOrbits
 
   function GetOrbit(this,idx) result(o)
-    class(Orbits), intent(inout) :: this
+    class(Orbits), intent(in) :: this
     integer, intent(in) :: idx
     type(SingleParticleOrbit) :: o
     o = this%orb(idx)

@@ -21,6 +21,9 @@ emax_3n = 8
 e2max_3n = 8
 e3max_3n = 8
 
+Params['optrs']='Rm2,Rp2,Rn2'
+Params['optrs']=''
+
 def SetHamil():
     pass
 

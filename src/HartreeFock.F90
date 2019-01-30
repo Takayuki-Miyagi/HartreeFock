@@ -661,18 +661,29 @@ contains
   subroutine PrintSPEs(this,ms)
     class(HFSolver), intent(in) :: this
     type(MSpace), intent(in) :: ms
-    integer :: i, io
+    integer :: i, io, ch
+    type(NBodyPart) :: F_HF
+
+    F_HF = this%F
+    do ch = 1, ms%one%NChan
+      F_HF%MatCh(ch,ch)%DMat = this%C%MatCh(ch,ch)%DMat%T() * &
+          &  this%F%MatCh(ch,ch)%DMat * this%C%MatCh(ch,ch)%DMat
+    end do
+
+    write(*,'(a)') "  Hartree-Fock single-particle energies"
+
     do i = 1, size(ms%holes)
       io = ms%holes(i)
       write(*,'(a,a10,i4,f12.6)') 'hole:     ', trim(ms%sps%GetLabelFromIndex(io)), io, &
-          & this%F%GetOBME(ms%sps,ms%one,io,io)
+          & F_HF%GetOBME(ms%sps,ms%one,io,io)
     end do
 
     do i = 1, size(ms%particles)
       io = ms%particles(i)
       write(*,'(a,a10,i4,f12.6)') 'particle: ', trim(ms%sps%GetLabelFromIndex(io)), io, &
-          & this%F%GetOBME(ms%sps,ms%one,io,io)
+          & F_HF%GetOBME(ms%sps,ms%one,io,io)
     end do
+    call F_HF%fin()
   end subroutine PrintSPEs
 
   subroutine FinMonopole(this)

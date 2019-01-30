@@ -12,7 +12,7 @@ contains
     select case(optr)
     case('hamil', 'Hamil', "HOHamil", "Hohamil", 'hohamil' ,&
           & 'CMHamil', 'CMhamil', 'cmhamil', 'RM2', 'Rm2', "rm2", &
-          & 'Tcm', 'tcm')
+          & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2')
       jr = 0
       pr = 1
       zr = 0
@@ -88,7 +88,33 @@ contains
       if(na == nb) r = dble(2*na + la) + 1.5d0
       if(na == nb + 1) r = -dsqrt(dble(na) * (dble(na+la)+0.5d0))
       if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
-      r = r * (1.d0 - 1.d0/dble(A)) * hc ** 2 / (amnucl * hw * A)
+      r = r * (1.d0/dble(A) - 1.d0/dble(A)**2) * hc ** 2 / (amnucl * hw)
+      return
+
+    case("Rp2","RP2", "rp2")
+      if(la /= lb) return
+      if(ja /= jb) return
+      if(za /= zb) return
+      if(abs(na - nb) > 1) return
+      if(na == nb) r = dble(2*na + la) + 1.5d0
+      if(na == nb + 1) r = -dsqrt(dble(na) * (dble(na+la)+0.5d0))
+      if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
+      if(za == -1) r = r * (1.d0 / dble(Z) - 2.d0 / dble(A*Z) + 1.d0 / dble(A)**2)
+      if(za ==  1) r = r / dble(A)**2
+      r = r * hc ** 2 / (amnucl * hw)
+      return
+
+    case("Rn2","RN2", "rn2")
+      if(la /= lb) return
+      if(ja /= jb) return
+      if(za /= zb) return
+      if(abs(na - nb) > 1) return
+      if(na == nb) r = dble(2*na + la) + 1.5d0
+      if(na == nb + 1) r = -dsqrt(dble(na) * (dble(na+la)+0.5d0))
+      if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
+      if(za == -1) r = r / dble(A)**2
+      if(za ==  1) r = r * (1.d0 / dble(N) - 2.d0 / dble(A*N) + 1.d0 / dble(A)**2)
+      r = r * hc ** 2 / (amnucl * hw)
       return
 
     case default
@@ -104,6 +130,12 @@ contains
     character(*), intent(in) :: optr
     real(8), intent(in) :: hw
     integer, intent(in) :: ia(4), ib(4), ic(4), id(4), A, Z, N, Jab, Jcd
+    integer :: Zab, Zcd, Pab, Pcd
+
+    Pab = (-1)**(ia(2)+ib(2))
+    Pcd = (-1)**(ic(2)+id(2))
+    Zab = (ia(4)+ib(4))/2
+    Zcd = (ic(4)+id(4))/2
 
     r = 0.d0
     select case(optr)
@@ -111,24 +143,49 @@ contains
       return
 
     case('Tcm', 'tcm')
-      if(Jab /= Jcd) then
+      if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
         write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        return
       end if
       r = p_dot_p(ia,ib,ic,id,Jab) * hw / dble(A)
       return
 
     case("CMHamil","CMhamil")
-      if(Jab /= Jcd) then
+      if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
         write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        return
       end if
       r = (p_dot_p(ia,ib,ic,id,Jab)+r_dot_r(ia,ib,ic,id,Jab)) * hw/dble(A)
       return
 
     case('RM2', 'Rm2', 'rm2')
-      if(Jab /= Jcd) then
+      if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
         write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        return
       end if
-      r = - 4.d0 * r_dot_r(ia,ib,ic,id,Jab) * hc**2 / (amnucl*hw*dble(A)**2)
+      r = - 2.d0 * r_dot_r(ia,ib,ic,id,Jab) * hc**2 / (amnucl*hw*dble(A)**2)
+      return
+
+    case('Rp2', 'RP2', 'rp2')
+      if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
+        write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        return
+      end if
+      if(Zab == -1) r = ( 2.d0 / dble(A)**2 - 4.d0 / dble(A*Z) ) * r_dot_r(ia,ib,ic,id,Jab)
+      if(Zab ==  0) r = ( 2.d0 / dble(A)**2 - 2.d0 / dble(A*Z) ) * r_dot_r(ia,ib,ic,id,Jab)
+      if(Zab ==  1) r =  2.d0 * r_dot_r(ia,ib,ic,id,Jab) / dble(A)**2
+      r = r * hc**2 / (amnucl*hw)
+      return
+
+    case('Rn2', 'RN2', 'rn2')
+      if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
+        write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        return
+      end if
+      if(Zab == -1) r = 2.d0 * r_dot_r(ia,ib,ic,id,Jab) / dble(A)**2
+      if(Zab ==  0) r = ( 2.d0 / dble(A)**2 - 2.d0 / dble(A*N) ) * r_dot_r(ia,ib,ic,id,Jab)
+      if(Zab ==  1) r = ( 2.d0 / dble(A)**2 - 4.d0 / dble(A*N) ) * r_dot_r(ia,ib,ic,id,Jab)
+      r = r * hc**2 / (amnucl*hw)
       return
 
     case default

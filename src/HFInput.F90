@@ -25,6 +25,7 @@ module HFInput
     ! output files
     character(256) :: summary_file
     logical :: is_Op_out
+    logical :: is_MBPTscalar_full
   contains
     procedure :: init => InitInputParameters
     procedure :: PrintInputParameters
@@ -58,6 +59,7 @@ contains
 
     character(256) :: summary_file = 'summary.out'
     logical :: is_Op_out = .false.
+    logical :: is_MBPTscalar_full = .false.
 
     type(sys) :: s
     integer :: io
@@ -65,7 +67,7 @@ contains
         & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
-        & summary_file, is_Op_out
+        & summary_file, is_Op_out, is_MBPTscalar_full
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -97,6 +99,7 @@ contains
 
     this%summary_file = summary_file
     this%is_Op_out = is_Op_out
+    this%is_MBPTscalar_full = is_MBPTscalar_full
 
     if(lmax == -1) this%lmax = emax
     if(lmax_nn == -1) this%lmax_nn = emax_nn
@@ -147,5 +150,7 @@ contains
       if( this%Ops(n) == 'none' .or. this%Ops(n) == '') cycle
       write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))
     end do
+    if(this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is fully done up to 2nd order."
+    if(.not. this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is approximately done. "
   end subroutine PrintInputParameters
 end module HFInput
