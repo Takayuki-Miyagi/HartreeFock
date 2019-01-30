@@ -58,7 +58,7 @@ program HFMain
 
   open(wunit, file = p%summary_file, action='write',status='replace')
   call p%PrintInputParameters(wunit)
-  write(wunit,'(a,5x,a,5x,a,5x,a,5x,a)') &
+  write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
       & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
   write(wunit,'(a,4f18.8)') 'hamil: ', PT%e_0, PT%e_2, PT%e_3, &
       &           PT%e_0+PT%e_2+PT%e_3
@@ -68,8 +68,8 @@ program HFMain
 
   if(p%Ops(1) /= 'none' .or. p%Ops(1) /= '') then
     open(wunit, file = p%summary_file, action='write',status='old',position='append')
-    write(wunit,'(a,5x,a,5x,a,5x,a,5x,a)') &
-        & "# Operator", "HF expect", "1st order", "2nd order", "Total"
+    write(wunit,'(a,1x,a,9x,a,9x,a,13x,a)') &
+        & "# Operator", "HF exp. val.", "1st order", "2nd order", "Total"
     close(wunit)
   end if
 
@@ -83,7 +83,7 @@ program HFMain
     call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
     open(wunit, file = p%summary_file, action='write',status='old',position='append')
     !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
-    write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+    write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
     close(wunit)
     if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()

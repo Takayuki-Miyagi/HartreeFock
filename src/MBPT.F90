@@ -17,7 +17,20 @@ module MBPT
   private :: energy_third_hh
   private :: energy_third_ph
   private :: cross_couple
-  private :: MaxDenominator
+  private :: MBPTCriteria
+
+  private :: CalcScalarCorr
+  private :: scalar_first
+  private :: scalar_second
+  private :: scalar_second_s1p
+  private :: scalar_second_s1h
+  private :: scalar_second_s1ph
+  private :: scalar_second_s2pp
+  private :: scalar_second_s2hh
+  private :: scalar_second_s2ph
+  private :: scalar_second_v2pp
+  private :: scalar_second_v2hh
+  private :: scalar_second_v2ph
 
   type :: MBPTEnergy
     real(8) :: e_0 = 0.d0
@@ -73,7 +86,7 @@ contains
     write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
     write(*,*)
 
-    call MaxDenominator(ms,hamil%one)
+    call MBPTCriteria(ms,hamil)
 
     this%e_0 = hamil%zero
     call this%energy_second(ms,hamil)
@@ -470,12 +483,15 @@ contains
     end do
   end function cross_couple
 
-  subroutine MaxDenominator(ms,f)
+  subroutine MBPTCriteria(ms,h)
+    !
+    ! MBPT criteria is not clear, but it definitely gets worse in the proton-neutron unbalance system.
+    !
     type(MSPace), intent(in) :: ms
-    type(NBodyPart), intent(in) :: f
-    integer :: a, b, i, j, norbs
+    type(Op), intent(in) :: h
+    integer :: a, b, i, j, norbs, ch
     type(SingleParticleOrbit) :: oa, ob, oi, oj
-    real(8) :: max_denom1b, max_denom2b
+    real(8) :: max_denom1b, max_denom2b, max_twbme
 
     max_denom1b = 0.d0
     norbs = ms%sps%norbs
@@ -485,7 +501,7 @@ contains
       do i = 1, norbs
       oi = ms%sps%get(i)
       if( oi%ph /= 0 ) cycle
-        max_denom1b = max(max_denom1b, 1.d0 / abs(denom1b(ms%sps,ms%one,f,i,a)))
+        max_denom1b = max(max_denom1b, 1.d0 / abs(denom1b(ms%sps,ms%one,h%one,i,a)))
       end do
     end do
 
@@ -504,15 +520,23 @@ contains
             oj = ms%sps%get(j)
             if( oj%ph /= 0 ) cycle
             max_denom2b = max(max_denom2b, &
-                & 1.d0 / abs(denom2b(ms%sps,ms%one,f,i,j,a,b)))
+                & 1.d0 / abs(denom2b(ms%sps,ms%one,h%one,i,j,a,b)))
           end do
         end do
       end do
     end do
 
+    max_twbme = 0.d0
+    do ch = 1, ms%two%NChan
+      max_twbme = max(max_twbme, maxval(abs(h%two%MatCh(ch,ch)%m)))
+    end do
+
     write(*,'(a,f12.6)') " max(1 / |e_h1 - e_p1|)               = ", max_denom1b
     write(*,'(a,f12.6)') " max(1 / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
-  end subroutine MaxDenominator
+    if(max(max_denom2b,max_denom1b) * max_twbme > 1.d3) then
+      write(*,'(a)') "Warning: MBPT might be dengerous!"
+    end if
+  end subroutine MBPTCriteria
 
   subroutine CalcScalarCorr(this,ms,hamil,opr,is_MBPT_full)
     class(MBPTScalar), intent(inout) :: this
@@ -736,7 +760,7 @@ contains
             if(  Tz(ms%sps,i,j) /=   Tz(ms%sps,a,b)) cycle
 
             do ik = 1, size(ms%holes)
-              k = ms%particles(ik)
+              k = ms%holes(ik)
               if(Eket(ms%sps,i,k) > ms%two%e2max) cycle
               if(ms%sps%orb(j)%j /= ms%sps%orb(k)%j) cycle
               if(ms%sps%orb(j)%l /= ms%sps%orb(k)%l) cycle
