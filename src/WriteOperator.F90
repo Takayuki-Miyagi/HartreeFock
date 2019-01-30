@@ -1,284 +1,164 @@
+! Write operators in snt (Tokyo) format
 module WriteOperator
-  use class_sys, only: sy
-  use class_stopwatch
-  use MPIFunction, only: myrank
-  use InputParameters, only: parameters
-  use ModelSpace, only: spo_pn, MSpace, OneBodySpace, TwoBodySpace, ThreeBodySpace, &
-      & OneBodyChannel, TwoBodyChannel, ThreeBodyChannel
-  use read_3bme, only: iThreeBodyScalar
-  use ScalarOperator
+  use omp_lib
+  use Operators
   implicit none
-  type(sy) :: sys
-  private :: write_snt_bin, write_snt_txt, write_kshell_txt
-  public :: write_hamil
+
+  type :: WriteFiles
+    integer :: emax
+    integer :: e2max
+    character(256) :: filename = 'none'
+  contains
+    procedure :: init => InitWriteFiles
+    procedure :: writef => WriteFile
+    procedure :: SetFileName
+  end type WriteFiles
 contains
-  subroutine write_hamil(params, sps, ms, hamil)
-    type(parameters), intent(in) :: params
-    type(spo_pn), intent(in) :: sps
+  subroutine InitWriteFiles(this, emax, e2max)
+    class(WriteFiles), intent(inout) :: this
+    integer, intent(in) :: emax, e2max
+    this%emax = emax
+    this%e2max = e2max
+  end subroutine InitWriteFiles
+
+  subroutine SetFileName(this, ms, opr, filename)
+    use ClassSys, only: sys
+    class(WriteFiles), intent(inout) :: this
     type(MSpace), intent(in) :: ms
-    type(ScalarOperators), intent(in) :: hamil
-    if(sys%find(params%no2bhfile, '.bin')) call write_snt_bin(params, sps, ms, hamil)
-    if(sys%find(params%no2bhfile, '.txt')) call write_snt_txt(params, sps, ms, hamil)
-    if(sys%find(params%no2bhfile, '.ksh')) call write_kshell_txt(params, sps, ms, hamil)
-  end subroutine write_hamil
+    type(Op), intent(in) :: opr
+    character(*), intent(in), optional :: filename
+    type(sys) :: s
 
-  subroutine write_snt_bin(params, sps, ms, hamil)
-    type(parameters), intent(in) :: params
-    type(spo_pn), intent(in) :: sps
+    if(present(filename)) then
+      this%filename = filename
+      return
+    end if
+
+    this%filename = trim(opr%optr) // '_' // trim(ms%Nucl) // &
+        & '_HF_hw' // trim(s%str(ms%hw)) // &
+        & '_e' // trim(s%str(this%emax)) // &
+        & '_2e' // trim(s%str(this%e2max)) // '.txt.snt'
+  end subroutine SetFileName
+
+  subroutine WriteFile(this,p,ms,opr,filename)
+    use Profiler, only: timer
+    use HFInput
+    class(WriteFiles), intent(inout) :: this
+    type(InputParameters), intent(in) :: p
     type(MSpace), intent(in) :: ms
-    type(ScalarOperators), intent(in) :: hamil
-    integer :: iunit = 19
-    integer :: i, num
-    integer :: ich
-    integer :: n
-    integer :: bra, ket
-    integer, allocatable :: aa(:), bb(:), cc(:), dd(:), jj(:)
-    real(8), allocatable :: v1save(:)
-    integer, allocatable :: nnum(:)
+    type(Op), intent(in) :: opr
+    character(*), intent(in), optional :: filename
+    type(SingleParticleOrbit) :: o
+    integer :: wunit = 33
+    integer :: i, cnt
+    integer :: chbra, chket, bra, ket, max_ket
+    integer :: a, b, c, d, Jbra, Jket
+    real(8) :: ti
 
-    call start_stopwatch(time_io_write)
-    open(iunit, form = "unformatted", file = params%no2bhfile, status = "replace", access='stream')
-    write(iunit) sps%n/2, sps%n/2, 0, 0
-    allocate(nnum(sps%n))
-    do i = 1, sps%n
-      nnum(i) = i
-    end do
-    write(iunit) nnum
-    write(iunit) sps%nn
-    write(iunit) sps%ll
-    write(iunit) sps%jj
-    write(iunit) sps%itz
-    deallocate(nnum)
+    ti = omp_get_wtime()
+    call this%SetFileName(ms,opr,filename)
 
-    write(iunit) hamil%zero
-    num = 0
-    do ich = 1, ms%one%n
-      num = num + ms%one%jptz(ich)%n * (ms%one%jptz(ich)%n + 1) / 2
+    open(wunit, file=this%filename, action = 'write')
+    call p%PrintInputParameters(wunit)
+    write(wunit,'(a,f18.8)') "# zero-body term: ", opr%zero
+    write(wunit,'(a)') "# model space"
+    write(wunit,'(4i4)') (this%emax+1)*(this%emax+2)/2,&
+        & (this%emax+1)*(this%emax+2)/2, 0, 0
+    cnt = 0
+    do i = 1, ms%sps%norbs
+      if(ms%sps%orb(i)%e > this%emax) cycle
+      cnt = cnt + 1
+      !o = ms%sps%get(i)
+      o = ms%sps%orb(i)
+      write(wunit,'(5i4)') cnt, o%n, o%l, o%j, o%z
     end do
-    write(iunit) num, 10, params%hw
-    allocate(aa(num), bb(num), v1save(num))
-    num = 0
-    do ich = 1, ms%one%n
-      n = ms%one%jptz(ich)%n
-      do bra = 1, n
-        do ket = 1, bra
-          num = num + 1
-          aa(num) = ms%one%jptz(ich)%n2label(bra)
-          bb(num) = ms%one%jptz(ich)%n2label(ket)
-          v1save(num) = hamil%one%jptz(ich)%m(bra, ket)
-        end do
-      end do
-    end do
-    write(iunit) aa
-    write(iunit) bb
-    write(iunit) v1save
-    deallocate(aa, bb, v1save)
+    write(wunit,'(2a)') "# ", trim(opr%optr)
 
-    num = 0
-    do ich = 1, ms%two%n
-      n = ms%two%jptz(ich)%n
-      num = num + n * (n + 1) / 2
-    end do
-    write(iunit) num
-    allocate(aa(num), bb(num), cc(num), dd(num), jj(num))
-    allocate(v1save(num))
-    num = 0
-    do ich = 1, ms%two%n
-      n = ms%two%jptz(ich)%n
-      do bra = 1, n
-        do ket = 1, bra
-          num = num + 1
-          aa(num) = ms%two%jptz(ich)%n2label1(bra)
-          bb(num) = ms%two%jptz(ich)%n2label2(bra)
-          cc(num) = ms%two%jptz(ich)%n2label1(ket)
-          dd(num) = ms%two%jptz(ich)%n2label2(ket)
-          jj(num) = ms%two%j(ich)
-          v1save(num) = hamil%two%jptz(ich)%m(bra, ket)
-        end do
-      end do
-    end do
-    write(iunit) aa
-    write(iunit) bb
-    write(iunit) cc
-    write(iunit) dd
-    write(iunit) jj
-    write(iunit) v1save
-    close(iunit)
-    call stop_stopwatch(time_io_write)
-    deallocate(aa, bb, cc, dd, jj)
-    deallocate(v1save)
-  end subroutine write_snt_bin
-
-  subroutine write_snt_txt(params, sps, ms, hamil)
-    type(parameters), intent(in) :: params
-    type(spo_pn), intent(in) :: sps
-    type(MSpace), intent(in) :: ms
-    type(ScalarOperators), intent(in) :: hamil
-    integer :: iunit = 19
-    integer :: i, num
-    integer :: ich
-    integer :: n
-    integer :: bra, ket
-    integer, allocatable :: nnum(:)
-
-    call start_stopwatch(time_io_write)
-    open(iunit, file = params%no2bhfile, status = "replace")
-    call params%PrtParams(iunit)
-    write(iunit, '(a)') '! n_proton, n_neutron, core_proton, core_neutron'
-    write(iunit, '(a)') '! num, n, l, j, tz'
-    write(iunit, '(4i4)') sps%n/2, sps%n/2, 0, 0
-    allocate(nnum(sps%n))
-    do i = 1, sps%n
-      nnum(i) = i
-    end do
-    do i = 1, sps%n
-      write(iunit, '(5i4)') nnum(i), sps%nn(i), sps%ll(i), &
-          & sps%jj(i), sps%itz(i)
-    end do
-    deallocate(nnum)
-
-    write(iunit, '(a)') '! Zero-body term (MeV)'
-    write(iunit, '(f15.8)') hamil%zero
-    num = 0
-    do ich = 1, ms%one%n
-      num = num + ms%one%jptz(ich)%n * (ms%one%jptz(ich)%n + 1) / 2
-    end do
-    write(iunit, '(a)') '! One-body term'
-    write(iunit, '(a)') '! num, method1 = 0, hw'
-    write(iunit, '(a)') '! i, j, <i|f|j>'
-    write(iunit, '(2i5, f8.4)') num, 0, params%hw
-    do ich = 1, ms%one%n
-      n = ms%one%jptz(ich)%n
-      do bra = 1, n
-        do ket = 1, bra
-          write(iunit, '(2i4, f15.8)') ms%one%jptz(ich)%n2label(bra), &
-              & ms%one%jptz(ich)%n2label(ket), hamil%one%jptz(ich)%m(bra,ket)
+    cnt = 0
+    do chbra = 1, ms%one%NChan
+      do chket = 1, chbra
+        if(.not. opr%one%MatCh(chbra,chket)%is) cycle
+        do bra = 1, ms%one%jpz(chbra)%nst
+          max_ket = ms%one%jpz(chket)%nst
+          if(chbra == chket) max_ket = bra
+          do ket = 1, max_ket
+            if(abs(opr%one%MatCh(chbra,chket)%m(bra,ket)) < 1.d-8) cycle
+            a = ms%one%jpz(chbra)%n2spi(bra)
+            b = ms%one%jpz(chket)%n2spi(ket)
+            if(ms%sps%orb(a)%e>this%emax) cycle
+            if(ms%sps%orb(b)%e>this%emax) cycle
+            cnt = cnt + 1
+          end do
         end do
       end do
     end do
 
-    num = 0
-    do ich = 1, ms%two%n
-      n = ms%two%jptz(ich)%n
-      num = num + n * (n + 1) / 2
-    end do
-    write(iunit, '(a)') '! Two-body term'
-    write(iunit, '(a)') '! num, method2 = 0, hw'
-    write(iunit, '(a)') '! i, j, k, l, JJ, <ij:JJ|v|kl:JJ>'
-    write(iunit, '(1i10, i5, f8.4)') num, 0, params%hw
-    num = 0
-    do ich = 1, ms%two%n
-      n = ms%two%jptz(ich)%n
-      do bra = 1, n
-        do ket = 1, bra
-          num = num + 1
-          write(iunit, '(5i4, f15.8)') ms%two%jptz(ich)%n2label1(bra), &
-              & ms%two%jptz(ich)%n2label2(bra), &
-              & ms%two%jptz(ich)%n2label1(ket), &
-              & ms%two%jptz(ich)%n2label2(ket), &
-              & ms%two%j(ich), &
-              & hamil%two%jptz(ich)%m(bra,ket)
-        end do
-      end do
-    end do
-    close(iunit)
-    call stop_stopwatch(time_io_write)
-
-  end subroutine write_snt_txt
-
-  subroutine write_kshell_txt(params, sps, ms, hamil)
-    type(parameters), intent(in) :: params
-    type(spo_pn), intent(in) :: sps
-    type(MSpace), intent(in) :: ms
-    type(ScalarOperators), intent(in) :: hamil
-    integer :: iunit = 19
-    integer :: i, num, tz, j
-    integer :: ich
-    integer :: n
-    integer :: bra, ket
-    integer, allocatable :: nnum(:)
-    integer, allocatable :: n2kshl(:), kshl2n(:)
-
-    allocate(n2kshl(sps%n))
-    allocate(kshl2n(sps%n))
-
-    n = 0
-    do tz = -1, 1, 2
-      do i = 1, sps%n
-        if(sps%itz(i) /= tz) cycle
-        n = n + 1
-        n2kshl(i) = n
-        kshl2n(n) = i
-      end do
-    end do
-
-    call start_stopwatch(time_io_write)
-    open(iunit, file = params%no2bhfile, status = "replace")
-    call params%PrtParams(iunit)
-    write(iunit, '(a)') '! n_proton, n_neutron, core_proton, core_neutron'
-    write(iunit, '(a)') '! num, n, l, j, tz'
-    write(iunit, '(4i4)') sps%n/2, sps%n/2, 0, 0
-    allocate(nnum(sps%n))
-    do i = 1, sps%n
-      nnum(i) = i
-    end do
-    do i = 1, sps%n
-      j = kshl2n(i)
-      write(iunit, '(5i4)') nnum(i), sps%nn(j), sps%ll(j), &
-          & sps%jj(j), sps%itz(j)
-    end do
-    deallocate(nnum)
-
-    write(iunit, '(a)') '! Zero-body term (MeV)'
-    write(iunit, '(a, f15.8)') '! ', hamil%zero
-    num = 0
-    do ich = 1, ms%one%n
-      num = num + ms%one%jptz(ich)%n * (ms%one%jptz(ich)%n + 1) / 2
-    end do
-    write(iunit, '(a)') '! One-body term'
-    write(iunit, '(a)') '! num, method1 = 0, hw'
-    write(iunit, '(a)') '! i, j, <i|f|j>'
-    write(iunit, '(2i5, f8.4)') num, 0, params%hw
-    do ich = 1, ms%one%n
-      n = ms%one%jptz(ich)%n
-      do bra = 1, n
-        do ket = 1, bra
-          write(iunit, '(2i4, f15.8)') n2kshl(ms%one%jptz(ich)%n2label(bra)), &
-              & n2kshl(ms%one%jptz(ich)%n2label(ket)), hamil%one%jptz(ich)%m(bra,ket)
+    write(wunit,'(i6,i2,f6.2)') cnt, 0, ms%hw
+    do chbra = 1, ms%one%NChan
+      do chket = 1, chbra
+        if(.not. opr%one%MatCh(chbra,chket)%is) cycle
+        do bra = 1, ms%one%jpz(chbra)%nst
+          max_ket = ms%one%jpz(chket)%nst
+          if(chbra == chket) max_ket = bra
+          do ket = 1, max_ket
+            if(abs(opr%one%MatCh(chbra,chket)%m(bra,ket)) < 1.d-8) cycle
+            a = ms%one%jpz(chbra)%n2spi(bra)
+            b = ms%one%jpz(chket)%n2spi(ket)
+            if(ms%sps%orb(a)%e>this%emax) cycle
+            if(ms%sps%orb(b)%e>this%emax) cycle
+            write(wunit,'(2i4,f18.8)') a,b,opr%one%MatCh(chbra,chket)%m(bra,ket)
+          end do
         end do
       end do
     end do
 
-    num = 0
-    do ich = 1, ms%two%n
-      n = ms%two%jptz(ich)%n
-      num = num + n * (n + 1) / 2
-    end do
-    write(iunit, '(a)') '! Two-body term'
-    write(iunit, '(a)') '! num, method2 = 0, hw'
-    write(iunit, '(a)') '! i, j, k, l, JJ, <ij:JJ|v|kl:JJ>'
-    write(iunit, '(1i10, i5, f8.4)') num, 0, params%hw
-    num = 0
-    do ich = 1, ms%two%n
-      n = ms%two%jptz(ich)%n
-      do bra = 1, n
-        do ket = 1, bra
-          num = num + 1
-          write(iunit, '(5i4, f15.8)') &
-              & n2kshl(ms%two%jptz(ich)%n2label1(bra)), &
-              & n2kshl(ms%two%jptz(ich)%n2label2(bra)), &
-              & n2kshl(ms%two%jptz(ich)%n2label1(ket)), &
-              & n2kshl(ms%two%jptz(ich)%n2label2(ket)), &
-              & ms%two%j(ich), &
-              & hamil%two%jptz(ich)%m(bra,ket)
+    cnt = 0
+    do chbra = 1, ms%two%NChan
+      do chket = 1, chbra
+        if(.not. opr%two%MatCh(chbra,chket)%is) cycle
+        do bra = 1, ms%two%jpz(chbra)%nst
+          max_ket = ms%two%jpz(chket)%nst
+          if(chbra == chket) max_ket = bra
+          do ket = 1, max_ket
+            if(abs(opr%two%MatCh(chbra,chket)%m(bra,ket)) < 1.d-8) cycle
+            cnt = cnt + 1
+          end do
         end do
       end do
     end do
-    close(iunit)
-    call stop_stopwatch(time_io_write)
 
-    deallocate(n2kshl)
-    deallocate(kshl2n)
+    write(wunit,'(i12,i2,f6.2)') cnt, 0, ms%hw
+    do chbra = 1, ms%two%NChan
+      Jbra = ms%two%jpz(chbra)%j
+      do chket = 1, chbra
+        Jket = ms%two%jpz(chket)%j
+        if(.not. opr%two%MatCh(chbra,chket)%is) cycle
+        do bra = 1, ms%two%jpz(chbra)%nst
+          max_ket = ms%two%jpz(chket)%nst
+          if(chbra == chket) max_ket = bra
+          do ket = 1, max_ket
+            if(abs(opr%two%MatCh(chbra,chket)%m(bra,ket)) < 1.d-8) cycle
+            a = ms%two%jpz(chbra)%n2spi1(bra)
+            b = ms%two%jpz(chbra)%n2spi2(bra)
+            c = ms%two%jpz(chket)%n2spi1(ket)
+            d = ms%two%jpz(chket)%n2spi2(ket)
+            if(ms%sps%orb(a)%e>this%emax) cycle
+            if(ms%sps%orb(b)%e>this%emax) cycle
+            if(ms%sps%orb(c)%e>this%emax) cycle
+            if(ms%sps%orb(d)%e>this%emax) cycle
+            if(ms%sps%orb(a)%e+ms%sps%orb(b)%e>this%e2max) cycle
+            if(ms%sps%orb(c)%e+ms%sps%orb(d)%e>this%e2max) cycle
+            if(opr%Scalar) write(wunit,'(5i4,f18.8)') &
+                & a,b,c,d,Jbra,opr%two%MatCh(chbra,chket)%m(bra,ket)
+            if(.not. opr%Scalar) write(wunit,'(6i4,f18.8)') &
+                & a,b,c,d,Jbra,Jket,opr%two%MatCh(chbra,chket)%m(bra,ket)
+          end do
+        end do
+      end do
+    end do
 
-  end subroutine write_kshell_txt
+    close(wunit)
+    call timer%Add("Write to file", omp_get_wtime()-ti)
+  end subroutine WriteFile
+
 end module WriteOperator

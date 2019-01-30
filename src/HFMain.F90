@@ -1,128 +1,138 @@
-program HartreeFockMain
-  use common_library, only: init_dbinomial_triangle, fin_dbinomial_triangle, &
+program HFMain
+  use omp_lib
+  use Profiler, only: timer
+  use CommonLibrary, only: &
+      & init_dbinomial_triangle, fin_dbinomial_triangle, &
       & set_physics_constant
-  use InputParameters, only: parameters, set_parameters
-  use ModelSpace, only: Mspace, spo_pn, spo_isospin
-  use read_3BME, only: iThreeBodyScalar
-  use ScalarOperator
-  use NormalOrdering
-  use HFSolver, only: HFSol
+  use HFInput
+  use ModelSpace
+  use Operators
+  use HartreeFock
+  use MBPT
   use WriteOperator
-  use MBPT3, only: MBPT
-#ifdef MPI
-  use mpi
-  use MPIFunction, only: myrank, nprocs, ierr
-#else
-  use MPIFunction, only: myrank
-#endif
-  use class_stopwatch, only: time_total, start_stopwatch, &
-      & stop_stopwatch, print_summary_stopwatch, time_calcop, &
-      & time_HF, time_MS, time_set_hamil, time_set_ope
-  !$ use omp_lib
   implicit none
-  type(parameters) :: params
-  type(spo_pn) :: sps
-  type(spo_isospin) :: isps
+  type(InputParameters) :: p
   type(MSpace) :: ms
-  type(iThreeBodyScalar) :: thbme
-  type(ScalarOperators) :: hamil, scalar
-  type(HFSol) :: hf_sol
-  type(MBPT) :: mbpt_sol
-  integer :: iunite = 118
-  call start_stopwatch(time_total)
-#ifdef MPI
-  call mpi_init(ierr)
-  call mpi_comm_size(mpi_comm_world, nprocs, ierr)
-  call mpi_comm_rank(mpi_comm_world, myrank, ierr)
-#endif
+  type(Op) :: h, opr
+  type(HFSolver) :: HF
+  type(MBPTEnergy) :: PT
+  type(MBPTScalar) :: PTs
+  type(WriteFiles) :: w
+  character(256) :: inputfile
+  real(8) :: ti
+  integer :: n, wunit=23
+
+  call timer%init()
+
+  call getarg(1,inputfile)
+  call p%init(inputfile)
+  call p%PrintInputParameters()
 
   call set_physics_constant()
-  call set_parameters(params)
 
+  ti = omp_get_wtime()
   call init_dbinomial_triangle()
-  call sps%init(params)
+  call timer%Add("Init for Rotation Group",omp_get_wtime()-ti)
 
-  ! Model Space
-  call start_stopwatch(time_MS)
-  call ms%init(sps, params)
-  call stop_stopwatch(time_MS)
+  select case(p%int_3n_file)
+  case('none', 'None', 'NONE')
+    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax)
+  case default
+    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax)
+  end select
+  call w%init(p%emax, p%e2max)
 
-  call start_stopwatch(time_set_hamil)
-  ! Three-Body Force
-  if(params%thbmefile /= 'None') call isps%init(params%emax_3nf)
-  if(params%thbmefile /= 'None') call thbme%init(isps, params, params%thbmefile)
+  ! Hamiltonian -----
+  call h%init('hamil',ms,ms%is_three_body)
+  call h%set(ms,p%int_nn_file,p%int_3n_file,&
+      & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
+      & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
-  ! Hamiltonian
-  call hamil%init(ms)
-  call hamil%set(params, sps, ms, 'hamil', params%twbmefile, thbme)
-  call stop_stopwatch(time_set_hamil)
+  call HF%init(ms,h,alpha=p%alpha)
+  call HF%solve(ms%sps,ms%one)
 
+  call HF%PrintSPEs(ms)
+  call HF%TransformToHF(ms,h)
 
-  ! Hartree-Fock calculation
-  call start_stopwatch(time_HF)
-  call hf_sol%init(ms)
-  if(params%thbmefile /= 'None') call hf_sol%solve(params, sps, ms, hamil, thbme)
-  if(params%thbmefile == 'None') call hf_sol%solve(params, sps, ms, hamil)
-  call stop_stopwatch(time_HF)
+  call PT%calc(ms,H)
 
-  if(params%thbmefile /= 'None') call thbme%fin(isps)
-  if(params%thbmefile /= 'None') call isps%fin()
-  open(iunite, file=params%egs, status = 'replace')
-  call params%PrtParams(iunite)
-  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1ho, hf_sol%e2ho, hf_sol%e3ho, hf_sol%eho, ' HO'
-  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
+  open(wunit, file = p%summary_file, action='write',status='replace')
+  call p%PrintInputParameters(wunit)
+  write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
+      & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
+  write(wunit,'(a,4f18.8)') 'hamil: ', PT%e_0, PT%e_2, PT%e_3, &
+      &           PT%e_0+PT%e_2+PT%e_3
+  close(wunit)
+  if(p%is_Op_out) call w%writef(p,ms,h)
+  ! Hamiltonian -----
 
-
-  if(params%sv_hf_rslt) then
-    call write_hamil(params, sps, ms, hamil)
+  if(p%Ops(1) /= 'none' .or. p%Ops(1) /= '') then
+    open(wunit, file = p%summary_file, action='write',status='old',position='append')
+    write(wunit,'(a,1x,a,9x,a,9x,a,13x,a)') &
+        & "# Operator", "HF exp. val.", "1st order", "2nd order", "Total"
+    close(wunit)
   end if
 
-  if(params%vac == 'ref' .and. params%MBPT) then
-    call mbpt_sol%calc(params, sps, ms, hamil)
-    if(myrank == 0) write(iunite,'(4f15.6, a)') mbpt_sol%e_0, mbpt_sol%e_2, mbpt_sol%e_3, &
-      & mbpt_sol%e_0 + mbpt_sol%e_2 + mbpt_sol%e_3, ' MBPT'
-  end if
+  ! -- bare Ops --
+  do n = 1, size(p%Ops)
+    if(p%Ops(n) == 'none' .or. p%Ops(n) == "") cycle
+    write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
+    call opr%init(p%Ops(n),ms,.false.)
+    call opr%set(ms)
+    call HF%TransformToHF(ms,opr)
+    call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
+    open(wunit, file = p%summary_file, action='write',status='old',position='append')
+    !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
+    write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+    close(wunit)
+    if(p%is_Op_out) call w%writef(p,ms,opr)
+    call opr%fin()
+  end do
 
-  call hamil%fin()
+  ! -- Ops from NN file (srg evolved or two-body current) --
+  do n = 1, size(p%files_nn)
+    if(p%files_nn(n) == 'none' .or. p%Ops(n) == "") cycle
+    write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n))
+    call opr%init(p%Ops(n),ms,.false.)
+    call opr%set(ms, p%files_nn(n), 'none', &
+        & [p%emax_nn, p%e2max_nn,p%lmax_nn])
+    call HF%TransformToHF(ms,opr)
+    call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
+    open(wunit, file = p%summary_file, action='write',status='old',position='append')
+    !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
+    !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
+    write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+    close(wunit)
+    if(p%is_Op_out) call w%writef(p,ms,opr)
+    call opr%fin()
+  end do
 
-  ! --- other scalar operators
+  ! -- Ops from NN+3N file (srg evolved or two-body current) --
+  do n = 1, size(p%files_3n)
+    if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
+    write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n)), &
+        & " and ", trim(p%files_3n(n))
+    call opr%init(p%Ops(n),ms,.true.)
+    call opr%set(ms, p%files_nn(n), p%files_3n(n), &
+        & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
+        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
+    call HF%TransformToHF(ms,opr)
+    call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
+    open(wunit, file = p%summary_file, action='write',status='old',position='append')
+    !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
+    !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
+    !write(wunit,'(2a)') "# 3B file is ", trim(p%files_3n(n))
+    !write(wunit,'(4f18.8)') PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+    write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+    close(wunit)
+    if(p%is_Op_out) call w%writef(p,ms,opr)
+    call opr%fin()
+  end do
 
-  ! --- bare operator
-  call scalar%init(ms)
-  call scalar%set(params, sps, ms, 'rm')
-  call hf_sol%HFBasis(params, sps, ms, scalar)
-  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
-  call scalar%fin()
-
-
-  ! --- two-body effective operator
-  call scalar%init(ms)
-  call scalar%set(params, sps, ms, 'rm', f2 = params%scfile2)
-  call hf_sol%HFBasis(params, sps, ms, scalar)
-  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
-  call scalar%fin()
-
-  ! --- three-body operator
-  if(params%scfile3 /= 'None') call isps%init(params%emax_3nf)
-  if(params%scfile3 /= 'None') call thbme%init(isps, params, params%scfile3)
-  call scalar%init(ms)
-  call scalar%set(params, sps, ms, 'rm', f2 = params%scfile2, thbme = thbme)
-  if(params%scfile3 /= 'None') call hf_sol%HFBasis(params, sps, ms, scalar, thbme)
-  if(params%scfile3 == 'None') call hf_sol%HFBasis(params, sps, ms, scalar)
-  if(myrank == 0) write(iunite,'(4f15.6, a)') hf_sol%e1hf, hf_sol%e2hf, hf_sol%e3hf, hf_sol%ehf, ' HF'
-  if(params%scfile3 /= 'None') call thbme%fin(isps)
-  if(params%scfile3 /= 'None') call isps%fin()
-  call scalar%fin()
-
-  ! --- other scalar operators
-  call hf_sol%fin()
+  call h%fin()
+  call HF%fin()
   call ms%fin()
-  call sps%fin()
 
   call fin_dbinomial_triangle()
-#ifdef MPI
-  call mpi_finalize(ierr)
-#endif
-  call stop_stopwatch(time_total)
-  call print_summary_stopwatch()
-end program HartreeFockMain
+  call timer%fin()
+end program HFMain

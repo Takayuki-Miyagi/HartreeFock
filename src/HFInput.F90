@@ -1,138 +1,156 @@
-module InputParameters
-  use MPIFunction, only: myrank
-  use class_sys, only: sy
+module HFInput
   implicit none
-  type(sy) :: sys
-  type :: parameters
+  type :: InputParameters
+    integer :: emax
+    integer :: lmax
+    integer :: e2max
+    integer :: e3max
     real(8) :: hw
-
-    ! two-body matrix element file
-    character(256) :: twbmefile = 'None', scfile2 = 'None'
-    integer :: emax_2nf, e2max_2nf
-
-    ! three-body matrix element file
-    integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
-    character(256) :: thbmefile = 'None'
-    character(256) :: scfile3 = 'None'
-
-    integer :: pmass ! Z
-    integer :: nmass ! N
-    integer :: mass  ! A
-    logical :: HFloop ! Hartree-Fock calculation
-    logical :: sv_hf_rslt
-    logical :: MBPT
-    integer :: emax, e2max, e3max ! model space
-    real(8) :: conv ! tolerance
-    real(8) :: betaCM = 0.d0
-    character(256) :: vac = 'ref'
-    character(256) :: egs = 'None', no2bhfile = 'None', fmt_hf_snt = 'None'
-    character(256) :: reference = 'None', nocoef = 'None'
-
+    real(8) :: alpha
+    character(256), allocatable :: Ops(:)
+    character(:), allocatable :: Nucl
+    ! two-body file
+    character(256) :: int_nn_file
+    character(256), allocatable :: files_nn(:)
+    integer :: emax_nn
+    integer :: e2max_nn
+    integer :: lmax_nn
+    ! three-body file
+    character(256) :: int_3n_file
+    character(256), allocatable :: files_3n(:)
+    integer :: emax_3n
+    integer :: e2max_3n
+    integer :: e3max_3n
+    integer :: lmax_3n
+    ! output files
+    character(256) :: summary_file
+    logical :: is_Op_out
+    logical :: is_MBPTscalar_full
   contains
-    procedure :: GetFileName
-    procedure :: PrtParams
-  end type parameters
+    procedure :: init => InitInputParameters
+    procedure :: PrintInputParameters
+  end type InputParameters
 contains
-  subroutine set_parameters(params, hw_in, emax_in)
-    type(parameters) :: params
-    real(8), optional :: hw_in
-    integer, optional :: emax_in
-    integer :: pmass, nmass, mass
-    real(8) :: hw, conv, betaCM
-    integer :: emax_2nf, e2max_2nf
-    integer :: emax_3nf, e2max_3nf, e3max_3nf, e3cut
-    character(256) :: inputfile, fmt_hf_snt, vac
+  subroutine InitInputParameters(this, inputfile)
+    use ClassSys, only: sys
+    class(InputParameters), intent(inout) :: this
+    character(*), intent(in) :: inputfile
+    integer :: emax=6
+    integer :: e2max=12
+    integer :: e3max=6
+    integer :: lmax=-1
+    real(8) :: hw=20.d0
+    real(8) :: alpha=1.d0
+    character(20) :: Nucl='O16'
+    character(256) :: int_nn_file
+    character(256) :: int_3n_file
 
-    logical :: sv_hf_rslt, HFloop, NO2B, MBPT
-    integer :: emax, e2max, e3max
-    integer :: narg
-    namelist /input/ pmass, nmass, mass, &
-      & hw, conv, emax_2nf, e2max_2nf, &
-      & emax_3nf, e2max_3nf, e3max_3nf, &
-      & sv_hf_rslt, &
-      & HFloop, NO2B, emax, e2max, &
-      & e3cut, fmt_hf_snt, vac, MBPT, fmt_hf_snt, betaCM
+    character(1024) :: optrs="none"
+    character(1024) :: files_nn="none"
+    integer :: emax_nn=6
+    integer :: e2max_nn=12
+    integer :: lmax_nn=-1
+    ! three-body file
+    character(1024) :: files_3n="none"
+    integer :: emax_3n=6
+    integer :: e2max_3n=6
+    integer :: e3max_3n=6
+    integer :: lmax_3n=-1
 
-    narg = command_argument_count()
-    call getarg(1, inputfile)
-    open(118, file = inputfile, status = 'old')
-    read(118, nml=input)
-    close(118)
-    if(narg >= 2) call getarg(2, params%reference)
-    if(narg >= 3) call getarg(3, params%nocoef)
-    if(narg >= 4) call getarg(4, params%twbmefile)
-    if(narg >= 5) call getarg(5, params%thbmefile)
-    if(narg >= 6) call getarg(6, params%scfile2)
-    if(narg >= 7) call getarg(7, params%scfile3)
+    character(256) :: summary_file = 'summary.out'
+    logical :: is_Op_out = .false.
+    logical :: is_MBPTscalar_full = .false.
 
-    params%pmass = pmass
-    params%nmass = nmass
-    params%mass  =  mass
-    params%hw = hw
-    params%conv = conv
-    params%fmt_hf_snt = fmt_hf_snt
-    params%emax_2nf = emax_2nf
-    params%e2max_2nf = e2max_2nf
-    params%emax_3nf = emax_3nf
-    params%e2max_3nf = e2max_3nf
-    params%e3max_3nf = e3max_3nf
-    params%e3cut = e3cut
-    params%HFloop = HFloop
-    params%emax = emax
-    params%e2max = e2max
-    params%e3max = 18
-    params%sv_hf_rslt = sv_hf_rslt
-    params%vac = vac
-    params%MBPT = MBPT
-    params%fmt_hf_snt = fmt_hf_snt
-    params%betaCM = betaCM
-    if(present(emax_in)) then
-      params%emax = emax_in
-      params%e2max = 2 * emax_in
-    end if
-    if(present(hw_in)) params%hw = hw_in
-    call params%GetFileName()
-    call params%PrtParams(6)
-  end subroutine set_parameters
+    type(sys) :: s
+    integer :: io
+    namelist /input/ emax, e2max, e3max, lmax, hw, &
+        & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
+        & e2max_nn, lmax_nn, int_3n_file, files_3n, &
+        & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
+        & summary_file, is_Op_out, is_MBPTscalar_full
 
-  subroutine GetFileName(params)
-  class(parameters), intent(inout) :: params
-    params%no2bhfile = 'None'
-    params%no2bhfile = 'Hamil.snt.' // trim(params%fmt_hf_snt)
-    params%egs = 'Summary.out'
-  end subroutine GetFileName
-
-  subroutine PrtParams(params, iunit)
-  class(parameters), intent(in) :: params
-    integer, intent(in) :: iunit
-    ! Show Parameters
-    if(myrank == 0) then
-      write(iunit,'(a)') '! Calculation Parameters:'
-      write(iunit,'(a, f6.2, a, f6.2)') '! hw = ', params%hw, ' MeV, betaCM = ', params%betaCM
-      write(iunit,'(a,i3,a,i3,a,i3)') '! Z = ', params%pmass, &
-      & ',  N = ', params%nmass, ',  A = ', params%mass
-      write(iunit,'(a,i3,a,i3)') '! emax = ', params%emax, &
-      & ',  e2max = ', params%e2max
-      write(iunit,'(a)') '! Input Files:'
-      write(iunit,'(2a)') '! reference-state file: ', trim(params%reference)
-      write(iunit,'(2a)') '! normal-ordered-state file: ', trim(params%nocoef)
-      write(iunit,'(2a)') '! 2BME file: ', trim(params%twbmefile)
-      write(iunit,'(2a)') '! 3BME file: ', trim(params%thbmefile)
-      write(iunit,'(2a)') '! 2BME scalar file: ', trim(params%scfile2)
-      write(iunit,'(2a)') '! 3BME scalar file: ', trim(params%scfile3)
-    end if
-    write(iunit,'(a)') '! Output Files:'
-    write(iunit,'(2a)') '! Ground-state energy: ', trim(params%egs)
-    if(params%sv_hf_rslt) then
-      write(iunit,'(2a)') '! NO2B file: ', trim(params%no2bhfile)
-      write(iunit,'(3a)') '! Normal ordered w.r.t. ', trim(params%vac), ' state'
-    end if
-
-    if(params%vac /= 'ref' .and. params%vac /= 'vacuum') then
-      write(*,*) 'value of vac has to be ref or vacuum: vac = ', trim(params%vac)
+    open(118, file=inputfile, action='read', iostat=io)
+    if(io /= 0) then
+      write(*,'(2a)') 'File opening error: ', trim(inputfile)
       stop
     end if
+    read(118,nml=input)
+    close(118)
 
-  end subroutine PrtParams
-end module InputParameters
+    this%emax = emax
+    this%e2max = e2max
+    this%e3max = e3max
+    this%hw = hw
+    this%alpha = alpha
+    this%Nucl = Nucl
+    this%int_nn_file = int_nn_file
+    this%int_3n_file = int_3n_file
 
+    this%emax_nn = emax_nn
+    this%e2max_nn = e2max_nn
+
+    this%emax_3n = emax_3n
+    this%e2max_3n = e2max_3n
+    this%e3max_3n = e3max_3n
+
+    this%lmax = lmax
+    this%lmax_nn = lmax_nn
+    this%lmax_3n = lmax_3n
+
+    this%summary_file = summary_file
+    this%is_Op_out = is_Op_out
+    this%is_MBPTscalar_full = is_MBPTscalar_full
+
+    if(lmax == -1) this%lmax = emax
+    if(lmax_nn == -1) this%lmax_nn = emax_nn
+    if(lmax_3n == -1) this%lmax_3n = emax_3n
+
+    call s%split(optrs, ',', this%Ops)
+    call s%split(files_nn, ',', this%files_nn)
+    call s%split(files_3n, ',', this%files_3n)
+
+  end subroutine InitInputParameters
+
+  subroutine PrintInputParameters(this,iunit)
+    class(InputParameters), intent(in) :: this
+    integer, intent(in), optional :: iunit
+    integer :: iut = 6
+    integer :: n
+
+    if(present(iunit)) iut = iunit
+
+    write(iut,'(a)') "######  Input parameters  ####  "
+    write(iut,'(2a)') "#  Target nuclide is ", trim(this%Nucl)
+    write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  Model space: emax =", &
+        & this%emax, ", e2max =", this%e2max, &
+        & ", e3max =", this%e3max, ", lmax =", this%lmax
+    write(iut,'(a,f8.3,a)') "#  HO basis parameter hw = ", this%hw, " MeV"
+
+    write(iut,'(a)') "#"
+    write(iut,'(a)') "#  NN files:"
+    write(iut,'(2a)') "#  ", trim(this%int_nn_file)
+    do n = 1, size(this%files_nn)
+      if( this%files_nn(n) == 'none' .or. this%files_nn(n) == '') cycle
+      write(iut,'(2a)') "#  ", trim(this%files_nn(n))
+    end do
+    write(iut,'(a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_nn, &
+        & ", e2max =",this%e2max_nn, ", lmax =",this%lmax_nn
+
+    write(iut,'(a)') "#"
+    write(iut,'(a)') "#  3N files:"
+    write(iut,'(2a)') "#  ", trim(this%int_3n_file)
+    do n = 1, size(this%files_3n)
+      if( this%files_3n(n) == 'none' .or. this%files_3n(n) == '') cycle
+      write(iut,'(2a)') "#  ", trim(this%files_3n(n))
+    end do
+    write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_3n, &
+        & ", e2max =",this%e2max_3n, ", e3max =", this%e3max_3n, &
+        & ", lmax =",this%lmax_3n
+    do n = 1, size(this%Ops)
+      if( this%Ops(n) == 'none' .or. this%Ops(n) == '') cycle
+      write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))
+    end do
+    if(this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is fully done up to 2nd order."
+    if(.not. this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is approximately done. "
+  end subroutine PrintInputParameters
+end module HFInput
