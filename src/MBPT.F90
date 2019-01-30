@@ -491,7 +491,7 @@ contains
     type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
     type(SingleParticleOrbit) :: oa, oi
-    real(8) :: max_denom1b, max_denom2b
+    real(8) :: max_denom1b, max_denom2b, max_val
 
     max_denom1b = 0.d0
     norbs = ms%sps%norbs
@@ -510,6 +510,8 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%nst
 
+      !$omp parallel
+      !$omp do private(ab, a, b, ij, i, j) reduction(max:max_val) schedule(dynamic)
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)
@@ -520,11 +522,14 @@ contains
           j = ms%two%jpz(ch)%n2spi2(ij)
           if( ms%sps%orb(i)%ph /= 0 ) cycle
           if( ms%sps%orb(j)%ph /= 0 ) cycle
-          max_denom2b = max(max_denom2b, &
+          max_val = max(max_val, &
               & h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) / abs(denom2b(ms%sps,ms%one,h%one,i,j,a,b)))
 
         end do
       end do
+      !$omp end do
+      !$omp end parallel
+      max_denom2b = max(max_denom2b, max_val)
     end do
 
     write(*,'(a,f12.6)') " max(h / |e_h1 - e_p1|)               = ", max_denom1b
@@ -554,12 +559,14 @@ contains
     write(*,'(a,f16.8)') "s1 p ladder  = ", this%s_2_s1p
     write(*,'(a,f16.8)') "s1 h ladder  = ", this%s_2_s1h
     write(*,'(a,f16.8)') "s1 ph bubble = ", this%s_2_s1ph
-    write(*,'(a,f16.8)') "s2 pp ladder = ", this%s_2_s2pp
-    write(*,'(a,f16.8)') "s2 hh ladder = ", this%s_2_s2hh
-    write(*,'(a,f16.8)') "s2 ph ladder = ", this%s_2_s2ph
-    write(*,'(a,f16.8)') "v2 pp ladder = ", this%s_2_v2pp
-    write(*,'(a,f16.8)') "v2 hh ladder = ", this%s_2_v2hh
-    write(*,'(a,f16.8)') "v2 ph ladder = ", this%s_2_v2ph
+    if(is_MBPT_full) then
+      write(*,'(a,f16.8)') "s2 pp ladder = ", this%s_2_s2pp
+      write(*,'(a,f16.8)') "s2 hh ladder = ", this%s_2_s2hh
+      write(*,'(a,f16.8)') "s2 ph ladder = ", this%s_2_s2ph
+      write(*,'(a,f16.8)') "v2 pp ladder = ", this%s_2_v2pp
+      write(*,'(a,f16.8)') "v2 hh ladder = ", this%s_2_v2hh
+      write(*,'(a,f16.8)') "v2 ph ladder = ", this%s_2_v2ph
+    end if
     write(*,'(a,f16.8)') "Total        = ", this%s_2
 
   end subroutine CalcScalarCorr
