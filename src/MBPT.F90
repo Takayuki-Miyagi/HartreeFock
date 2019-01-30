@@ -489,9 +489,9 @@ contains
     !
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
-    integer :: a, b, i, j, norbs, ch
-    type(SingleParticleOrbit) :: oa, ob, oi, oj
-    real(8) :: max_denom1b, max_denom2b, max_twbme
+    integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
+    type(SingleParticleOrbit) :: oa, oi
+    real(8) :: max_denom1b, max_denom2b
 
     max_denom1b = 0.d0
     norbs = ms%sps%norbs
@@ -501,39 +501,35 @@ contains
       do i = 1, norbs
       oi = ms%sps%get(i)
       if( oi%ph /= 0 ) cycle
-        max_denom1b = max(max_denom1b, 1.d0 / abs(denom1b(ms%sps,ms%one,h%one,i,a)))
+        max_denom1b = max(max_denom1b, h%one%GetOBME(ms%sps,ms%one,i,a) / abs(denom1b(ms%sps,ms%one,h%one,i,a)))
       end do
     end do
 
     max_denom2b = 0.d0
-    norbs = ms%sps%norbs
-    do a = 1, norbs
-      oa = ms%sps%get(a)
-      if( oa%ph /= 1 ) cycle
-      do b = 1, a
-        ob = ms%sps%get(b)
-        if( ob%ph /= 1 ) cycle
-        do i = 1, norbs
-          oi = ms%sps%get(i)
-          if( oi%ph /= 0 ) cycle
-          do j = 1, i
-            oj = ms%sps%get(j)
-            if( oj%ph /= 0 ) cycle
-            max_denom2b = max(max_denom2b, &
-                & 1.d0 / abs(denom2b(ms%sps,ms%one,h%one,i,j,a,b)))
-          end do
+    do ch = 1, ms%two%NChan
+      J2 = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
+
+      do ab = 1, n
+        a = ms%two%jpz(ch)%n2spi1(ab)
+        b = ms%two%jpz(ch)%n2spi2(ab)
+        if( ms%sps%orb(a)%ph /= 1 ) cycle
+        if( ms%sps%orb(b)%ph /= 1 ) cycle
+        do ij = 1, n
+          i = ms%two%jpz(ch)%n2spi1(ij)
+          j = ms%two%jpz(ch)%n2spi2(ij)
+          if( ms%sps%orb(i)%ph /= 0 ) cycle
+          if( ms%sps%orb(j)%ph /= 0 ) cycle
+          max_denom2b = max(max_denom2b, &
+              & h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) / abs(denom2b(ms%sps,ms%one,h%one,i,j,a,b)))
+
         end do
       end do
     end do
 
-    max_twbme = 0.d0
-    do ch = 1, ms%two%NChan
-      max_twbme = max(max_twbme, maxval(abs(h%two%MatCh(ch,ch)%m)))
-    end do
-
-    write(*,'(a,f12.6)') " max(1 / |e_h1 - e_p1|)               = ", max_denom1b
-    write(*,'(a,f12.6)') " max(1 / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
-    if(max(max_denom2b,max_denom1b) * max_twbme > 1.d3) then
+    write(*,'(a,f12.6)') " max(h / |e_h1 - e_p1|)               = ", max_denom1b
+    write(*,'(a,f12.6)') " max(v / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
+    if(max(max_denom2b,max_denom1b) > 1.d0) then
       write(*,'(a)') "Warning: MBPT might be dengerous!"
     end if
   end subroutine MBPTCriteria

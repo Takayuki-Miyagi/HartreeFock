@@ -225,12 +225,18 @@ contains
   end subroutine SetOperatorFromFile
 
   subroutine SetOperator(this, ms)
+    use Profiler, only: timer
     class(Op), intent(inout) :: this
     type(MSpace), intent(in) :: ms
+    real(8) :: ti
+
+    ti = omp_get_wtime()
 
     call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
     call this%two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
     this%is_three_body = .false.
+
+    call timer%Add("Set operator "//trim(this%optr), omp_get_wtime()-ti)
   end subroutine SetOperator
 
   subroutine PrintOperator(this, iunit)
