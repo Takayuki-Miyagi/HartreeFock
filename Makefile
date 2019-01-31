@@ -2,7 +2,7 @@
 # Make file for TTFcalc code
 #--------------------------------------------------
 TARGET=HartreeFock
-INSTLDIR=~/Desktop/HFtest/
+INSTLDIR=./
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
   elif hostname|grep -q cedar; then echo cedar; \
@@ -14,48 +14,49 @@ $(info Host:$(HOST))
 # Default Parameters
 #--------------------------------------------------
 ifeq ($(HOST),other)
-	FDEP=makedepf90
-	CC=gcc
-	FC=gfortran
-	LDFLAGS= -llapack -lblas -lgsl
-	OMP = -fopenmp
-	FFLAGS=-O3 -Dsingle_precision
-	CFLAGS=-O3
-	FF2C= -ff2c
-	FDFLAGS=
-	#FDFLAGS+=-DModelSpaceDebug
-	#FDFLAGS+=-DNOperatorsDebug
-	FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+  FDEP=makedepf90
+  CC=gcc
+  FC=gfortran
+  LDFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl
+  OMP = -fopenmp
+  FFLAGS=-O3 -Dsingle_precision
+  CFLAGS=-O3
+  FF2C= -ff2c
+  FDFLAGS=
+  #FDFLAGS+=-DModelSpaceDebug
+  #FDFLAGS+=-DNOperatorsDebug
+  FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
 endif
 
 ifeq ($(HOST),apt)
-#	FDEP=
-	CC=gcc
-	FC=ifort
-	LDFLAGS=-mkl -lgsl
-	OMP = -openmp
-	FFLAGS=-O3 -no-ipo -static -Dsingle_precision
-	CFLAGS=-O3
-	FF2C=
-	#FDFLAGS=-Ddebug
-	#FDFLAGS+=-check-all
+  #FDEP=
+  CC=gcc
+  FC=ifort
+  LDFLAGS=-mkl -lgsl
+  OMP = -openmp
+  FFLAGS=-O3 -no-ipo -static -Dsingle_precision
+  CFLAGS=-O3
+  FF2C=
+  #FDFLAGS+=-check-all
 endif
 
 #-----------------------------
 # oak (oak.arc.ubc.ca)
+# -heap-arrays option is needed for built in transpose function with
+#  large dimension matrix
 #-----------------------------
 ifeq ($(strip $(HOST)),oak)
   FDEP=
   CC=icc
   FC=ifort
   MKL=-L$(MKLROOT)/lib/ -L$(MKLROOT)/lib/intel64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -Wl,-rpath,$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/../compiler/lib/
-  LDFLAGS=$(MKL)
+  LDFLAGS=$(MKL) -lgsl
   OMP = -qopenmp
   FFLAGS=-O3 -heap-arrays
   CFLAGS=-O3
   LINT = -i8
   FF2C=
-  #FDFLAGS=-check all
+  #FDFLAGS =-check all
   FFLAGS+= -Dsingle_precision
 endif
 
@@ -155,29 +156,30 @@ clean:
 	rm -f $(OBJS)
 
 #--------------------------------------------------
--include $(wildcard $(DEPDIR)/*.d)
-#$(OBJDIR)/wallclock.o : $(SRCDIR)/wallclock.c
-#$(OBJDIR)/RotationGroup.o : $(SRCDIR)/RotationGroup.c
-##$(OBJDIR)/common_library.o : $(SRCDIR)/common_library.f90 $(OBJDIR)/class_sys.o
-#$(OBJDIR)/common_library.o : $(SRCDIR)/common_library.f90 $(OBJDIR)/class_sys.o $(OBJDIR)/RotationGroup.o
-#$(OBJDIR)/HFSolver.o : $(SRCDIR)/HFSolver.f90 $(OBJDIR)/Optimizer.o $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/NormalOrdering.o $(OBJDIR)/ScalarOperator.o $(OBJDIR)/Read3BME.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/MPIFunction.o
-#$(OBJDIR)/class_sys.o : $(SRCDIR)/class_sys.f90
-#$(OBJDIR)/Optimizer.o : $(SRCDIR)/Optimizer.f90 $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o
-#$(OBJDIR)/MBPT3.o : $(SRCDIR)/MBPT3.F90 $(OBJDIR)/ScalarOperator.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/common_library.o
-#$(OBJDIR)/NormalOrdering.o : $(SRCDIR)/NormalOrdering.F90 $(OBJDIR)/MPIFunction.o $(OBJDIR)/Read3BME.o $(OBJDIR)/common_library.o $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/ScalarOperator.o $(OBJDIR)/HFInput.o
-#$(OBJDIR)/WriteOperator.o : $(SRCDIR)/WriteOperator.F90 $(OBJDIR)/ScalarOperator.o $(OBJDIR)/Read3BME.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/MPIFunction.o $(OBJDIR)/class_stopwatch.o $(OBJDIR)/class_sys.o
-#$(OBJDIR)/MPIFunction.o : $(SRCDIR)/MPIFunction.F90
-#$(OBJDIR)/ModelSpace.o : $(SRCDIR)/ModelSpace.F90 $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/MPIFunction.o $(OBJDIR)/HFInput.o $(OBJDIR)/common_library.o
-#$(OBJDIR)/ScalarOperator.o : $(SRCDIR)/ScalarOperator.F90 $(OBJDIR)/class_stopwatch.o $(OBJDIR)/common_library.o $(OBJDIR)/Read3BME.o $(OBJDIR)/LinAlgLib.o $(OBJDIR)/VectorDouble.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/class_sys.o
-#$(OBJDIR)/HFInput.o : $(SRCDIR)/HFInput.F90 $(OBJDIR)/class_sys.o $(OBJDIR)/MPIFunction.o
-#$(OBJDIR)/class_stopwatch.o : $(SRCDIR)/class_stopwatch.F90 $(OBJDIR)/MPIFunction.o
-#$(OBJDIR)/Read3BME.o : $(SRCDIR)/Read3BME.F90 $(OBJDIR)/class_sys.o $(OBJDIR)/common_library.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/MPIFunction.o $(OBJDIR)/HFInput.o
-#$(OBJDIR)/HFMain.o : $(SRCDIR)/HFMain.F90 $(OBJDIR)/class_stopwatch.o $(OBJDIR)/MPIFunction.o $(OBJDIR)/MBPT3.o $(OBJDIR)/WriteOperator.o $(OBJDIR)/HFSolver.o $(OBJDIR)/NormalOrdering.o $(OBJDIR)/ScalarOperator.o $(OBJDIR)/Read3BME.o $(OBJDIR)/ModelSpace.o $(OBJDIR)/HFInput.o $(OBJDIR)/common_library.o
-#$(OBJDIR)/LinAlgLib.o : $(LINSRCDIR)/LinAlgLib.f90 $(OBJDIR)/Parameters.o $(OBJDIR)/MatVecComplex.o $(OBJDIR)/MatVecDouble.o $(OBJDIR)/MatrixComplex.o $(OBJDIR)/MatrixDouble.o $(OBJDIR)/VectorComplex.o $(OBJDIR)/VectorDouble.o
-#$(OBJDIR)/MatVecDouble.o : $(LINSRCDIR)/MatVecDouble.f90 $(OBJDIR)/MatrixDouble.o $(OBJDIR)/VectorDouble.o
-#$(OBJDIR)/VectorComplex.o : $(LINSRCDIR)/VectorComplex.f90 $(OBJDIR)/Parameters.o
-#$(OBJDIR)/MatrixDouble.o : $(LINSRCDIR)/MatrixDouble.f90 $(OBJDIR)/VectorDouble.o
-#$(OBJDIR)/VectorDouble.o : $(LINSRCDIR)/VectorDouble.f90 $(OBJDIR)/Parameters.o
-#$(OBJDIR)/MatrixComplex.o : $(LINSRCDIR)/MatrixComplex.f90 $(OBJDIR)/VectorComplex.o
-#$(OBJDIR)/Parameters.o : $(LINSRCDIR)/Parameters.f90
-#$(OBJDIR)/MatVecComplex.o : $(LINSRCDIR)/MatVecComplex.f90 $(OBJDIR)/MatrixComplex.o $(OBJDIR)/VectorComplex.o
+#-include $(wildcard $(DEPDIR)/*.d)
+obj/ClassSys.o : src/ClassSys.f90
+obj/CommonLibrary.o : src/CommonLibrary.f90 obj/ClassSys.o
+obj/DefineOperators.o : src/DefineOperators.F90 obj/CommonLibrary.o
+obj/HFInput.o : src/HFInput.F90 obj/ClassSys.o
+obj/HFMain.o : src/HFMain.F90 obj/WriteOperator.o obj/MBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/CommonLibrary.o obj/Profiler.o
+obj/HartreeFock.o : src/HartreeFock.F90 obj/CommonLibrary.o obj/Profiler.o obj/Operators.o obj/LinAlgLib.o
+obj/MBPT.o : src/MBPT.F90 obj/CommonLibrary.o obj/Profiler.o obj/Operators.o obj/ModelSpace.o
+obj/MPIFunction.o : src/MPIFunction.F90
+obj/ModelSpace.o : src/ModelSpace.F90 obj/LinAlgLib.o obj/CommonLibrary.o obj/ClassSys.o obj/Profiler.o obj/SingleParticleState.o
+obj/NOperators.o : src/NOperators.F90 obj/Profiler.o obj/ClassSys.o obj/DefineOperators.o obj/CommonLibrary.o obj/ModelSpace.o obj/LinAlgLib.o
+obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/NOperators.o obj/ModelSpace.o
+obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o
+obj/SingleParticleState.o : src/SingleParticleState.F90 obj/ClassSys.o
+obj/WriteOperator.o : src/WriteOperator.F90 obj/HFInput.o obj/Profiler.o obj/ClassSys.o obj/Operators.o
+obj/LinAlgLib.o : LinAlgf90/src/LinAlgLib.f90 obj/MatVecComplex.o obj/MatVecDouble.o obj/MatVecSingle.o obj/MatrixComplex.o obj/MatrixDouble.o obj/MatrixSingle.o obj/VectorComplex.o obj/VectorDouble.o obj/VectorSingle.o obj/SingleDouble.o obj/LinAlgParameters.o
+obj/LinAlgParameters.o : LinAlgf90/src/LinAlgParameters.f90
+obj/MatVecComplex.o : LinAlgf90/src/MatVecComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o obj/LinAlgParameters.o
+obj/MatVecDouble.o : LinAlgf90/src/MatVecDouble.f90 obj/MatrixDouble.o obj/VectorDouble.o obj/LinAlgParameters.o
+obj/MatVecSingle.o : LinAlgf90/src/MatVecSingle.f90 obj/MatrixSingle.o obj/VectorSingle.o obj/LinAlgParameters.o
+obj/MatrixComplex.o : LinAlgf90/src/MatrixComplex.f90 obj/VectorComplex.o obj/LinAlgParameters.o
+obj/MatrixDouble.o : LinAlgf90/src/MatrixDouble.f90 obj/VectorDouble.o obj/LinAlgParameters.o
+obj/MatrixSingle.o : LinAlgf90/src/MatrixSingle.f90 obj/VectorSingle.o obj/LinAlgParameters.o
+obj/SingleDouble.o : LinAlgf90/src/SingleDouble.f90 obj/MatrixDouble.o obj/VectorDouble.o obj/MatrixSingle.o obj/VectorSingle.o
+obj/VectorComplex.o : LinAlgf90/src/VectorComplex.f90 obj/LinAlgParameters.o
+obj/VectorDouble.o : LinAlgf90/src/VectorDouble.f90 obj/LinAlgParameters.o
+obj/VectorSingle.o : LinAlgf90/src/VectorSingle.f90 obj/LinAlgParameters.o

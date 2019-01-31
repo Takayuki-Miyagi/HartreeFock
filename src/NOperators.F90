@@ -1364,52 +1364,62 @@ contains
     integer, intent(in) :: A, Z, N
     integer :: bra, ket, ia, ib, ic, id
 
+    !$omp parallel
+    !$omp do private(bra,ia,ib,ket,ic,id) schedule(dynamic)
     do bra = 1, chbra%nst
       ia = chbra%n2spi1(bra)
       ib = chbra%n2spi2(bra)
       do ket = 1, chket%nst
-        ic = chbra%n2spi1(ket)
-        id = chbra%n2spi2(ket)
+        ic = chket%n2spi1(ket)
+        id = chket%n2spi2(ket)
 
-        this%m(bra,ket) = mat_elm()
+        this%m(bra,ket) = mat_elm(sps,optr,hw,A,Z,N,&
+            & ia,ib,ic,id,chbra%J,chket%J)
 
       end do
     end do
-  contains
-    function mat_elm() result(r)
-      use DefineOperators, only: two_body_element
-      real(8) :: r
-      integer :: na, la, ja, za
-      integer :: nb, lb, jb, zb
-      integer :: nc, lc, jc, zc
-      integer :: nd, ld, jd, zd
-
-      r = 0.d0
-      na = sps%orb(ia)%n
-      la = sps%orb(ia)%l
-      ja = sps%orb(ia)%j
-      za = sps%orb(ia)%z
-
-      nb = sps%orb(ib)%n
-      lb = sps%orb(ib)%l
-      jb = sps%orb(ib)%j
-      zb = sps%orb(ib)%z
-
-      nc = sps%orb(ic)%n
-      lc = sps%orb(ic)%l
-      jc = sps%orb(ic)%j
-      zc = sps%orb(ic)%z
-
-      nd = sps%orb(id)%n
-      ld = sps%orb(id)%l
-      jd = sps%orb(id)%j
-      zd = sps%orb(id)%z
-
-      r = two_body_element(optr, [na,la,ja,za], [nb,lb,jb,zb], &
-          & [nc,lc,jc,zc], [nd,ld,jd,zd], chbra%J, chket%J, hw, A, Z, N)
-
-    end function mat_elm
+    !$omp end do
+    !$omp end parallel
   end subroutine SetTwoBodyChannel
+
+  function mat_elm(sps,optr,hw,A,Z,N,ia,ib,ic,id,Jbra,Jket) result(r)
+    use DefineOperators, only: two_body_element
+    type(Orbits), intent(in) :: sps
+    character(*), intent(in) :: optr
+    real(8), intent(in) :: hw
+    integer, intent(in) :: A, Z, N
+    integer, intent(in) :: ia, ib, ic, id,Jbra,Jket
+    real(8) :: r
+    integer :: na, la, ja, za
+    integer :: nb, lb, jb, zb
+    integer :: nc, lc, jc, zc
+    integer :: nd, ld, jd, zd
+
+    r = 0.d0
+    na = sps%orb(ia)%n
+    la = sps%orb(ia)%l
+    ja = sps%orb(ia)%j
+    za = sps%orb(ia)%z
+
+    nb = sps%orb(ib)%n
+    lb = sps%orb(ib)%l
+    jb = sps%orb(ib)%j
+    zb = sps%orb(ib)%z
+
+    nc = sps%orb(ic)%n
+    lc = sps%orb(ic)%l
+    jc = sps%orb(ic)%j
+    zc = sps%orb(ic)%z
+
+    nd = sps%orb(id)%n
+    ld = sps%orb(id)%l
+    jd = sps%orb(id)%j
+    zd = sps%orb(id)%z
+
+    r = two_body_element(optr, [na,la,ja,za], [nb,lb,jb,zb], &
+        & [nc,lc,jc,zc], [nd,ld,jd,zd], Jbra, Jket, hw, A, Z, N)
+
+  end function mat_elm
 
   ! Tensor case should be tested
   function NormalOrderingFromSp3To2(this,ms) result(r)
@@ -1832,8 +1842,8 @@ contains
 
               if(a == b .and. mod(J,2) == 1 .and. abs(me_nn) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
               if(c == d .and. mod(J,2) == 1 .and. abs(me_nn) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
-              if(a == b .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
-              if(c == d .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_nn)
+              if(a == b .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_pp)
+              if(c == d .and. mod(J,2) == 1 .and. abs(me_pp) > 1.d-8) call me2j_read_warning(a,b,c,d,J,me_pp)
 
               if(ap == 0) cycle
               if(bp == 0) cycle

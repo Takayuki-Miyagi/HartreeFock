@@ -117,7 +117,7 @@ program HFMain
     call opr%fin()
   end do
 
-  ! -- Ops from NN+3N file (srg evolved or two-body current) --
+  ! -- Ops from NN+3N file (srg evolved) --
   do n = 1, size(p%files_3n)
     if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n)), &
