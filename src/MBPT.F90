@@ -490,7 +490,7 @@ contains
     !
     ! MBPT criteria is not clear, but it definitely gets worse in the proton-neutron unbalance system.
     !
-    class(MBPTEnergy), intent(in) :: this
+    class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch
