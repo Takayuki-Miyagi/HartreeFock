@@ -26,6 +26,8 @@ module HFInput
     character(256) :: summary_file
     logical :: is_Op_out
     logical :: is_MBPTscalar_full
+    logical :: is_MBPTScalar
+    logical :: is_MBPTEnergy
   contains
     procedure :: init => InitInputParameters
     procedure :: PrintInputParameters
@@ -60,6 +62,8 @@ contains
     character(256) :: summary_file = 'summary.out'
     logical :: is_Op_out = .false.
     logical :: is_MBPTscalar_full = .false.
+    logical :: is_MBPTScalar = .true.
+    logical :: is_MBPTEnergy = .true.
 
     type(sys) :: s
     integer :: io
@@ -67,7 +71,8 @@ contains
         & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
-        & summary_file, is_Op_out, is_MBPTscalar_full
+        & summary_file, is_Op_out, is_MBPTscalar_full, &
+        & is_MBPTScalar, is_MBPTEnergy
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -100,6 +105,8 @@ contains
     this%summary_file = summary_file
     this%is_Op_out = is_Op_out
     this%is_MBPTscalar_full = is_MBPTscalar_full
+    this%is_MBPTEnergy = is_MBPTEnergy
+    this%is_MBPTScalar = is_MBPTScalar
 
     if(lmax == -1) this%lmax = emax
     if(lmax_nn == -1) this%lmax_nn = emax_nn
@@ -150,7 +157,11 @@ contains
       if( this%Ops(n) == 'none' .or. this%Ops(n) == '') cycle
       write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))
     end do
-    if(this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is fully done up to 2nd order."
-    if(.not. this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is approximately done. "
+    if(this%is_MBPTEnergy) write(iut,'(a)') "# MBPT calc g.s. energy is done up to 3rd order"
+    if(this%is_MBPTScalar) then
+      write(iut,'(a)') "# MBPT calc g.s. scalar is done up to 2nd order"
+      if(this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is fully done up to 2nd order."
+      if(.not. this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is approximately done. "
+    end if
   end subroutine PrintInputParameters
 end module HFInput

@@ -39,6 +39,8 @@ module MBPT
     real(8) :: e_3_pp = 0.d0
     real(8) :: e_3_hh = 0.d0
     real(8) :: e_3_ph = 0.d0
+    real(8) :: perturbativity1b = 0.d0
+    real(8) :: perturbativity2b = 0.d0
   contains
     procedure :: calc => CalcEnergyCorr
     procedure :: energy_second
@@ -46,6 +48,7 @@ module MBPT
     procedure :: energy_third_pp
     procedure :: energy_third_hh
     procedure :: energy_third_ph
+    procedure :: MBPTCriteria
   end type MBPTEnergy
 
   type :: MBPTScalar
@@ -86,7 +89,7 @@ contains
     write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
     write(*,*)
 
-    call MBPTCriteria(ms,hamil)
+    call this%MBPTCriteria(ms,hamil)
 
     this%e_0 = hamil%zero
     call this%energy_second(ms,hamil)
@@ -483,10 +486,11 @@ contains
     end do
   end function cross_couple
 
-  subroutine MBPTCriteria(ms,h)
+  subroutine MBPTCriteria(this, ms,h)
     !
     ! MBPT criteria is not clear, but it definitely gets worse in the proton-neutron unbalance system.
     !
+    class(MBPTEnergy), intent(in) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch
@@ -536,6 +540,8 @@ contains
     if(max(max_denom2b,max_denom1b) * max_twbme > 1.d3) then
       write(*,'(a)') "Warning: MBPT might be dengerous!"
     end if
+    this%perturbativity1b = max_denom1b
+    this%perturbativity2b = max_denom2b
   end subroutine MBPTCriteria
 
   subroutine CalcScalarCorr(this,ms,hamil,opr,is_MBPT_full)

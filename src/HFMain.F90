@@ -54,15 +54,21 @@ program HFMain
   call HF%PrintSPEs(ms)
   call HF%TransformToHF(ms,h)
 
-  call PT%calc(ms,H)
-
-  open(wunit, file = p%summary_file, action='write',status='replace')
-  call p%PrintInputParameters(wunit)
-  write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
-      & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
-  write(wunit,'(a,4f18.8)') 'hamil: ', PT%e_0, PT%e_2, PT%e_3, &
-      &           PT%e_0+PT%e_2+PT%e_3
-  close(wunit)
+  if(p%is_MBPTEnergy) then
+    call PT%calc(ms,H)
+    open(wunit, file = p%summary_file, action='write',status='replace')
+    call p%PrintInputParameters(wunit)
+    if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0) then
+      write(wunit,'(a)') "# MBPT might be dengerous: "
+      write(wunit,'(a,f12.6)') "# max(1 / |e_h1 - e_p1|)               = ", max_denom1b
+      write(wunit,'(a,f12.6)') "# max(1 / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
+    end if
+    write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
+        & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
+    write(wunit,'(a,4f18.8)') 'hamil: ', PT%e_0, PT%e_2, PT%e_3, &
+        & PT%e_0+PT%e_2+PT%e_3
+    close(wunit)
+  end if
   if(p%is_Op_out) call w%writef(p,ms,h)
   ! Hamiltonian -----
 
@@ -80,11 +86,13 @@ program HFMain
     call opr%init(p%Ops(n),ms,.false.)
     call opr%set(ms)
     call HF%TransformToHF(ms,opr)
-    call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
-    open(wunit, file = p%summary_file, action='write',status='old',position='append')
-    !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
-    write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
-    close(wunit)
+    if(p%is_MBPTScalar) then
+      call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
+      open(wunit, file = p%summary_file, action='write',status='old',position='append')
+      !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
+      write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      close(wunit)
+    end if
     if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()
   end do
@@ -97,12 +105,14 @@ program HFMain
     call opr%set(ms, p%files_nn(n), 'none', &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
     call HF%TransformToHF(ms,opr)
-    call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
-    open(wunit, file = p%summary_file, action='write',status='old',position='append')
-    !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
-    !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
-    write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
-    close(wunit)
+    if(p%is_MBPTScalar) then
+      call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
+      open(wunit, file = p%summary_file, action='write',status='old',position='append')
+      !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
+      !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
+      write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      close(wunit)
+    end if
     if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()
   end do
@@ -117,14 +127,16 @@ program HFMain
         & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
     call HF%TransformToHF(ms,opr)
-    call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
-    open(wunit, file = p%summary_file, action='write',status='old',position='append')
-    !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
-    !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
-    !write(wunit,'(2a)') "# 3B file is ", trim(p%files_3n(n))
-    !write(wunit,'(4f18.8)') PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
-    write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
-    close(wunit)
+    if(p%is_MBPTScalar) then
+      call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
+      open(wunit, file = p%summary_file, action='write',status='old',position='append')
+      !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
+      !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
+      !write(wunit,'(2a)') "# 3B file is ", trim(p%files_3n(n))
+      !write(wunit,'(4f18.8)') PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      close(wunit)
+    end if
     if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()
   end do
