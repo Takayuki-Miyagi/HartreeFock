@@ -265,19 +265,20 @@ contains
     call this%thr%fin()
   end subroutine FinMSpace
 
-  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, lmax)
+  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, lmax, beta)
     class(MSpace), intent(inout) :: this
     character(*), intent(in) :: Nucl
     real(8), intent(in) :: hw
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: e3max, lmax
+    real(8), intent(in), optional :: beta
     integer :: A, Z, N
 
     call GetAZNFromReference(Nucl,A,Z,N)
-    call this%init(A,Z,N,hw,emax,e2max,e3max,lmax)
+    call this%init(A,Z,N,hw,emax,e2max,e3max,lmax,beta)
   end subroutine InitMSpaceFromReference
 
-  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax)
+  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax, beta)
     use Profiler, only: timer
     use ClassSys, only: sys
     class(MSpace), intent(inout) :: this
@@ -285,6 +286,7 @@ contains
     integer, intent(in) :: A, Z, N
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
+    real(8), intent(in), optional :: beta
     type(sys) :: s
     integer :: i, l
     character(20) :: Nucl
@@ -308,6 +310,7 @@ contains
     this%hw = hw
     if(present(e3max)) this%e3max = e3max
     if(present(lmax)) this%lmax = lmax
+    if(present(beta)) this%beta = beta
     write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
     if(present(e3max)) then
       write(*,'(a,i3)',advance='no') ", e3max=",this%e3max

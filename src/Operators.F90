@@ -209,8 +209,8 @@ contains
       this%two = this%two - Tcm_two
 
       if(ms%beta > 1.d-4) then
-        call Hcm_one%init(ms%one, .true., 'CMhamil', 0, 1, 0)
-        call Hcm_two%init(ms%two, .true., 'CMhamil', 0, 1, 0)
+        call Hcm_one%init(ms%one, .true., 'Hcm', 0, 1, 0)
+        call Hcm_two%init(ms%two, .true., 'Hcm', 0, 1, 0)
 
         call Hcm_one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
         call Hcm_two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
@@ -231,7 +231,11 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
-
+    select case(this%optr)
+    case('Hcm', 'HCM')
+      this%zero = - 1.5d0 * ms%hw
+    case default
+    end select
     call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
     call this%two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
     this%is_three_body = .false.

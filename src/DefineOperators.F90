@@ -11,7 +11,7 @@ contains
 
     select case(optr)
     case('hamil', 'Hamil', "HOHamil", "Hohamil", 'hohamil' ,&
-          & 'CMHamil', 'CMhamil', 'cmhamil', 'RM2', 'Rm2', "rm2", &
+          & 'Hcm','HCM','RM2', 'Rm2', "rm2", &
           & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2')
       jr = 0
       pr = 1
@@ -72,7 +72,7 @@ contains
       r = (dble(2*na+la)+1.5d0) * hw
       return
 
-    case("CMHamil","CMhamil")
+    case("Hcm","HCM")
       if(na /= nb) return
       if(la /= lb) return
       if(ja /= jb) return
@@ -150,7 +150,7 @@ contains
       r = p_dot_p(ia,ib,ic,id,Jab) * hw / dble(A)
       return
 
-    case("CMHamil","CMhamil")
+    case("Hcm","HCM")
       if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
         write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
         return

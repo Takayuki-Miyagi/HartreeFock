@@ -36,9 +36,9 @@ program HFMain
 
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
-    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax)
+    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
   case default
-    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax)
+    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
   end select
   call w%init(p%emax, p%e2max)
 
@@ -58,10 +58,10 @@ program HFMain
     call PT%calc(ms,H)
     open(wunit, file = p%summary_file, action='write',status='replace')
     call p%PrintInputParameters(wunit)
+    write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
+    write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
     if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0) then
       write(wunit,'(a)') "# MBPT might be dengerous: "
-      write(wunit,'(a,f12.6)') "# max(1 / |e_h1 - e_p1|)               = ", PT%perturbativity1b
-      write(wunit,'(a,f12.6)') "# max(1 / |e_h1 + e_h2 - e_p1 - e_p2|) = ", PT%perturbativity2b
     end if
     write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
         & "# Operator", "HF energy", "2nd order", "3rd order", "Total"

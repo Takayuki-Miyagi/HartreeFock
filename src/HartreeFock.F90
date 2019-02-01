@@ -314,7 +314,6 @@ contains
     type(DMat) :: UT, V2, V3
 
     ti = omp_get_wtime()
-    Opr%zero = 0.d0
     do ch = 1, ms%one%NChan
       Opr%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
           &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
@@ -403,7 +402,7 @@ contains
     o0from2 = o1from2%NormalOrderingFrom1To0(ms)
     o0from1 = Opr%one%NormalOrderingFrom1To0(ms)
 
-    Opr%zero = o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+    Opr%zero = Opr%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
     Opr%one = Opr%one + o1from2 + o1from3 * 0.5d0
     Opr%two = Opr%two + o2from3
 
