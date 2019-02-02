@@ -1,5 +1,10 @@
 module HFInput
   implicit none
+
+  public :: InputParameters
+
+  private :: InitInputParameters
+  private :: PrintInputParameters
   type :: InputParameters
     integer :: emax
     integer :: lmax
