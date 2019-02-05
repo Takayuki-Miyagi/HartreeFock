@@ -1,0 +1,656 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx,color}% Include figure files
+\usepackage[bookmarksnumbered=true, colorlinks,linkcolor=blue, citecolor=blue]{hyperref}
+\usepackage{subfigure}
+\usepackage{feynmp-auto}
+
+\newcommand{\bra}{\langle}
+\newcommand{\ket}{\rangle}
+
+\newcommand{\cg}[6]{\left(
+    \begin{array}{cc|c}
+      #1 & #2 & #3 \\
+      #4 & #5 & #6
+    \end{array}
+\right)}
+
+\newcommand{\thrj}[6]{\left(
+    \begin{array}{ccc}
+      #1 & #2 & #3 \\
+      #4 & #5 & #6
+    \end{array}
+\right)}
+
+\newcommand{\sixj}[6]{\left\{
+    \begin{array}{ccc}
+      #1 & #2 & #3 \\
+      #4 & #5 & #6
+    \end{array}
+\right\}}
+
+\newcommand{\ninej}[9]{\left\{
+    \begin{array}{ccc}
+      #1 & #2 & #3 \\
+      #4 & #5 & #6 \\
+      #7 & #8 & #9
+    \end{array}
+\right\}}
+\bibliographystyle{unsrt}
+
+\begin{document}
+\title{Hartree-Fock calculations for nuclear physics}
+\date{\today}
+\author{Takayuki Miyagi}
+\maketitle
+
+
+
+
+\section{Many-body perturbation theory}
+
+
+\subsection{Corrections for ground-state energy}
+
+\begin{fmffile}{MBPTEnergy}
+\begin{table}
+  \caption{\label{tab:mbpt} Hugenholtz diagrams for the ground-state energy up to the third order.
+   Note that the first order contributions are omitted.
+   The cross and dot indicate the one- and two-body part of Hamiltonian, respectively.
+   The diagram rules are same as in Ref.~\cite{Shavitt2009}.}
+  \begin{tabular}{cccc}
+    \multicolumn{4}{c}{Second order} \\ \hline
+    & & & \\
+    \multicolumn{2}{c}{
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfright{h1,h2}
+          \fmfbottom{v2}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{dashes,dash_len=0.01cm}{h1,v2}
+          \fmf{dashes,dash_len=0.01cm}{h2,v1}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1,h2}
+      \end{fmfgraph}}
+    &
+    \multicolumn{2}{c}{
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v2}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.8}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.8}{v2,v1}
+          \fmfdot{v1,v2}
+      \end{fmfgraph}}
+    \\
+    \multicolumn{2}{c}{$S_{1}$}& \multicolumn{2}{c}{$S_{2}$} \\ \hline
+    \multicolumn{4}{c}{Third order} \\ \hline
+    & & & \\
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{dashes}{h1,v1}
+          \fmf{dashes}{h2,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1,h2,h3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,right=0.5}{v1,v3}
+          \fmf{dashes}{h1,v1}
+          \fmf{dashes}{h2,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1,h2,h3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{phantom,tension=100}{v1,v2}
+          \fmf{phantom,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v3}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfdot{v3}
+          \fmf{dashes}{h1,v1}
+          \fmf{dashes}{h2,v2}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1,h2}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{phantom,tension=100}{v1,v2}
+          \fmf{phantom,tension=100}{v2,v3}
+          \fmf{fermion,left=0.8}{v2,v1}
+          \fmf{fermion,left=0.8}{v1,v2}
+          \fmf{fermion,left=0.8}{v3,v2}
+          \fmf{fermion,left=0.8}{v2,v3}
+          \fmfdot{v2}
+          \fmf{dashes}{h1,v1}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1,h3}
+      \end{fmfgraph}
+      \\
+      $T_{1}$ & $T_{2}$ & $T_{3}$ & $T_{4}$
+      \\
+      \\
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{phantom,tension=100}{v1,v2}
+          \fmf{phantom,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v3}
+          \fmfdot{v1}
+          \fmf{dashes}{h2,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h2,h3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfdot{v2,v3}
+          \fmf{dashes}{h1,v1}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfdot{v2,v3}
+          \fmf{dashes}{h1,v1}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v3}
+          \fmfdot{v1,v3}
+          \fmf{dashes}{h2,v2}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h2}
+      \end{fmfgraph}
+      \\
+      $T_{5}$ & $T_{6}$ & $T_{7}$ & $T_{8}$
+      \\
+      \\
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v3}
+          \fmfdot{v1,v3}
+          \fmf{dashes}{h2,v2}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h2}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmfdot{v1,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmfdot{v1,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % pp-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,right=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,right=0.5}{v3,v2}
+          \fmfdot{v1,v2,v3}
+      \end{fmfgraph}
+      \\
+      $T_{9}$ & $T_{10}$ & $T_{11}$ & $T_{12}$ \\
+      \\
+      \begin{fmfgraph}(50,50) % hh-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,right=0.8}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,right=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmf{fermion,right=0.5}{v2,v3}
+          \fmfdot{v1,v2,v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % ph-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfdot{v1,v2,v3}
+      \end{fmfgraph}
+      & & \\
+      $T_{13}$ & $T_{14}$ &  & \\
+  \end{tabular}
+\end{table}
+\end{fmffile}
+
+\subsection{Corrections for an expectation value of scalar operators}
+
+\begin{fmffile}{MBPTScalar}
+\begin{table}
+  \caption{\label{tab:mbpt} Hugenholtz diagrams for the ground-state expectation value of a scalar operator
+   up to the second order.
+   The solid and open circles indicate Hamiltonian and scalar operators, respectively.
+   The Hartree-Fock basis is assumed.
+   The diagram rules are same as in Ref.~\cite{Shavitt2009}.}
+  \begin{tabular}{cccc}
+    \multicolumn{4}{c}{First order} \\ \hline
+    & & & \\
+    \multicolumn{2}{c}{
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v2}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.8}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.8}{v2,v1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v1}
+      \end{fmfgraph}}
+    &
+    \multicolumn{2}{c}{
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v2}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.8}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.8}{v2,v1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v2}
+      \end{fmfgraph}}
+    \\
+    \multicolumn{2}{c}{$F_{1}$}& \multicolumn{2}{c}{$F_{2}$} \\ \hline
+    \multicolumn{4}{c}{Second order} \\ \hline
+    & & & \\
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfdot{v2,v3}
+          \fmf{dashes}{h1,v1}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v1}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfdot{v2,v3}
+          \fmf{dashes}{h1,v1}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v1}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v3}
+          \fmfdot{v1,v3}
+          \fmf{dashes}{h2,v2}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v2}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v3}
+          \fmfdot{v1,v3}
+          \fmf{dashes}{h2,v2}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v2}
+      \end{fmfgraph}
+      \\
+      $S_{1}$ & $S_{2}$ & $S_{3}$ & $S_{4}$
+      \\
+      \\
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,tension=100}{v1,v2}
+          \fmf{fermion,tension=100}{v2,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmfdot{v1,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50)
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmfright{h3,h2,h1}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,tension=100}{v2,v1}
+          \fmf{fermion,tension=100}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmfdot{v1,v2}
+          \fmf{dashes}{h3,v3}
+          \fmfv{decor.shape=cross,decor.size=0.25cm}{h3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % pp-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,right=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,right=0.5}{v3,v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v2,v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % hh-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,right=0.8}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,right=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmf{fermion,right=0.5}{v2,v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v2,v3}
+      \end{fmfgraph}
+      \\
+      $S_{5}$ & $S_{6}$ & $S_{7}$ & $S_{8}$ \\
+      \\
+      \begin{fmfgraph}(50,50) % ph-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v1}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v2,v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % pp-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,right=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,right=0.5}{v3,v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1,v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % hh-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,right=0.8}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,right=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmf{fermion,right=0.5}{v2,v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1,v3}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % ph-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1,v3}
+      \end{fmfgraph}
+      \\
+      $S_{9}$ & $S_{10}$ & $S_{11}$ & $S_{12}$ \\
+      \\
+      \begin{fmfgraph}(50,50) % pp-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,right=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,right=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,right=0.5}{v3,v2}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1,v2}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % hh-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,right=0.8}{v3,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,right=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmf{fermion,right=0.5}{v2,v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1,v2}
+      \end{fmfgraph}
+      &
+      \begin{fmfgraph}(50,50) % ph-ladder
+        \fmfstraight
+        \fmfset{arrow_len}{0.25cm}
+        \fmfset{arrow_ang}{15}
+        \fmftop{v1}
+          \fmfbottom{v3}
+          \fmf{fermion,left=0.8}{v3,v1}
+          \fmf{fermion,left=0.8}{v1,v3}
+          \fmf{fermion,left=0.5}{v2,v1}
+          \fmf{fermion,left=0.5}{v1,v2}
+          \fmf{fermion,left=0.5}{v3,v2}
+          \fmf{fermion,left=0.5}{v2,v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=empty}{v3}
+          \fmfv{decor.shape=circle,decor.size=0.2cm,decor.filled=full}{v1,v2}
+      \end{fmfgraph}
+      &\\
+      $S_{13}$ & $S_{14}$ & $S_{15}$ & \\
+  \end{tabular}
+\end{table}
+\end{fmffile}
+
+
+
+\end{document}

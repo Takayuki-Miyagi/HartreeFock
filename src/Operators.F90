@@ -47,6 +47,7 @@ module Operators
 contains
   subroutine FinOp(this)
     class(Op), intent(inout) :: this
+    this%zero = 0.d0
     call this%one%fin()
     call this%two%fin()
     if(.not. this%is_three_body) return
@@ -84,6 +85,7 @@ contains
     if(this%jr == 0 .and. this%pr == 1 .and. this%zr == 0) this%Scalar = .true.
     if(this%jr /= 0 .or.  this%pr /= 1 .or.  this%zr /= 0) this%Scalar = .false.
 
+    this%zero = 0.d0
     call this%one%init(ms%one, this%Scalar, optr, jr, pr, zr)
     call this%two%init(ms%two, this%Scalar, optr, jr, pr, zr)
     if(.not. is_three) then

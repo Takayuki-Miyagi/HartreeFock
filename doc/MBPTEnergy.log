@@ -1,0 +1,17 @@
+This is MetaPost, version 2.00 (TeX Live 2018) (kpathsea version 6.3.0)  31 JAN 2019 16:20
+**MBPTEnergy.mp
+(/usr/local/texlive/2018/texmf-dist/metapost/base/mpost.mp
+(/usr/local/texlive/2018/texmf-dist/metapost/base/plain.mp
+Preloading the plain mem file, version 1.005) ) (./MBPTEnergy.mp
+(/usr/local/texlive/2018/texmf-dist/metapost/feynmf/feynmp.mp)
+feynmf: ignoring option dash_len=0.01cm.
+feynmf: ignoring option dash_len=0.01cm. [1] [2] [3] [4] [5] [6] [7] [8] [9]
+[10] [11] [12] [13] [14] [15] [16] )
+ 
+Here is how much of MetaPost's memory you used:
+ 374 strings using 5090 characters
+ 2267432 bytes of node memory
+ 924 symbolic tokens
+ 14i,77n,28p,111b,3f stack positions out of 16i,96n,32p,200b,4f
+16 output files written: MBPTEnergy.1 .. MBPTEnergy.16
+
