@@ -4,6 +4,11 @@ module WriteOperator
   use Operators
   implicit none
 
+  public :: WriteFiles
+  private :: InitWriteFiles
+  private :: WriteFile
+  private :: SetFileName
+
   type :: WriteFiles
     integer :: emax
     integer :: e2max

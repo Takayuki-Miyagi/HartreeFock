@@ -3,6 +3,23 @@ module HartreeFock
   use Operators
   implicit none
 
+  public :: HFSolver
+
+  private :: FinHFSolver
+  private :: InitHFSolver
+  private :: SolveHFSolver
+  private :: PrintSPEs
+  private :: DiagonalizationFockMatrix
+  private :: SetOccupationMatrix
+  private :: UpdateDensityMatrix
+  private :: UpdateFockMatrix
+  private :: CalcEnergy
+  private :: TransformToHF
+  private :: HFBasisHamiltonian
+  private :: HFBasisScalar
+  !private :: HFBasisTensor ! To do
+
+
   private :: InitMonopole2
   private :: InitMonopole3_sp
   private :: InitMonopole3

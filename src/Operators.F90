@@ -4,6 +4,23 @@ module Operators
   use NOperators
   implicit none
 
+  public :: Op
+
+  private :: FinOp
+  private :: InitOp
+  private :: InitOpFromString
+  private :: SetOperatorFromFile
+  private :: SetOperator
+  private :: PrintOperator
+  private :: CopyOp
+  private :: SumOp
+  private :: SubtractOp
+  private :: ScaleOp
+  private :: NormalOrdering
+  private :: UnNormalOrdering
+  private :: DiscardThreeBodyPart
+  private :: NO2BApproximation
+
   type :: Op
     character(32) :: optr
     real(8) :: zero
