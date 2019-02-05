@@ -56,9 +56,9 @@ module NOperators
   private :: ScaleNBodyPart
 
   private :: NormalOrderingFromSp3To2
-  private :: NormalOrderingFromSp3To2
-  private :: NormalOrderingFromSp2To1
-  private :: NormalOrderingFromSp1To0
+  private :: NormalOrderingFrom3To2
+  private :: NormalOrderingFrom2To1
+  private :: NormalOrderingFrom1To0
 
   ! reading methdos
   ! two-body scalar

@@ -9,7 +9,7 @@ module HartreeFock
   private :: InitHFSolver
   private :: SolveHFSolver
   private :: PrintSPEs
-  private :: DiagonalizationFockMatrix
+  private :: DiagonalizeFockMatrix
   private :: SetOccupationMatrix
   private :: UpdateDensityMatrix
   private :: UpdateFockMatrix
