@@ -51,7 +51,8 @@ program HFMain
   call HF%init(ms,h,alpha=p%alpha)
   call HF%solve(ms%sps,ms%one)
 
-  call HF%PrintSPEs(ms)
+  ! print single-particle energies
+  !call HF%PrintSPEs(ms)
   call HF%TransformToHF(ms,h)
 
   if(p%is_MBPTEnergy) then

@@ -323,17 +323,17 @@ contains
 
     write(*,'(3a)') " Target Nuclide is ", trim(this%Nucl), ", Orbits:"
     write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
-    do i = 1, this%nh
+    do i = 1, this%nh ! print hole states
       l = this%holes(i)
       write(*,'(a10,5i4,f14.6)') '     hole:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
           & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
     end do
 
-    do i = 1, this%np
-      l = this%particles(i)
-      write(*,'(a10,5i4,f14.6)') ' particle:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
-          & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
-    end do
+    !do i = 1, this%np ! print particle states
+    !  l = this%particles(i)
+    !  write(*,'(a10,5i4,f14.6)') ' particle:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
+    !      & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
+    !end do
     write(*,*)
 
     call this%one%init(this%sps)
