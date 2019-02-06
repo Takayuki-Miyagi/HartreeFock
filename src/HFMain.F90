@@ -18,13 +18,28 @@ program HFMain
   type(MBPTEnergy) :: PT
   type(MBPTScalar) :: PTs
   type(WriteFiles) :: w
-  character(256) :: inputfile
+  character(256) :: inputfile='none', conffile='none'
   real(8) :: ti
-  integer :: n, wunit=23
+  integer :: n, istatus, wunit=23
 
   call timer%init()
 
-  call getarg(1,inputfile)
+  select case(command_argument_count())
+  case(0)
+    write(*,'(a)') "This code needs input file!"
+    stop
+  case(1)
+    call get_command_argument(1,inputfile,status=istatus)
+    write(*,'(2a)') "Input file: ", trim(inputfile)
+  case(2)
+    call get_command_argument(1,inputfile,status=istatus)
+    call get_command_argument(2,conffile,status=istatus)
+    write(*,'(4a)') "Input files: ", trim(inputfile), ", ", trim(conffile)
+  case default
+    write(*,'(a)') "Too many arguments!"
+    stop
+  end select
+
   call p%init(inputfile)
   call p%PrintInputParameters()
 
@@ -36,9 +51,11 @@ program HFMain
 
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
-    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
   case default
-    call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
   end select
   call w%init(p%emax, p%e2max)
 

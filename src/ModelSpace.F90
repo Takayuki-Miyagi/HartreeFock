@@ -136,7 +136,9 @@ module ModelSpace
     type(ThreeBodyChannel), allocatable :: jpz(:)
     integer, allocatable :: jpz2ch(:,:,:)
     integer :: NChan
-    integer :: emax, e2max, e3max
+    integer :: emax
+    integer :: e2max
+    integer :: e3max
   contains
     procedure :: init => InitThreeBodySpace
     procedure :: fin => FinThreeBodySpace
@@ -215,15 +217,19 @@ module ModelSpace
     character(:), allocatable :: Nucl
     integer :: A, Z, N
     integer :: np, nh
-    integer :: emax = 0
-    integer :: e2max = 0
-    integer :: e3max = 0
-    integer :: lmax = 0
+    integer :: emax = -1
+    integer :: e2max = -1
+    integer :: e3max = -1
+    integer :: lmax = -1
   contains
     procedure :: fin => FinMSpace
+    procedure :: InitMSpace
     procedure :: InitMSpaceFromReference
     procedure :: InitMSpaceFromAZN
-    generic :: init => InitMSPaceFromReference, InitMSpaceFromAZN
+    procedure :: InitMSpaceFromFile
+    generic :: init => InitMspace, InitMSPaceFromReference, InitMSpaceFromAZN, &
+        & InitMSpaceFromFile
+    procedure :: GetConfFromFile
     procedure :: GetNOCoef
     procedure :: GetParticleHoleOrbits
   end type MSpace
@@ -275,7 +281,7 @@ contains
     integer :: A, Z, N
 
     call GetAZNFromReference(Nucl,A,Z,N)
-    call this%init(A,Z,N,hw,emax,e2max,e3max,lmax,beta)
+    call this%InitMSpaceFromAZN(A,Z,N,hw,emax,e2max,e3max,lmax,beta)
   end subroutine InitMSpaceFromReference
 
   subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax, beta)
@@ -335,26 +341,119 @@ contains
     !      & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
     !end do
     write(*,*)
+    call this%InitMSpace()
+    write(*,*)
+    call timer%countup_memory("Model Space")
+    call timer%Add('Construct Model Space', omp_get_wtime()-ti)
+  end subroutine InitMSpaceFromAZN
 
+  subroutine InitMSpaceFromFile(this, Nucl, filename, hw, emax, e2max, e3max, lmax, beta)
+    use Profiler, only: timer
+    use ClassSys, only: sys
+    class(MSpace), intent(inout) :: this
+    character(*), intent(in) :: Nucl, filename
+    real(8), intent(in) :: hw
+    integer, intent(in) :: emax, e2max
+    integer, intent(in), optional :: lmax, e3max
+    real(8), intent(in), optional :: beta
+    type(sys) :: s
+    integer :: A, Z, N, i, l
+    real(8) :: ti
+
+    ti = omp_get_wtime()
+    call timer%cmemory()
+    write(*,*)
+    write(*,'(a)') "### Model-space constructor ###"
+    this%is_constructed = .true.
+    this%emax = emax
+    this%e2max = e2max
+    this%lmax = emax
+    this%hw = hw
+    if(present(e3max)) this%e3max = e3max
+    if(present(lmax)) this%lmax = lmax
+    if(present(beta)) this%beta = beta
+    write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
+    if(present(e3max)) then
+      write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
+    end if
+    write(*,'(a,i3)') ", lmax=",this%lmax
+    write(*,'(a,f6.2,a)') " hw = ",this%hw, " MeV"
+
+    call this%sps%init(this%emax,this%lmax)
+    call this%GetConfFromFile(filename, A, Z, N)
+    call this%GetParticleHoleOrbits()
+    this%A = A
+    this%Z = Z
+    this%N = N
+    this%Nucl = trim(elements(this%Z+1)) // trim(s%str(this%A))
+    if(Nucl /= this%Nucl) then
+      write(*,'(a)') "Warning: make sure the target nuclide"
+    end if
+    write(*,'(3a)') " Target Nuclide is ", trim(this%Nucl), ", Orbits:"
+    write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
+    do i = 1, this%nh ! print hole states
+      l = this%holes(i)
+      write(*,'(a10,5i4,f14.6)') '     hole:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
+          & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
+    end do
+    write(*,*)
+    call this%InitMSpace()
+    write(*,*)
+
+    call timer%countup_memory("Model Space")
+    call timer%Add('Construct Model Space', omp_get_wtime()-ti)
+  end subroutine InitMSpaceFromFile
+
+  subroutine InitMSpace(this)
+    class(MSpace), intent(inout) :: this
     call this%one%init(this%sps)
     call this%two%init(this%sps, this%e2max)
     write(*,'(a)') "  # of J, parity, and tz Channels:"
     write(*,'(a,i3)') "    OneBody: ", this%one%NChan
     write(*,'(a,i3)') "    TwoBody: ", this%two%NChan
-    if(.not. present(e3max)) then
-      write(*,*)
-      call timer%countup_memory("Model Space")
-      call timer%Add('Construct Model Space', omp_get_wtime()-ti)
-      return
-    end if
+    if(this%e3max == -1) return
     this%is_three_body = .true.
     call this%isps%init(this%emax)
     call this%thr%init(this%isps, this%e2max, this%e3max)
     write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
-    write(*,*)
-    call timer%countup_memory("Model Space")
-    call timer%Add('Construct Model Space', omp_get_wtime()-ti)
-  end subroutine InitMSpaceFromAZN
+  end subroutine InitMSpace
+
+  subroutine GetConfFromFile(this, filename, A, Z, N)
+    use CommonLibrary, only: skip_comment
+    class(MSpace), intent(inout) :: this
+    character(*), intent(in) :: filename
+    integer, intent(out) :: A, Z, N
+    integer :: nn, ll, jj, zz, idx, occ_num
+    integer :: runit=20
+
+    Z = 0
+    N = 0
+    allocate(this%NOCoef(this%sps%norbs))
+    this%NOCoef(:) = 0.d0
+    open(runit, file=filename, status='old', action='read')
+    call skip_comment(runit, '!')
+    do
+      read(runit,*,end=999) nn, ll, jj, zz, occ_num
+      idx = this%sps%nljz2idx(nn,ll,jj,zz)
+      this%NOcoef(idx) = dble(occ_num)/dble(jj+1)
+      if(zz == -1) Z = Z + occ_num
+      if(zz ==  1) N = N + occ_num
+    end do
+999 close(runit)
+    A = Z + N
+
+    do idx = 1, this%sps%norbs
+      call this%sps%orb(idx)%SetOccupation(this%NOcoef(idx))
+      if(this%NOcoef(idx) < 1.d-6) then
+        call this%sps%orb(idx)%SetParticleHole(1)
+      elseif(abs(1.d0 - this%NOCoef(idx)) < 1.d-6) then
+        call this%sps%orb(idx)%SetParticleHole(0)
+      else
+        call this%sps%orb(idx)%SetParticleHole(2)
+      end if
+    end do
+
+  end subroutine GetConfFromFile
 
   subroutine GetNOCoef(this)
     ! This should be called after obtaining A, Z, N
