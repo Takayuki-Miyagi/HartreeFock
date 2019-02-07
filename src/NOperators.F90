@@ -2280,8 +2280,8 @@ contains
     call isps%init(this%emax2, this%lmax2)
     open(runit, file=this%file_nn, action='read',iostat=io)
     read(runit, *) nlines, emax_in, e2max_in, hw_in, lambda_in
-    if(emax_in /= this%emax2) write(*,'(a)') "Warning: file emax doesn't mutch"
-    if(e2max_in /= this%e2max2) write(*,'(a)') "Warning: file e2max doesn't mutch"
+    if(emax_in /= this%emax2 ) write(*,'(a)') "Warning: file emax doesn't match"
+    if(e2max_in/= this%e2max2) write(*,'(a)') "Warning: file e2max doesn't match"
     do iline = 1, nlines
       read(runit,*) a, b, c, d, J, T, trel, horel, vcoul, vpn, vpp, vnn
       if(J > min(2*sps%lmax+1, ms%e2max+1)) exit

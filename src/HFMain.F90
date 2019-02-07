@@ -78,8 +78,9 @@ program HFMain
     call p%PrintInputParameters(wunit)
     write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
     write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
-    if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0) then
-      write(wunit,'(a)') "# MBPT might be dengerous: "
+    write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
+    if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0 .or. PT%energy_gap < 0.d0) then
+      write(wunit,'(a)') "# MBPT might be dengerous! "
     end if
     write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
         & "# Operator", "HF energy", "2nd order", "3rd order", "Total"

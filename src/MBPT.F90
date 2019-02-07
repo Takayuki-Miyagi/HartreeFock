@@ -41,6 +41,7 @@ module MBPT
     real(8) :: e_3_ph = 0.d0
     real(8) :: perturbativity1b = 0.d0
     real(8) :: perturbativity2b = 0.d0
+    real(8) :: energy_gap = 0.d0
   contains
     procedure :: calc => CalcEnergyCorr
     procedure :: energy_second
@@ -495,10 +496,27 @@ contains
     type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
     type(SingleParticleOrbit) :: oa, oi
-    real(8) :: max_denom1b, max_denom2b, max_val, max_v
+    real(8) :: max_denom1b, max_denom2b, max_val, max_v, lowest_particle, highest_hole
 
-    max_denom1b = 0.d0
     norbs = ms%sps%norbs
+
+    lowest_particle = 100.d0
+    do a = 1, norbs
+      oa = ms%sps%get(a)
+      if( oa%ph /= 1 ) cycle
+      lowest_particle = min(lowest_particle, h%one%GetOBME(ms%sps,ms%one,a,a))
+    end do
+
+    highest_hole = -100.d0
+    do a = 1, norbs
+      oa = ms%sps%get(a)
+      if( oa%ph /= 0 ) cycle
+      highest_hole = max(highest_hole, h%one%GetOBME(ms%sps,ms%one,a,a))
+    end do
+    this%energy_gap = lowest_particle - highest_hole
+
+    ! -- check HF condition, max_denom1b should be 0
+    max_denom1b = 0.d0
     do a = 1, norbs
       oa = ms%sps%get(a)
       if( oa%ph /= 1 ) cycle
@@ -540,8 +558,9 @@ contains
 
     write(*,'(a,f12.6)') " max(h / |e_h1 - e_p1|)               = ", max_denom1b
     write(*,'(a,f12.6)') " max(v / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
+    write(*,'(a,f12.6)') " min( e_p ) - max( e_h ) = ", this%energy_gap
     !write(*,'(a,f12.6)') " max(|v|) = ", max_v
-    if(max(max_denom2b,max_denom1b) > 1.d0) then
+    if(max(max_denom2b,max_denom1b) > 1.d0 .or. this%energy_gap < 0.d0) then
       write(*,'(a)') "Warning: MBPT might be dengerous!"
     end if
     this%perturbativity1b = max_denom1b
