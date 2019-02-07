@@ -2210,9 +2210,56 @@ contains
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: isps
+    integer :: io, runit = 22
+    integer :: a, b, c, d, J, T
+    integer :: ap, bp, cp, dp
+    integer :: an, bn, cn, dn
+    integer :: iline, nlines
+    real(8) :: trel, horel, vcoul, vpn, vpp, vnn, fact
 
-    write(*,*) "reading this format has not been implemented yet."
-    return
+
+    call isps%init(this%emax2, this%lmax2)
+    open(runit, file=this%file_nn, action='read',iostat=io)
+    read(runit, *) nlines
+    do iline = 1, nlines
+      read(runit,*) a, b, c, d, J, T, trel, horel, vcoul, vpn, vpp, vnn
+      if(J > min(2*sps%lmax+1, ms%e2max+1)) exit
+      if(a > isps%norbs) cycle
+      if(b > isps%norbs) cycle
+      if(c > isps%norbs) cycle
+      if(d > isps%norbs) cycle
+      if(isps%orb(a)%e + isps%orb(b)%e > ms%e2max) cycle
+      if(isps%orb(c)%e + isps%orb(d)%e > ms%e2max) cycle
+      ap = isps%iso2pn(sps,a,-1)
+      an = isps%iso2pn(sps,a, 1)
+      bp = isps%iso2pn(sps,b,-1)
+      bn = isps%iso2pn(sps,b, 1)
+      cp = isps%iso2pn(sps,c,-1)
+      cn = isps%iso2pn(sps,c, 1)
+      dp = isps%iso2pn(sps,d,-1)
+      dn = isps%iso2pn(sps,d, 1)
+      fact = 1.d0
+      if(a == b) fact = fact / dsqrt(2.d0)
+      if(c == d) fact = fact / dsqrt(2.d0)
+      if(T==1) then
+        call two%SetTwBME(sps,ms,ap,bp,cp,dp,J,vpp)
+        call two%SetTwBME(sps,ms,an,bn,cn,dn,J,vnn)
+        call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,fact*vpn)
+        if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,fact*vpn)
+        if(a/=b .and. c/=d) call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
+        if(a/=b .and. (a/=c .or. b/=d)) call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,fact*vpn)
+      end if
+
+      if(T==0) then
+        call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,fact*vpn)
+        if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,-fact*vpn)
+        if(a/=b .and. c/=d) call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
+        if(a/=b .and. (a/=c .or. b/=d)) call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,-fact*vpn)
+      end if
+
+    end do
+    close(runit)
   end subroutine read_scalar_nv_txt
 
   !

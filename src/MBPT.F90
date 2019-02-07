@@ -495,7 +495,7 @@ contains
     type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
     type(SingleParticleOrbit) :: oa, oi
-    real(8) :: max_denom1b, max_denom2b, max_val
+    real(8) :: max_denom1b, max_denom2b, max_val, max_v
 
     max_denom1b = 0.d0
     norbs = ms%sps%norbs
@@ -510,6 +510,7 @@ contains
     end do
 
     max_denom2b = 0.d0
+    max_v = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%nst
@@ -533,11 +534,13 @@ contains
       end do
       !$omp end do
       !$omp end parallel
+      max_v = max(max_v, maxval(abs(h%two%MatCh(ch,ch)%m)))
       max_denom2b = max(max_denom2b, max_val)
     end do
 
     write(*,'(a,f12.6)') " max(h / |e_h1 - e_p1|)               = ", max_denom1b
     write(*,'(a,f12.6)') " max(v / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
+    !write(*,'(a,f12.6)') " max(|v|) = ", max_v
     if(max(max_denom2b,max_denom1b) > 1.d0) then
       write(*,'(a)') "Warning: MBPT might be dengerous!"
     end if
