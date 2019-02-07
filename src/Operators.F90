@@ -184,28 +184,17 @@ contains
     if(file_nn == 'none' .and. file_3n == 'none') return
 
     write(*,'(3a)') "Set ", trim(this%optr), " operator from files"
+    call rd%set(file_nn, file_3n)
     ! -- boundary for two-body file
-    rd%file_nn = file_nn
-    rd%emax2 = ms%emax
-    rd%e2max2 = ms%e2max
-    rd%lmax2 = ms%lmax
+    call rd%set(ms%emax, ms%e2max, ms%lmax)
     if(present(bound_2b_file)) then
-      rd%emax2 = bound_2b_file(1)
-      rd%e2max2= bound_2b_file(2)
-      rd%lmax2 = bound_2b_file(3)
+    call rd%set(bound_2b_file(1), bound_2b_file(2), bound_2b_file(3))
     end if
 
     ! -- boundary for three-body file
-    rd%file_3n = file_3n
-    rd%emax3 = ms%emax
-    rd%e2max3 = ms%e2max
-    rd%e3max3 = ms%e3max
-    rd%lmax3 = ms%lmax
+    call rd%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
     if(present(bound_3b_file)) then
-      rd%emax3 = bound_3b_file(1)
-      rd%e2max3= bound_3b_file(2)
-      rd%e3max3= bound_3b_file(3)
-      rd%lmax3 = bound_3b_file(4)
+    call rd%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
     end if
 
     call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)

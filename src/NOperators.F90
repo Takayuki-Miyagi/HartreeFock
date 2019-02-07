@@ -61,24 +61,27 @@ module NOperators
   private :: NormalOrderingFrom1To0
 
   ! reading methdos
+  private :: SetReadFiles ! setter
+  private :: SetReadFiles2Boundaries ! setter
+  private :: SetReadFiles3Boundaries ! setter
   ! two-body scalar
   private :: ReadScalar2BFile
-  private :: read_scalar_me2j_txt
+  private :: read_scalar_me2j_ascii
   private :: read_scalar_me2j_bin
   private :: count_scalar_me2j
   private :: get_vector_me2j_formatted
-  private :: read_scalar_myg_txt
+  private :: read_scalar_myg_ascii
   private :: read_Scalar_myg_bin
-  private :: read_scalar_snt_txt
-  private :: read_scalar_nv_txt
+  private :: read_scalar_snt_ascii
+  private :: read_scalar_navratil_ascii
   ! two-body tensor
   private :: ReadTensor2BFile
   ! three-body scalar
   private :: ReadScalar3BFile
-  private :: read_scalar_3bme_txt
+  private :: read_scalar_3bme_ascii
   private :: read_scalar_3bme_bin
   private :: ReadScalar3BFileSp
-  private :: read_scalar_3bme_txt_sp
+  private :: read_scalar_3bme_ascii_sp
   private :: read_scalar_3bme_bin_sp
   private :: read_scalar_3bme_bin_stream_sp
   private :: read_scalar_3bme_bin_comp_sp
@@ -87,10 +90,10 @@ module NOperators
   private :: store_scalar_3bme_sp
   ! three-body tensor
   private :: ReadTensor3BFile
-  private :: read_tensor_3bme_txt
+  private :: read_tensor_3bme_ascii
   private :: read_tensor_3bme_bin
   private :: ReadTensor3BFileSp
-  private :: read_tensor_3bme_txt_sp
+  private :: read_tensor_3bme_ascii_sp
   private :: read_tensor_3bme_bin_sp
 
 
@@ -197,31 +200,36 @@ module NOperators
 
   type :: ReadFiles
     character(:), allocatable :: file_nn, file_3n
-    integer :: emax2, e2max2, lmax2
-    integer :: emax3, e2max3, e3max3, lmax3
+    integer :: emax2=-1, e2max2=-1, lmax2=-1
+    integer :: emax3=-1, e2max3=-1, e3max3=-1, lmax3=-1
   contains
+    procedure :: SetReadFiles ! setter
+    procedure :: SetReadFiles2Boundaries ! setter
+    procedure :: SetReadFiles3Boundaries ! setter
+    generic :: set => SetReadFiles, SetReadFiles2Boundaries, &
+        & SetReadFiles3Boundaries
     ! methods for two-body matrix element
     procedure :: ReadScalar2BFile
     procedure :: ReadTensor2BFile
-    procedure :: read_scalar_me2j_txt
+    procedure :: read_scalar_me2j_ascii
     procedure :: read_scalar_me2j_bin
-    procedure :: read_scalar_myg_txt
+    procedure :: read_scalar_myg_ascii
     procedure :: read_scalar_myg_bin
-    procedure :: read_scalar_snt_txt
-    procedure :: read_scalar_nv_txt
+    procedure :: read_scalar_snt_ascii
+    procedure :: read_scalar_navratil_ascii
 
     ! methods for three-body marix element
     procedure :: ReadScalar3BFile
     procedure :: ReadScalar3BFileSp
     procedure :: ReadTensor3BFile
     procedure :: ReadTensor3BFileSp
-    procedure :: read_scalar_3bme_txt
+    procedure :: read_scalar_3bme_ascii
     procedure :: read_scalar_3bme_bin
-    procedure :: read_scalar_3bme_txt_sp
+    procedure :: read_scalar_3bme_ascii_sp
     procedure :: read_scalar_3bme_bin_sp
-    procedure :: read_tensor_3bme_txt
+    procedure :: read_tensor_3bme_ascii
     procedure :: read_tensor_3bme_bin
-    procedure :: read_tensor_3bme_txt_sp
+    procedure :: read_tensor_3bme_ascii_sp
     procedure :: read_tensor_3bme_bin_sp
     procedure :: read_scalar_3bme_bin_stream_sp
     procedure :: read_scalar_3bme_bin_comp_sp
@@ -1711,6 +1719,53 @@ contains
   !     File reading methods
   !
   !
+  subroutine SetReadFiles(this, file_nn, file_3n)
+    use ClassSys, only: sys
+    class(ReadFiles), intent(inout) :: this
+    character(*), intent(in), optional :: file_nn, file_3n
+    type(sys) :: s
+    logical :: ex
+
+    ! -- two-body file
+    this%file_nn = 'none'
+    if(present(file_nn)) this%file_nn = file_nn
+    select case(this%file_nn)
+    case("NONE", "none", "None")
+    case default
+      ex = s%isfile(this%file_nn, "SetReadFiles: two-body file")
+    end select
+
+    ! -- three-body file
+    this%file_3n = 'none'
+    if(present(file_3n)) this%file_3n = file_3n
+    select case(this%file_3n)
+    case("NONE", "none", "None")
+    case default
+      ex = s%isfile(this%file_3n, "SetReadFiles: three-body file")
+    end select
+
+  end subroutine SetReadFiles
+
+  subroutine SetReadFiles2Boundaries(this, emax, e2max, lmax)
+    class(ReadFiles), intent(inout) :: this
+    integer, intent(in) :: emax, e2max, lmax
+
+    this%emax2 = emax
+    this%e2max2= e2max
+    this%lmax2 = lmax
+
+  end subroutine SetReadFiles2Boundaries
+
+  subroutine SetReadFiles3Boundaries(this, emax, e2max, e3max, lmax)
+    class(ReadFiles), intent(inout) :: this
+    integer, intent(in) :: emax, e2max, e3max, lmax
+
+    ! -- boundary for three-body file
+    this%emax3 = emax
+    this%e2max3= e2max
+    this%e3max3= e3max
+    this%lmax3 = lmax
+  end subroutine SetReadFiles3Boundaries
 
   subroutine ReadTwoBodyFile(this, sps, ms, rd)
     use Profiler, only: timer
@@ -1745,7 +1800,7 @@ contains
     type(sys) :: s
 
     if(s%find(this%file_nn, '.txt') .and. s%find(this%file_nn, '.me2j')) then
-      call this%read_scalar_me2j_txt(two,sps,ms)
+      call this%read_scalar_me2j_ascii(two,sps,ms)
       return
     end if
 
@@ -1755,7 +1810,7 @@ contains
     end if
 
     if(s%find(this%file_nn, '.txt') .and. s%find(this%file_nn, '.myg')) then
-      call this%read_scalar_myg_txt(two,sps,ms)
+      call this%read_scalar_myg_ascii(two,sps,ms)
       return
     end if
 
@@ -1765,17 +1820,18 @@ contains
     end if
 
     if(s%find(this%file_nn, '.txt') .and. s%find(this%file_nn, '.snt')) then
-      call this%read_scalar_snt_txt(two,sps,ms)
+      call this%read_scalar_snt_ascii(two,sps,ms)
       return
     end if
 
-    if(s%find(this%file_nn, '.txt') .and. s%find(this%file_nn, '.nv')) then
-      call this%read_scalar_nv_txt(two,sps,ms)
+    if(s%find(this%file_nn, 'TBMEA2')) then
+      call this%read_scalar_navratil_ascii(two,sps,ms)
       return
     end if
+    write(*,*) "In ReadScalar2BFile, file format cannot be detected."
   end subroutine ReadScalar2BFile
 
-  subroutine read_scalar_me2j_txt(this,two,sps,ms)
+  subroutine read_scalar_me2j_ascii(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
@@ -1893,7 +1949,7 @@ contains
     deallocate(v)
     call sps_me2j%fin()
     return
-  end subroutine read_scalar_me2j_txt
+  end subroutine read_scalar_me2j_ascii
 
   subroutine me2j_read_warning(a,b,c,d,J,me)
     integer, intent(in) :: a, b, c, d, J
@@ -2079,7 +2135,7 @@ contains
     read(ut,*) v(lines*10+1:nelm)
   end subroutine get_vector_me2j_formatted
 
-  subroutine read_scalar_myg_txt(this,two,sps,ms)
+  subroutine read_scalar_myg_ascii(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
@@ -2109,7 +2165,7 @@ contains
       call two%SetTwBME(sps,ms,a,b,c,d,J,me)
     end do
     close(runit)
-  end subroutine read_scalar_myg_txt
+  end subroutine read_scalar_myg_ascii
 
   subroutine read_scalar_myg_bin(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this
@@ -2151,7 +2207,7 @@ contains
     !$omp end parallel
   end subroutine read_scalar_myg_bin
 
-  subroutine read_scalar_snt_txt(this,two,sps,ms)
+  subroutine read_scalar_snt_ascii(this,two,sps,ms)
     use CommonLibrary, only: skip_comment
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
@@ -2203,9 +2259,9 @@ contains
       call two%SetTwBME(sps,ms,ia,ib,ic,id,J,me)
     end do
     close(runit)
-  end subroutine read_scalar_snt_txt
+  end subroutine read_scalar_snt_ascii
 
-  subroutine read_scalar_nv_txt(this,two,sps,ms)
+  subroutine read_scalar_navratil_ascii(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
@@ -2217,18 +2273,22 @@ contains
     integer :: an, bn, cn, dn
     integer :: iline, nlines
     real(8) :: trel, horel, vcoul, vpn, vpp, vnn, fact
+    integer :: emax_in, e2max_in
+    real(8) :: hw_in, lambda_in
 
 
     call isps%init(this%emax2, this%lmax2)
     open(runit, file=this%file_nn, action='read',iostat=io)
-    read(runit, *) nlines
+    read(runit, *) nlines, emax_in, e2max_in, hw_in, lambda_in
+    if(emax_in /= this%emax2) write(*,'(a)') "Warning: file emax doesn't mutch"
+    if(e2max_in /= this%e2max2) write(*,'(a)') "Warning: file e2max doesn't mutch"
     do iline = 1, nlines
       read(runit,*) a, b, c, d, J, T, trel, horel, vcoul, vpn, vpp, vnn
       if(J > min(2*sps%lmax+1, ms%e2max+1)) exit
-      if(a > isps%norbs) cycle
-      if(b > isps%norbs) cycle
-      if(c > isps%norbs) cycle
-      if(d > isps%norbs) cycle
+      if(isps%orb(a)%e > ms%emax) cycle
+      if(isps%orb(b)%e > ms%emax) cycle
+      if(isps%orb(c)%e > ms%emax) cycle
+      if(isps%orb(d)%e > ms%emax) cycle
       if(isps%orb(a)%e + isps%orb(b)%e > ms%e2max) cycle
       if(isps%orb(c)%e + isps%orb(d)%e > ms%e2max) cycle
       ap = isps%iso2pn(sps,a,-1)
@@ -2240,27 +2300,31 @@ contains
       dp = isps%iso2pn(sps,d,-1)
       dn = isps%iso2pn(sps,d, 1)
       fact = 1.d0
-      if(a == b) fact = fact / dsqrt(2.d0)
-      if(c == d) fact = fact / dsqrt(2.d0)
+      if(a/=b) fact = fact / dsqrt(2.d0)
+      if(c/=d) fact = fact / dsqrt(2.d0)
+
       if(T==1) then
         call two%SetTwBME(sps,ms,ap,bp,cp,dp,J,vpp)
         call two%SetTwBME(sps,ms,an,bn,cn,dn,J,vnn)
         call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,fact*vpn)
         if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,fact*vpn)
-        if(a/=b .and. c/=d) call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
-        if(a/=b .and. (a/=c .or. b/=d)) call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,fact*vpn)
+        if(a/=b .and. c/=d) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
+        if(a/=b .and. (a/=c .or. b/=d)) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,fact*vpn)
       end if
 
       if(T==0) then
         call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,fact*vpn)
         if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,-fact*vpn)
-        if(a/=b .and. c/=d) call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
-        if(a/=b .and. (a/=c .or. b/=d)) call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,-fact*vpn)
+        if(a/=b .and. c/=d) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
+        if(a/=b .and. (a/=c .or. b/=d)) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,-fact*vpn)
       end if
-
     end do
     close(runit)
-  end subroutine read_scalar_nv_txt
+  end subroutine read_scalar_navratil_ascii
 
   !
   !
@@ -2341,7 +2405,7 @@ contains
 
     write(*,*) trim(this%file_3n)
     if(s%find(this%file_3n,'.txt')) then
-      call this%read_scalar_3bme_txt(thr,sps,ms)
+      call this%read_scalar_3bme_ascii(thr,sps,ms)
       return
     end if
 
@@ -2351,7 +2415,7 @@ contains
     end if
   end subroutine ReadScalar3BFile
 
-  subroutine read_scalar_3bme_txt(this,thr,sps,ms)
+  subroutine read_scalar_3bme_ascii(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: thr
     type(OrbitsIsospin), intent(in) :: sps
@@ -2377,7 +2441,7 @@ contains
 
     deallocate(v)
     call spsf%fin()
-  end subroutine read_scalar_3bme_txt
+  end subroutine read_scalar_3bme_ascii
 
   subroutine read_scalar_3bme_bin(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
@@ -2416,7 +2480,7 @@ contains
     type(sys) :: s
 
     if(s%find(this%file_3n,'.txt')) then
-      call this%read_scalar_3bme_txt_sp(thr,sps,ms)
+      call this%read_scalar_3bme_ascii_sp(thr,sps,ms)
       return
     end if
 
@@ -2437,7 +2501,7 @@ contains
 
   end subroutine ReadScalar3BFileSp
 
-  subroutine read_scalar_3bme_txt_sp(this,thr,sps,ms)
+  subroutine read_scalar_3bme_ascii_sp(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPartSp), intent(inout) :: thr
     type(OrbitsIsospin), intent(in) :: sps
@@ -2466,7 +2530,7 @@ contains
 
     deallocate(v)
     call spsf%fin()
-  end subroutine read_scalar_3bme_txt_sp
+  end subroutine read_scalar_3bme_ascii_sp
 
   subroutine read_scalar_3bme_bin_sp(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
@@ -2936,7 +3000,7 @@ contains
     type(sys) :: s
 
     if(s%find(this%file_3n,'.txt')) then
-      call this%read_tensor_3bme_txt(thr,sps,ms)
+      call this%read_tensor_3bme_ascii(thr,sps,ms)
       return
     end if
 
@@ -2946,14 +3010,14 @@ contains
     end if
   end subroutine ReadTensor3BFile
 
-  subroutine read_tensor_3bme_txt(this,thr,sps,ms)
+  subroutine read_tensor_3bme_ascii(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: thr
     type(OrbitsIsospin), intent(in) :: sps
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     write(*,*) "reading tensor is not ready"
     return
-  end subroutine read_tensor_3bme_txt
+  end subroutine read_tensor_3bme_ascii
 
   subroutine read_tensor_3bme_bin(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
@@ -2972,7 +3036,7 @@ contains
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     type(sys) :: s
     if(s%find(this%file_3n,'.txt')) then
-      call this%read_tensor_3bme_txt_sp(thr,sps,ms)
+      call this%read_tensor_3bme_ascii_sp(thr,sps,ms)
       return
     end if
 
@@ -2982,14 +3046,14 @@ contains
     end if
   end subroutine ReadTensor3BFileSp
 
-  subroutine read_tensor_3bme_txt_sp(this,thr,sps,ms)
+  subroutine read_tensor_3bme_ascii_sp(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
     type(NBodyPartSp), intent(inout) :: thr
     type(OrbitsIsospin), intent(in) :: sps
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     write(*,*) "reading tensor is not ready"
     return
-  end subroutine read_tensor_3bme_txt_sp
+  end subroutine read_tensor_3bme_ascii_sp
 
   subroutine read_tensor_3bme_bin_sp(this,thr,sps,ms)
     class(ReadFiles), intent(in) :: this
