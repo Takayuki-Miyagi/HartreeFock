@@ -25,14 +25,15 @@ module Operators
     character(32) :: optr
     real(8) :: zero
     type(NBodyPart) :: one, two
-!#ifdef single_precision
-    type(NBodyPartSp) :: thr
-!#else
-!    type(NBodyPart) :: thr
-!#endif
+#ifdef single_precision
+    type(NBodyPartSp) :: thr21, thr
+#else
+    type(NBodyPart) :: thr21, thr
+#endif
     logical :: is_normal_ordered = .false.
     logical :: Scalar
     logical :: is_three_body = .false.
+    logical :: is_orth_three_body = .false.
     integer :: jr, pr, zr
   contains
     procedure :: fin => FinOp
@@ -99,6 +100,7 @@ contains
     this%pr = pr
     this%zr = zr
     this%optr = optr
+    this%is_orth_three_body = ms%is_orth_three_body
     if(this%jr == 0 .and. this%pr == 1 .and. this%zr == 0) this%Scalar = .true.
     if(this%jr /= 0 .or.  this%pr /= 1 .or.  this%zr /= 0) this%Scalar = .false.
 
@@ -111,7 +113,10 @@ contains
       return
     end if
     this%is_three_body = .true.
-    call this%thr%init(ms%thr, this%Scalar, optr, jr, pr, zr)
+    call this%thr21%init(ms%thr21, this%Scalar, optr, jr, pr, zr)
+    if(this%is_orth_three_body) then
+      call this%thr%init(ms%thr, this%Scalar, optr, jr, pr, zr)
+    end if
 
     call timer%countup_memory(trim(optr))
     call timer%Add('Construct '//trim(optr), omp_get_wtime()-ti)
@@ -202,7 +207,11 @@ contains
     call this%two%ReadFile(ms%sps, ms%two, rd)
     if(this%is_three_body) then
       write(*,'(2a)') "3B file: ", trim(file_3n)
-      call this%thr%ReadFile(ms%isps,ms%thr, rd)
+      call this%thr21%ReadFile(ms%isps, ms%thr21, rd)
+    end if
+
+    if(this%is_three_body .and. this%is_orth_three_body) then
+      call this%thr%TransToOrthogonal(this%thr21, ms)
     end if
 
     select case(this%optr)
@@ -284,11 +293,11 @@ contains
     end if
 
     if(this%is_three_body) then
-!#ifdef single_precision
-      op2from3 = this%thr%NormalOrderingFromSp3To2(ms)
-!#else
-!      op2from3 = this%thr%NormalOrderingFrom3To2(ms)
-!#endif
+#ifdef single_precision
+      op2from3 = this%thr21%NormalOrderingFromSp3To2(ms)
+#else
+      op2from3 = this%thr21%NormalOrderingFrom3To2(ms)
+#endif
     end if
 
     op1from3 = op2from3%NormalOrderingFrom2To1(ms)

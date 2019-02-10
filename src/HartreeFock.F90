@@ -138,11 +138,11 @@ contains
 
       ti = omp_get_wtime()
       call timer%cmemory()
-!#ifdef single_precision
-      call this%V3%InitMonopole3_sp(ms, hamil%thr)
-!#else
-!      call this%V3%InitMonopole3(ms, hamil%thr)
-!#endif
+#ifdef single_precision
+      call this%V3%InitMonopole3_sp(ms, hamil%thr21)
+#else
+      call this%V3%InitMonopole3(ms, hamil%thr21)
+#endif
       call timer%countup_memory('Monople 3Body int.')
       call timer%Add("Construct Monopole 3Body int.", omp_get_wtime() - ti)
     end if

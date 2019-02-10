@@ -61,7 +61,7 @@ module NOperators
   private :: NormalOrderingFrom1To0
 
   ! reading methdos
-  private :: SetReadFiles ! setter
+  private :: SetReadFiles            ! setter
   private :: SetReadFiles2Boundaries ! setter
   private :: SetReadFiles3Boundaries ! setter
   ! two-body scalar
@@ -100,6 +100,8 @@ module NOperators
   type, extends(SMat) :: NBodyChannelSp
     integer :: ndims(2)
     logical :: is = .false.
+  contains
+    procedure :: TransToOrthogonalChannel => TransToOrthogoanlChannel_sp
   end type NBodyChannelSp
 
   type :: NBodyPartSp
@@ -110,7 +112,9 @@ module NOperators
     integer :: jr, pr, tr, zr
   contains
     procedure :: fin => FinNbodyPartSp
-    procedure :: init => InitNonOrthIsospinThreebodyPartSp
+    procedure :: InitNonOrthIsospinThreeBodyPartSp
+    procedure :: InitThreeBodyPartSp
+    generic :: init => InitNonOrthIsospinThreeBodyPartSp, InitThreeBodyPartSp
 
     procedure :: GetThBMEpn_scalar_Sp
     procedure :: GetThBMEIso_scalar_Sp
@@ -130,6 +134,7 @@ module NOperators
     generic :: operator(*) => ScaleNBodyPartSp
 
     procedure :: NormalOrderingFromSp3To2
+    procedure :: TransToOrthogonal => TransToOrthogonal_sp
   end type NBodyPartSp
 
   type, extends(DMat) :: NBodyChannel
@@ -139,6 +144,7 @@ module NOperators
     procedure :: SetOneBodyChannel
     procedure :: SetTwoBodyChannel
     generic :: set => SetOneBodyChannel, setTwoBodyChannel
+    procedure :: TransToOrthogonalChannel => TransToOrthogoanlChannel_dp
   end type NBodyChannel
 
   type :: NBodyPart
@@ -150,9 +156,9 @@ module NOperators
   contains
     procedure :: fin => FinNbodyPart
 
-    procedure :: InitOnebodyPart
-    procedure :: InitTwobodyPart
-    procedure :: InitThreebodyPart
+    procedure :: InitOneBodyPart
+    procedure :: InitTwoBodyPart
+    procedure :: InitThreeBodyPart
     procedure :: InitNonOrthIsospinThreebodyPart
     generic :: init => InitOneBodyPart, InitTwoBodyPart, InitThreeBodyPart, &
         & InitNonOrthIsospinThreeBodyPart
@@ -174,6 +180,7 @@ module NOperators
     procedure :: GetThBMEIso_general
     generic :: GetThBME => GetThBMEpn_scalar, GetThBMEIso_scalar, &
         & GetThBMEIso_general, GetThBMEpn_general
+    procedure :: TransToOrthogonal => TransToOrthogonal_dp
 
     procedure :: ReadTwoBodyFile
     procedure :: ReadIsospinThreeBodyFile
@@ -474,6 +481,49 @@ contains
       end do
     end do
   end subroutine InitNonOrthIsospinThreeBodyPartSp
+
+  subroutine InitThreeBodyPartSp(this, thr, Scalar, optr, jr, pr, zr)
+    use CommonLibrary, only: triag
+    class(NBodyPartSp), intent(inout) :: this
+    type(ThreeBodySpace), intent(in) :: thr
+    logical, intent(in) :: Scalar
+    character(*), intent(in) :: optr
+    integer, intent(in) :: jr, pr, zr
+    integer :: chbra, chket
+    integer :: jbra, pbra, zbra, nbra
+    integer :: jket, pket, zket, nket
+
+    this%optr = optr
+    this%Scalar = Scalar
+    this%jr = jr
+    this%pr = pr
+    this%tr = 0
+    this%zr = zr
+    this%NChan = thr%NChan
+
+    allocate(this%MatCh(this%NChan,this%NChan))
+
+    do chbra = 1, this%NChan
+      jbra = thr%jpz(chbra)%j
+      pbra = thr%jpz(chbra)%p
+      zbra = thr%jpz(chbra)%z
+      nbra = thr%jpz(chbra)%nst
+      do chket = 1, this%NChan
+        jket = thr%jpz(chket)%j
+        pket = thr%jpz(chket)%p
+        zket = thr%jpz(chket)%z
+        nket = thr%jpz(chket)%nst
+
+        if(triag(jbra, jket, 2*jr)) cycle
+        if(pbra * pket * pr /= 1) cycle
+        if(zbra - 2*zr - zket /= 0) cycle
+        this%MatCh(chbra,chket)%is = .true.
+        this%MatCh(chbra,chket)%ndims = [nbra,nket]
+        call this%MatCh(chbra,chket)%zeros(nbra,nket)
+      end do
+    end do
+
+  end subroutine InitThreeBodyPartSp
 
   subroutine CopyNBodyPartSp(a, b)
     class(NBodyPartSp), intent(inout) :: a
@@ -1062,10 +1112,10 @@ contains
         if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
-          ch = ms%thr%jpt2ch(J,P,T)
+          ch = ms%thr21%jpt2ch(J,P,T)
           if(ch == 0) cycle
           r = r + &
-              & this%GetThBME(ms%isps,ms%thr,a,b,c,J12,T12,&
+              & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
               & d,e,f,J45,T45,J,T) * &
               & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
               & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
@@ -1116,11 +1166,11 @@ contains
             if(abs(Zbra) > Tbra) cycle
           do Tket = abs(2*T45-1), 2*T45+1, 2
             if(abs(Zket) > Tket) cycle
-            chbra = ms%thr%jpt2ch(Jbra,Pbra,Tbra)
-            chket = ms%thr%jpt2ch(Jket,Pket,Tket)
+            chbra = ms%thr21%jpt2ch(Jbra,Pbra,Tbra)
+            chket = ms%thr21%jpt2ch(Jket,Pket,Tket)
             if(chbra*chket == 0) cycle
             r = r + &
-                & this%GetThBME(ms%isps,ms%thr,a,b,c,J12,T12,&
+                & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
                 & d,e,f,J45,T45,Jbra,Jket,Tbra,Tket) * &
                 & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,Tbra,Zbra) * &
                 & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,Tket,Zket)
@@ -1259,10 +1309,10 @@ contains
         if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
-          ch = ms%thr%jpt2ch(J,P,T)
+          ch = ms%thr21%jpt2ch(J,P,T)
           if(ch == 0) cycle
           r = r + &
-              & this%GetThBME(ms%isps,ms%thr,a,b,c,J12,T12,&
+              & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
               & d,e,f,J45,T45,J,T) * &
               & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
               & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
@@ -1314,11 +1364,11 @@ contains
             if(abs(Zbra) > Tbra) cycle
           do Tket = abs(2*T45-1), 2*T45+1, 2
             if(abs(Zket) > Tket) cycle
-            chbra = ms%thr%jpt2ch(Jbra,Pbra,Tbra)
-            chket = ms%thr%jpt2ch(Jket,Pket,Tket)
+            chbra = ms%thr21%jpt2ch(Jbra,Pbra,Tbra)
+            chket = ms%thr21%jpt2ch(Jket,Pket,Tket)
             if(chbra*chket == 0) cycle
             r = r + &
-                & this%GetThBME(ms%isps,ms%thr,a,b,c,J12,T12,&
+                & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
                 & d,e,f,J45,T45,Jbra,Jket,Tbra,Tket) * &
                 & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,Tbra,Zbra) * &
                 & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,Tket,Zket)
@@ -1327,6 +1377,134 @@ contains
       end do
     end do
   end function GetThBMEpn_general_sp
+
+  subroutine TransToOrthogonal_dp(thr, thr21, ms)
+    class(NBodyPart), intent(inout) :: thr
+    type(NBodyPart), intent(in) :: thr21
+    type(MSpace), intent(in) :: ms
+    integer :: chbra, chket
+
+    do chbra = 1, ms%thr%NChan
+      do chket = 1, ms%thr%NChan
+        if(thr%Scalar .and. chbra /= chket) cycle
+        call thr%MatCh(chbra,chket)%TransToOrthogonalChannel(thr21,ms,chbra,chket)
+      end do
+    end do
+  end subroutine TransToOrthogonal_dp
+
+  subroutine TransToOrthogonal_sp(thr, thr21, ms)
+    class(NBodyPartSp), intent(inout) :: thr
+    type(NBodyPartSp), intent(in) :: thr21
+    type(MSpace), intent(in) :: ms
+    integer :: chbra, chket
+
+    do chbra = 1, ms%thr%NChan
+      do chket = 1, ms%thr%NChan
+        if(thr%Scalar .and. chbra /= chket) cycle
+        call thr%MatCh(chbra,chket)%TransToOrthogonalChannel(thr21,ms,chbra,chket)
+      end do
+    end do
+  end subroutine TransToOrthogonal_sp
+
+  ! This routine can be bottle neck
+  subroutine TransToOrthogoanlChannel_sp(Mat, thr21, ms, chbra, chket)
+    class(NBodyChannelSp), intent(inout) :: Mat
+    type(NBodyPartSp), intent(in) :: thr21
+    type(MSpace), intent(in) :: ms
+    integer, intent(in) :: chbra, chket
+    integer :: bra, ket, jbra, jket
+    integer :: a, b, c, iabc, nabc
+    integer :: d, e, f, idef, ndef
+    integer :: i_bra, aa, bb, cc, Jab
+    integer :: i_ket, dd, ee, ff, Jde
+    real(8), allocatable :: v(:,:)
+
+    jbra = ms%thr%jpz(chbra)%j
+    jket = ms%thr%jpz(chket)%j
+
+    do bra = 1, ms%thr%jpz(chbra)%nst
+      a    = ms%thr%jpz(chbra)%n2spi1(bra)
+      b    = ms%thr%jpz(chbra)%n2spi2(bra)
+      c    = ms%thr%jpz(chbra)%n2spi3(bra)
+      iabc = ms%thr%jpz(chbra)%n2labl(bra)
+      nabc = ms%thr%jpz(chbra)%spis2idx(a,b,c)
+      do ket = 1, ms%thr%jpz(chket)%nst
+        if(chbra == chket .and. bra < ket) cycle
+        d    = ms%thr%jpz(chket)%n2spi1(ket)
+        e    = ms%thr%jpz(chket)%n2spi2(ket)
+        f    = ms%thr%jpz(chket)%n2spi3(ket)
+        idef = ms%thr%jpz(chket)%n2labl(ket)
+        ndef = ms%thr%jpz(chket)%spis2idx(d,e,f)
+        allocate(v(ms%thr%jpz(chbra)%idx(nabc)%nphys, ms%thr%jpz(chket)%idx(ndef)%nphys))
+        do i_bra = 1, ms%thr%jpz(chbra)%idx(nabc)%nphys
+          aa = ms%thr%jpz(chbra)%idx(nabc)%n2spi1(i_bra)
+          bb = ms%thr%jpz(chbra)%idx(nabc)%n2spi2(i_bra)
+          cc = ms%thr%jpz(chbra)%idx(nabc)%n2spi3(i_bra)
+          Jab= ms%thr%jpz(chbra)%idx(nabc)%n2J12( i_bra)
+          do i_ket = 1, ms%thr%jpz(chket)%idx(ndef)%nphys
+            dd = ms%thr%jpz(chket)%idx(ndef)%n2spi1(i_ket)
+            ee = ms%thr%jpz(chket)%idx(ndef)%n2spi2(i_ket)
+            ff = ms%thr%jpz(chket)%idx(ndef)%n2spi3(i_ket)
+            Jde= ms%thr%jpz(chket)%idx(ndef)%n2J12( i_ket)
+            v(i_bra,i_ket) = thr21%GetThBME(ms,aa,bb,cc,Jab,dd,ee,ff,Jde,jbra,jket)
+          end do
+        end do
+        Mat%m(bra,ket) = dot_product(ms%thr%jpz(chbra)%idx(nabc)%cfp(iabc,:), &
+            & matmul(v, ms%thr%jpz(chket)%idx(ndef)%cfp(idef,:)))
+        deallocate(v)
+      end do
+    end do
+  end subroutine TransToOrthogoanlChannel_sp
+
+  ! This routine can be bottle neck
+  subroutine TransToOrthogoanlChannel_dp(Mat, thr21, ms, chbra, chket)
+    class(NBodyChannel), intent(inout) :: Mat
+    type(NBodyPart), intent(in) :: thr21
+    type(MSpace), intent(in) :: ms
+    integer, intent(in) :: chbra, chket
+    integer :: bra, ket, jbra, jket
+    integer :: a, b, c, iabc, nabc
+    integer :: d, e, f, idef, ndef
+    integer :: i_bra, aa, bb, cc, Jab
+    integer :: i_ket, dd, ee, ff, Jde
+    real(8), allocatable :: v(:,:)
+
+    jbra = ms%thr%jpz(chbra)%j
+    jket = ms%thr%jpz(chket)%j
+
+    do bra = 1, ms%thr%jpz(chbra)%nst
+      a    = ms%thr%jpz(chbra)%n2spi1(bra)
+      b    = ms%thr%jpz(chbra)%n2spi2(bra)
+      c    = ms%thr%jpz(chbra)%n2spi3(bra)
+      iabc = ms%thr%jpz(chbra)%n2labl(bra)
+      nabc = ms%thr%jpz(chbra)%spis2idx(a,b,c)
+      do ket = 1, ms%thr%jpz(chket)%nst
+        if(chbra == chket .and. bra < ket) cycle
+        d    = ms%thr%jpz(chket)%n2spi1(ket)
+        e    = ms%thr%jpz(chket)%n2spi2(ket)
+        f    = ms%thr%jpz(chket)%n2spi3(ket)
+        idef = ms%thr%jpz(chket)%n2labl(ket)
+        ndef = ms%thr%jpz(chket)%spis2idx(d,e,f)
+        allocate(v(ms%thr%jpz(chbra)%idx(nabc)%nphys, ms%thr%jpz(chket)%idx(ndef)%nphys))
+        do i_bra = 1, ms%thr%jpz(chbra)%idx(nabc)%nphys
+          aa = ms%thr%jpz(chbra)%idx(nabc)%n2spi1(i_bra)
+          bb = ms%thr%jpz(chbra)%idx(nabc)%n2spi2(i_bra)
+          cc = ms%thr%jpz(chbra)%idx(nabc)%n2spi3(i_bra)
+          Jab= ms%thr%jpz(chbra)%idx(nabc)%n2J12( i_bra)
+          do i_ket = 1, ms%thr%jpz(chket)%idx(ndef)%nphys
+            dd = ms%thr%jpz(chket)%idx(ndef)%n2spi1(i_ket)
+            ee = ms%thr%jpz(chket)%idx(ndef)%n2spi2(i_ket)
+            ff = ms%thr%jpz(chket)%idx(ndef)%n2spi3(i_ket)
+            Jde= ms%thr%jpz(chket)%idx(ndef)%n2J12( i_ket)
+            v(i_bra,i_ket) = thr21%GetThBME(ms,aa,bb,cc,Jab,dd,ee,ff,Jde,jbra,jket)
+          end do
+        end do
+        Mat%m(bra,ket) = dot_product(ms%thr%jpz(chbra)%idx(nabc)%cfp(iabc,:), &
+            & matmul(v, ms%thr%jpz(chket)%idx(ndef)%cfp(idef,:)))
+        deallocate(v)
+      end do
+    end do
+  end subroutine TransToOrthogoanlChannel_dp
 
   subroutine SetOneBodyChannel(this, optr, sps, chbra, chket, hw, A, Z, N)
     class(NBodyChannel), intent(inout) :: this

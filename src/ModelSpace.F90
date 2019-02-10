@@ -114,7 +114,7 @@ module ModelSpace
     integer, allocatable :: n2spi2(:) ! permutations
     integer, allocatable :: n2spi3(:) ! permutations
     integer, allocatable :: n2J12(:)  ! Jab
-    real(8), allocatable :: cfp(:,:)
+    real(8), allocatable :: cfp(:,:)  ! (orth|non-orth)
   contains
     procedure :: init => InitAdditionalQN
     procedure :: fin => FinAdditionalQN
@@ -207,10 +207,11 @@ module ModelSpace
     type(OrbitsIsospin) :: isps
     type(OneBodySpace) :: one
     type(TwoBodySpace) :: two
-    !type(ThreeBodySpace) :: thr ! Orthogonal pn three-body
-    type(NonOrthIsospinThreeBodySpace) :: thr
+    type(ThreeBodySpace) :: thr ! Orthogonal pn three-body
+    type(NonOrthIsospinThreeBodySpace) :: thr21
     logical :: is_constructed=.false.
     logical :: is_three_body =.false.
+    logical :: is_orth_three_body = .false.
     real(8), allocatable :: NOCoef(:)
     real(8) :: hw, beta = 0.d0
     integer, allocatable :: holes(:)
@@ -269,23 +270,26 @@ contains
     call this%two%fin()
     if(.not. this%is_three_body) return
     call this%isps%fin()
+    call this%thr21%fin()
+    if(.not. this%is_orth_three_body) return
     call this%thr%fin()
   end subroutine FinMSpace
 
-  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, lmax, beta)
+  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, lmax, beta, is_orth_three_body)
     class(MSpace), intent(inout) :: this
     character(*), intent(in) :: Nucl
     real(8), intent(in) :: hw
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: e3max, lmax
     real(8), intent(in), optional :: beta
+    logical, intent(in), optional :: is_orth_three_body
     integer :: A, Z, N
 
     call GetAZNFromReference(Nucl,A,Z,N)
-    call this%InitMSpaceFromAZN(A,Z,N,hw,emax,e2max,e3max,lmax,beta)
+    call this%InitMSpaceFromAZN(A,Z,N,hw,emax,e2max,e3max,lmax,beta,is_orth_three_body)
   end subroutine InitMSpaceFromReference
 
-  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax, beta)
+  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax, beta, is_orth_three_body)
     use Profiler, only: timer
     use ClassSys, only: sys
     class(MSpace), intent(inout) :: this
@@ -294,6 +298,7 @@ contains
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
     real(8), intent(in), optional :: beta
+    logical, intent(in), optional :: is_orth_three_body
     type(sys) :: s
     integer :: i, l
     character(20) :: Nucl
@@ -318,6 +323,7 @@ contains
     if(present(e3max)) this%e3max = e3max
     if(present(lmax)) this%lmax = lmax
     if(present(beta)) this%beta = beta
+    if(present(is_orth_three_body)) this%is_orth_three_body = is_orth_three_body
     write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
     if(present(e3max)) then
       write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
@@ -348,7 +354,7 @@ contains
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
 
-  subroutine InitMSpaceFromFile(this, Nucl, filename, hw, emax, e2max, e3max, lmax, beta)
+  subroutine InitMSpaceFromFile(this, Nucl, filename, hw, emax, e2max, e3max, lmax, beta, is_orth_three_body)
     use Profiler, only: timer
     use ClassSys, only: sys
     class(MSpace), intent(inout) :: this
@@ -357,6 +363,7 @@ contains
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
     real(8), intent(in), optional :: beta
+    logical, intent(in), optional :: is_orth_three_body
     type(sys) :: s
     integer :: A, Z, N, i, l
     real(8) :: ti
@@ -373,6 +380,7 @@ contains
     if(present(e3max)) this%e3max = e3max
     if(present(lmax)) this%lmax = lmax
     if(present(beta)) this%beta = beta
+    if(present(is_orth_three_body)) this%is_orth_three_body = is_orth_three_body
     write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
     if(present(e3max)) then
       write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
@@ -415,7 +423,10 @@ contains
     if(this%e3max == -1) return
     this%is_three_body = .true.
     call this%isps%init(this%emax)
-    call this%thr%init(this%isps, this%e2max, this%e3max)
+    call this%thr21%init(this%isps, this%e2max, this%e3max)
+    write(*,'(a,i3)') "  ThreeBody (2+1, isospin symmetry assumed): ", this%thr21%NChan
+    if(.not. this%is_orth_three_body) return
+    call this%thr%init(this%sps, this%e2max, this%e3max)
     write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
   end subroutine InitMSpace
 
