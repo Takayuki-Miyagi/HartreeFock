@@ -26,20 +26,21 @@ contains
     this%e2max = e2max
   end subroutine InitWriteFiles
 
-  subroutine SetFileName(this, ms, opr, filename)
+  subroutine SetFileName(this, outdir, ms, opr, filename)
     use ClassSys, only: sys
     class(WriteFiles), intent(inout) :: this
+    character(*), intent(in) :: outdir
     type(MSpace), intent(in) :: ms
     type(Op), intent(in) :: opr
     character(*), intent(in), optional :: filename
     type(sys) :: s
 
     if(present(filename)) then
-      this%filename = filename
+      this%filename = trim(outdir) // '/' // trim(filename)
       return
     end if
 
-    this%filename = trim(opr%optr) // '_' // trim(ms%Nucl) // &
+    this%filename = trim(outdir) // "/" // trim(opr%optr) // '_' // trim(ms%Nucl) // &
         & '_HF_hw' // trim(s%str(ms%hw)) // &
         & '_e' // trim(s%str(this%emax)) // &
         & '_2e' // trim(s%str(this%e2max)) // '.txt.snt'
@@ -61,7 +62,7 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
-    call this%SetFileName(ms,opr,filename)
+    call this%SetFileName(p%out_dir,ms,opr,filename)
 
     open(wunit, file=this%filename, action = 'write')
     call p%PrintInputParameters(wunit)

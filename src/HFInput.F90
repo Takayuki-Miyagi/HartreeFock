@@ -29,7 +29,10 @@ module HFInput
     integer :: e3max_3n
     integer :: lmax_3n
     ! output files
+    character(256) :: out_dir
     character(256) :: summary_file
+
+    !
     logical :: is_Op_out
     logical :: is_MBPTscalar_full
     logical :: is_MBPTScalar
@@ -66,6 +69,7 @@ contains
     integer :: e3max_3n=6
     integer :: lmax_3n=-1
 
+    character(256) :: out_dir = '.'
     character(256) :: summary_file = 'summary.out'
     logical :: is_Op_out = .false.
     logical :: is_MBPTscalar_full = .false.
@@ -79,7 +83,7 @@ contains
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
-        & is_MBPTScalar, is_MBPTEnergy, beta_cm
+        & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -109,7 +113,11 @@ contains
     this%lmax_nn = lmax_nn
     this%lmax_3n = lmax_3n
 
-    this%summary_file = summary_file
+    this%out_dir = out_dir
+    if(this%out_dir == '') this%out_dir = '.'
+    call s%mkdir(this%out_dir)
+    this%summary_file = trim(this%out_dir) // "/" // trim(summary_file)
+
     this%is_Op_out = is_Op_out
     this%is_MBPTscalar_full = is_MBPTscalar_full
     this%is_MBPTEnergy = is_MBPTEnergy
