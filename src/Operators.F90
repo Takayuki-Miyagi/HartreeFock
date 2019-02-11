@@ -69,6 +69,8 @@ contains
     call this%one%fin()
     call this%two%fin()
     if(.not. this%is_three_body) return
+    call this%thr21%fin()
+    if(.not. this%is_orth_three_body) return
     call this%thr%fin()
   end subroutine FinOp
 
@@ -136,6 +138,8 @@ contains
     a%one = b%one
     a%two = b%two
     if(.not. a%is_three_body) return
+    a%thr21 = b%thr21
+    if(.not. a%is_orth_three_body) return
     a%thr = b%thr
   end subroutine CopyOp
 
@@ -148,6 +152,8 @@ contains
     c%one = a%one + b%one
     c%two = a%two + b%two
     if(.not. a%is_three_body) return
+    c%thr21 = a%thr21 + b%thr21
+    if(.not. a%is_orth_three_body) return
     c%thr = a%thr + b%thr
   end function SumOp
 
@@ -160,6 +166,8 @@ contains
     c%one = a%one - b%one
     c%two = a%two - b%two
     if(.not. a%is_three_body) return
+    c%thr21 = a%thr21 - b%thr21
+    if(.not. a%is_orth_three_body) return
     c%thr = a%thr - b%thr
   end function SubtractOp
 
@@ -173,6 +181,8 @@ contains
     c%one = a%one * b
     c%two = a%two * b
     if(.not. a%is_three_body) return
+    c%thr21 = a%thr21 * b
+    if(.not. a%is_orth_three_body) return
     c%thr = a%thr * b
   end function ScaleOp
 
@@ -277,6 +287,9 @@ contains
     call this%two%prt(iunit)
 
     if(.not. this%is_three_body) return
+    write(ut,'(a)') "## Three-body part (2+1, isospin assumed) "
+    call this%thr21%prt(iunit)
+    if(.not. this%is_orth_three_body) return
     write(ut,'(a)') "## Three-body part"
     call this%thr%prt(iunit)
   end subroutine PrintOperator
@@ -350,8 +363,10 @@ contains
       write(*,'(a)') "No need to discard three-body part."
       return
     end if
-    call this%thr%fin()
+    call this%thr21%fin()
+    if(this%is_orth_three_body) call this%thr%fin()
     this%is_three_body = .false.
+    this%is_orth_three_body = .false.
   end subroutine DiscardThreeBodyPart
 
   subroutine NO2BApproximation(this,ms)

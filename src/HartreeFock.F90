@@ -293,7 +293,7 @@ contains
 
               do JJJ = abs(2*J-je), (2*J+je), 2
                 V3%m(bra,ket) = V3%m(bra,ket) + HF%rho%GetOBME(ms%sps,ms%one,e,f) * &
-                    & dble(JJJ+1) * H%thr%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
+                    & dble(JJJ+1) * H%thr21%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
               end do
 
             end do
@@ -386,7 +386,7 @@ contains
                 o2from3%MatCh(ch,ch)%m(bra,ket) = &
                     & o2from3%MatCh(ch,ch)%m(bra,ket) + &
                     & HF%rho%GetOBME(ms%sps,ms%one,e,f) * &
-                    & dble(JJJ+1) * Opr%thr%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
+                    & dble(JJJ+1) * Opr%thr21%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
               end do
 
             end do
