@@ -2,7 +2,7 @@
 # Make file for TTFcalc code
 #--------------------------------------------------
 TARGET=HartreeFock
-INSTLDIR=./
+INSTLDIR= $(HOME)/bin
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
   elif hostname|grep -q cedar; then echo cedar; \
@@ -121,8 +121,7 @@ $(TARGET): $(OBJS)
 	else \
 		mkdir $(INSTLDIR); \
 	fi
-	cp $(TARGET).exe $(INSTLDIR)
-	cp python_scripts/*.py $(INSTLDIR)
+	ln -sf $(PWD)/$(TARGET).exe $(INSTLDIR)
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
