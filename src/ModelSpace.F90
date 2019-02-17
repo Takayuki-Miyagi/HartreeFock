@@ -431,7 +431,7 @@ contains
   end subroutine InitMSpace
 
   subroutine GetConfFromFile(this, filename, A, Z, N)
-    use CommonLibrary, only: skip_comment
+    use MyLibrary, only: skip_comment
     class(MSpace), intent(inout) :: this
     character(*), intent(in) :: filename
     integer, intent(out) :: A, Z, N
@@ -778,7 +778,7 @@ contains
   end subroutine FinTwoBodySpace
 
   subroutine InitTwoBodySpace(this, sps, e2max)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(TwoBodySpace), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: e2max
@@ -902,7 +902,7 @@ contains
   end subroutine FinTwoBodyChannel
 
   subroutine InitTwoBodyChannel(this, j, p, z, n, sps, e2max)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(TwoBodyChannel), intent(inout) :: this
     integer, intent(in) :: j, p, z, n, e2max
     type(Orbits), intent(in) :: sps
@@ -974,7 +974,7 @@ contains
   end subroutine FinNonOrthIsospinThreeBodySpace
 
   subroutine InitNonOrthIsospinThreeBodySpace(this, sps, e2max, e3max)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodySpace), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     integer, intent(in) :: e2max, e3max
@@ -1159,7 +1159,7 @@ contains
   end subroutine FinNonOrthIsospinThreeBodyChannel
 
   subroutine InitNonOrthIsospinThreeBodyChannel(this,j,p,t,n,nidx,spis2idx,sps,e2max,e3max)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
     integer, intent(in) :: j, p, t, n, nidx, spis2idx(:,:,:), e2max, e3max
     type(OrbitsIsospin), intent(in) :: sps
@@ -1280,7 +1280,7 @@ contains
   end subroutine InitNonOrthIsospinThreeBodyChannel
 
   subroutine SetSortingIndices(this,j,p,t,sps,e2max,e3max)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     integer, intent(in) :: j, p, t, e2max, e3max
@@ -1424,7 +1424,7 @@ contains
 
   subroutine init_sort_index(this, sps, i1, i2, i3, a, b, c, &
         &    n_recouple, j, t, NOIAQN)
-    use CommonLibrary, only: triag, sjs, hat
+    use MyLibrary, only: triag, sjs, hat
     class(sort_index), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, a, b, c, n_recouple, j, t
@@ -1907,7 +1907,7 @@ contains
 
   subroutine InitAdditionalQN(this, sps, i1, i2, i3, j, nni, nnj)
     use LinAlgLib
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(AdditionalQN), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, j, nni, nnj
@@ -1981,7 +1981,7 @@ contains
   end subroutine InitAdditionalQN
 
   subroutine CntDim(sps, i1, i2, i3, j, ni, nj)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, j
     integer, intent(out) :: ni, nj
@@ -2098,7 +2098,7 @@ contains
   end function A3drct
 
   real(8) function A3exc1(sps, i1, i2, i3, j12, i4, i5, i6, j45, j) result(e)
-    use CommonLibrary, only: sjs
+    use MyLibrary, only: sjs
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
@@ -2116,7 +2116,7 @@ contains
   end function A3exc1
 
   real(8) function A3exc2(sps, i1, i2, i3, j12, i4, i5, i6, j45, j) result(e)
-    use CommonLibrary, only: sjs
+    use MyLibrary, only: sjs
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
@@ -2138,7 +2138,7 @@ end module ModelSpace
 !program main
 !  use Profiler, only: timer
 !  use ModelSpace, only: MSpace
-!  use CommonLibrary, only: &
+!  use MyLibrary, only: &
 !      &init_dbinomial_triangle, fin_dbinomial_triangle
 !  type(MSpace) :: ms
 !

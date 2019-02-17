@@ -272,7 +272,7 @@ contains
   end subroutine FinNBodyPartSp
 
   subroutine InitOneBodyPart(this, one, Scalar, optr, jr, pr, zr)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
     type(OneBodySpace), intent(in) :: one
     logical, intent(in) :: Scalar
@@ -314,7 +314,7 @@ contains
   end subroutine InitOneBodyPart
 
   subroutine InitTwoBodyPart(this, two, Scalar, optr, jr, pr, zr)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
     type(TwoBodySpace), intent(in) :: two
     logical, intent(in) :: Scalar
@@ -356,7 +356,7 @@ contains
   end subroutine InitTwoBodyPart
 
   subroutine InitThreeBodyPart(this, thr, Scalar, optr, jr, pr, zr)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
     type(ThreeBodySpace), intent(in) :: thr
     logical, intent(in) :: Scalar
@@ -399,7 +399,7 @@ contains
   end subroutine InitThreeBodyPart
 
   subroutine InitNonOrthIsospinThreeBodyPart(this, thr, Scalar, optr, jr, pr, tr)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
     type(NonOrthIsospinThreeBodySpace), intent(in) :: thr
     logical, intent(in) :: Scalar
@@ -441,7 +441,7 @@ contains
   end subroutine InitNonOrthIsospinThreeBodyPart
 
   subroutine InitNonOrthIsospinThreeBodyPartSp(this, thr, Scalar, optr, jr, pr, tr)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPartSp), intent(inout) :: this
     type(NonOrthIsospinThreeBodySpace), intent(in) :: thr
     logical, intent(in) :: Scalar
@@ -483,7 +483,7 @@ contains
   end subroutine InitNonOrthIsospinThreeBodyPartSp
 
   subroutine InitThreeBodyPartSp(this, thr, Scalar, optr, jr, pr, zr)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPartSp), intent(inout) :: this
     type(ThreeBodySpace), intent(in) :: thr
     logical, intent(in) :: Scalar
@@ -709,7 +709,7 @@ contains
   end subroutine SetOneBodyPart
 
   function GetTwBME_general(this,sps,ms,i1,i2,i3,i4,J12,J34) result(r)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     real(8) :: r
     class(NBodyPart), intent(in) :: this
     type(Orbits), intent(in) :: sps
@@ -755,7 +755,7 @@ contains
   end function GetTwBME_general
 
   function GetTwBME_scalar(this,sps,ms,i1,i2,i3,i4,J) result(r)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     real(8) :: r
     class(NBodyPart), intent(in) :: this
     type(Orbits), intent(in) :: sps
@@ -795,7 +795,7 @@ contains
   end function GetTwBME_scalar
 
   subroutine SetTwBME_general(this,sps,ms,i1,i2,i3,i4,J12,J34,me)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
@@ -880,7 +880,7 @@ contains
   end subroutine SetTwBME_scalar
 
   subroutine AddToTwBME_general(this,sps,ms,i1,i2,i3,i4,J12,J34,me)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: ms
@@ -1028,7 +1028,7 @@ contains
 
   function GetThBMEIso_general(this,sps,ms,i1,i2,i3,J12,T12,&
         & i4,i5,i6,J45,T45,Jbra,Jket,Tbra,Tket) result(r)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPart), intent(in) :: this
     type(OrbitsIsospin), intent(in) :: sps
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
@@ -1076,7 +1076,7 @@ contains
 
   function GetThBMEpn_scalar(this,ms,i1,i2,i3,J12,&
         & i4,i5,i6,J45,J) result(r)
-    use CommonLibrary, only: dcg
+    use MyLibrary, only: dcg
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
@@ -1126,7 +1126,7 @@ contains
 
   function GetThBMEpn_general(this,ms,i1,i2,i3,J12,&
         & i4,i5,i6,J45,Jbra,Jket) result(r)
-    use CommonLibrary, only: dcg
+    use MyLibrary, only: dcg
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
@@ -1224,7 +1224,7 @@ contains
 
   function GetThBMEIso_general_sp(this,sps,ms,i1,i2,i3,J12,T12,&
         & i4,i5,i6,J45,T45,Jbra,Jket,Tbra,Tket) result(r)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(NBodyPartSp), intent(in) :: this
     type(OrbitsIsospin), intent(in) :: sps
     type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
@@ -1272,7 +1272,7 @@ contains
 
   function GetThBMEpn_scalar_sp(this,ms,i1,i2,i3,J12,&
         & i4,i5,i6,J45,J) result(r)
-    use CommonLibrary, only: dcg
+    use MyLibrary, only: dcg
     class(NBodyPartSp), intent(in) :: this
     type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
@@ -1324,7 +1324,7 @@ contains
 
   function GetThBMEpn_general_sp(this,ms,i1,i2,i3,J12,&
         & i4,i5,i6,J45,Jbra,Jket) result(r)
-    use CommonLibrary, only: dcg
+    use MyLibrary, only: dcg
     class(NBodyPartSp), intent(in) :: this
     type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
@@ -1614,7 +1614,7 @@ contains
 
   ! Tensor case should be tested
   function NormalOrderingFromSp3To2(this,ms) result(r)
-    use CommonLibrary, only: triag, sjs
+    use MyLibrary, only: triag, sjs
     class(NBodyPartSp), intent(in) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPart) :: r
@@ -1687,7 +1687,7 @@ contains
 
   ! Tensor case should be tested
   function NormalOrderingFrom3To2(this,ms) result(r)
-    use CommonLibrary, only: triag, sjs
+    use MyLibrary, only: triag, sjs
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPart) :: r
@@ -1760,7 +1760,7 @@ contains
 
   ! Tensor case should be tested
   function NormalOrderingFrom2To1(this,ms) result(r)
-    use CommonLibrary, only: sjs, triag
+    use MyLibrary, only: sjs, triag
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPart) :: r
@@ -2386,7 +2386,7 @@ contains
   end subroutine read_scalar_myg_bin
 
   subroutine read_scalar_snt_ascii(this,two,sps,ms)
-    use CommonLibrary, only: skip_comment
+    use MyLibrary, only: skip_comment
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
@@ -3247,7 +3247,7 @@ end module NOperators
 ! test for operators
 !program test
 !  use Profiler, only: timer
-!  use CommonLibrary, only: &
+!  use MyLibrary, only: &
 !      &init_dbinomial_triangle, fin_dbinomial_triangle
 !  use ModelSpace, only: MSpace
 !  use NOperators

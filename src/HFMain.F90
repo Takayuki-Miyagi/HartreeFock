@@ -1,9 +1,6 @@
 program HFMain
   use omp_lib
   use Profiler, only: timer
-  use CommonLibrary, only: &
-      & init_dbinomial_triangle, fin_dbinomial_triangle, &
-      & set_physics_constant
   use HFInput
   use ModelSpace
   use Operators
@@ -43,10 +40,7 @@ program HFMain
   call p%init(inputfile)
   call p%PrintInputParameters()
 
-  call set_physics_constant()
-
   ti = omp_get_wtime()
-  call init_dbinomial_triangle()
   call timer%Add("Init for Rotation Group",omp_get_wtime()-ti)
 
   select case(p%int_3n_file)
@@ -164,6 +158,5 @@ program HFMain
   call HF%fin()
   call ms%fin()
 
-  call fin_dbinomial_triangle()
   call timer%fin()
 end program HFMain

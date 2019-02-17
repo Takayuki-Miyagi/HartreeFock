@@ -22,10 +22,11 @@ contains
   end subroutine GetOperatorRank
 
   function one_body_element(optr, ia, ib, hw, A, Z, N) result(r)
-    use CommonLibrary, only: hc, amnucl
+    use MyLibrary, only: hc, amp, amn
     real(8) :: r
     character(*), intent(in) :: optr
     real(8), intent(in) :: hw
+    real(8) :: amnucl
     integer, intent(in) :: ia(4), ib(4), A, Z, N
     integer :: na, la, ja, za
     integer :: nb, lb, jb, zb
@@ -88,6 +89,7 @@ contains
       if(na == nb) r = dble(2*na + la) + 1.5d0
       if(na == nb + 1) r = -dsqrt(dble(na) * (dble(na+la)+0.5d0))
       if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
+      amnucl = (amp + amn) * 0.5d0
       r = r * (1.d0/dble(A) - 1.d0/dble(A)**2) * hc ** 2 / (amnucl * hw)
       return
 
@@ -101,6 +103,7 @@ contains
       if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
       if(za == -1) r = r * (1.d0 / dble(Z) - 2.d0 / dble(A*Z) + 1.d0 / dble(A)**2)
       if(za ==  1) r = r / dble(A)**2
+      amnucl = (amp + amn) * 0.5d0
       r = r * hc ** 2 / (amnucl * hw)
       return
 
@@ -114,6 +117,7 @@ contains
       if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
       if(za == -1) r = r / dble(A)**2
       if(za ==  1) r = r * (1.d0 / dble(N) - 2.d0 / dble(A*N) + 1.d0 / dble(A)**2)
+      amnucl = (amp + amn) * 0.5d0
       r = r * hc ** 2 / (amnucl * hw)
       return
 
@@ -125,10 +129,11 @@ contains
   end function one_body_element
 
   function two_body_element(optr, ia, ib, ic, id, Jab, Jcd, hw, A, Z, N) result(r)
-    use CommonLibrary, only: hc, amnucl
+    use MyLibrary, only: hc, amp, amn
     real(8) :: r
     character(*), intent(in) :: optr
     real(8), intent(in) :: hw
+    real(8) :: amnucl
     integer, intent(in) :: ia(4), ib(4), ic(4), id(4), A, Z, N, Jab, Jcd
     integer :: Zab, Zcd, Pab, Pcd
 
@@ -163,6 +168,7 @@ contains
         write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
         return
       end if
+      amnucl = (amp + amn) * 0.5d0
       r = - 2.d0 * r_dot_r(ia,ib,ic,id,Jab) * hc**2 / (amnucl*hw*dble(A)**2)
       return
 
@@ -174,6 +180,7 @@ contains
       if(Zab == -1) r = ( 2.d0 / dble(A)**2 - 4.d0 / dble(A*Z) ) * r_dot_r(ia,ib,ic,id,Jab)
       if(Zab ==  0) r = ( 2.d0 / dble(A)**2 - 2.d0 / dble(A*Z) ) * r_dot_r(ia,ib,ic,id,Jab)
       if(Zab ==  1) r =  2.d0 * r_dot_r(ia,ib,ic,id,Jab) / dble(A)**2
+      amnucl = (amp + amn) * 0.5d0
       r = r * hc**2 / (amnucl*hw)
       return
 
@@ -185,6 +192,7 @@ contains
       if(Zab == -1) r = 2.d0 * r_dot_r(ia,ib,ic,id,Jab) / dble(A)**2
       if(Zab ==  0) r = ( 2.d0 / dble(A)**2 - 2.d0 / dble(A*N) ) * r_dot_r(ia,ib,ic,id,Jab)
       if(Zab ==  1) r = ( 2.d0 / dble(A)**2 - 4.d0 / dble(A*N) ) * r_dot_r(ia,ib,ic,id,Jab)
+      amnucl = (amp + amn) * 0.5d0
       r = r * hc**2 / (amnucl*hw)
       return
 
@@ -199,7 +207,7 @@ contains
   !  (1/2) * m * omega**2 * r_{i} \cdot r_{j} / hw
   !
   function r_dot_r(a, b, c, d, J) result(r)
-    use CommonLibrary, only: sjs
+    use MyLibrary, only: sjs
     integer, intent(in) :: a(4), b(4), c(4), d(4), J
     real(8) :: r
     integer :: ja, jb, jc, jd
@@ -227,7 +235,7 @@ contains
   !  (1/2m) * p_{i} \cdot p_{j} / hw
   !
   function p_dot_p(a, b, c, d, J) result(r)
-    use CommonLibrary, only: sjs
+    use MyLibrary, only: sjs
     integer, intent(in) :: a(4), b(4), c(4), d(4), J
     real(8) :: r
     integer :: ja, jb, jc, jd
@@ -253,7 +261,7 @@ contains
 
   ! < a || r || b >
   function red_r_j(a, b) result(r)
-    use CommonLibrary, only: red_r_l, sjs
+    use MyLibrary, only: red_r_l, sjs
     real(8) :: r
     integer, intent(in) :: a(4), b(4)
     integer :: na, la, ja, za
@@ -279,7 +287,7 @@ contains
 
   ! < a || \nabra || b >
   function red_nab_j(a, b) result(r)
-    use CommonLibrary, only: red_nab_l, sjs
+    use MyLibrary, only: red_nab_l, sjs
     real(8) :: r
     integer, intent(in) :: a(4), b(4)
     integer :: na, la, ja, za

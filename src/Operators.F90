@@ -391,8 +391,6 @@ end module Operators
 
 !program test
 !  use Profiler, only: timer
-!  use CommonLibrary, only: &
-!      &init_dbinomial_triangle, fin_dbinomial_triangle
 !  use ModelSpace, only: MSpace
 !  use Operators
 !

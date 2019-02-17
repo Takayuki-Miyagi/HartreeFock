@@ -842,7 +842,7 @@ contains
   end subroutine InitMonopole2
 
   subroutine InitMonopole3(this, ms, v3n)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPart), intent(in) :: v3n
@@ -1023,7 +1023,7 @@ contains
   end subroutine InitMonopole3
 
   subroutine InitMonopole3_sp(this, ms, v3n)
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     type(NBodyPartSp), intent(in) :: v3n
@@ -1240,7 +1240,7 @@ end module HartreeFock
 !program test
 !  use Profiler, only: timer
 !  use ClassSys, only: sys
-!  use CommonLibrary, only: &
+!  use MyLibrary, only: &
 !      &init_dbinomial_triangle, fin_dbinomial_triangle
 !  use ModelSpace, only: MSpace
 !  use Operators

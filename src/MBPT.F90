@@ -365,7 +365,7 @@ contains
     ! <ij|X|ab>_{L} = \sum_{A} [A] {i j A} <ij:A|X|ab:A>
     !                              {a b L}
     use Profiler, only: timer
-    use CommonLibrary, only: triag
+    use MyLibrary, only: triag
     class(MBPTEnergy), intent(inout) :: this
     type(MSPace), intent(in) :: ms
     type(Op), intent(in) :: h
@@ -454,7 +454,7 @@ contains
   end subroutine energy_third_ph
 
   function cross_couple(sps,two,v,i,j,a,b,L) result(r)
-    use CommonLibrary, only: triag,sjs
+    use MyLibrary, only: triag,sjs
     type(Orbits), intent(in) :: sps
     type(TwoBodySpace), intent(in) :: two
     type(NBodyPart), intent(in) :: v
