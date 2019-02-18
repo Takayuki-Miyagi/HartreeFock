@@ -16,49 +16,49 @@ module MyLibrary
   ! C interfaces
   interface
     ! 3-j symbol
-    function coupling_3j(j1,j2,j3,m1,m2,m3) bind(c,name='coupling_3j')
+    function coupling_3j(j1,j2,j3,m1,m2,m3) bind(c,name='gsl_sf_coupling_3j')
       import c_int, c_double
       real(c_double) :: coupling_3j
       integer(c_int), value, intent(in) :: j1,j2,j3,m1,m2,m3
     end function coupling_3j
 
     ! 6-j symbol
-    function coupling_6j(j1,j2,j3,j4,j5,j6) bind(c,name='coupling_6j')
+    function coupling_6j(j1,j2,j3,j4,j5,j6) bind(c,name='gsl_sf_coupling_6j')
       import c_int, c_double
       real(c_double) :: coupling_6j
       integer(c_int), value, intent(in) :: j1,j2,j3,j4,j5,j6
     end function coupling_6j
 
     ! 9-j symbol
-    function coupling_9j(j1,j2,j3,j4,j5,j6,j7,j8,j9) bind(c,name='coupling_9j')
+    function coupling_9j(j1,j2,j3,j4,j5,j6,j7,j8,j9) bind(c,name='gsl_sf_coupling_9j')
       import c_int, c_double
       real(c_double) :: coupling_9j
       integer(c_int), value, intent(in) :: j1,j2,j3,j4,j5,j6,j7,j8,j9
     end function coupling_9j
 
     ! factorial n!
-    function factorial(n) bind(c,name='factorial')
+    function factorial(n) bind(c,name='gsl_sf_fact')
       import c_double, c_int
       integer(c_int), value, intent(in) :: n
       real(c_double) :: factorial
     end function factorial
 
     ! double factorial n!!
-    function double_factorial(n) bind(c,name='double_factorial')
+    function double_factorial(n) bind(c,name='gsl_sf_doublefact')
       import c_double, c_int
       integer(c_int), value, intent(in) :: n
       real(c_double) :: double_factorial
     end function double_factorial
 
     ! Gamma function \Gamma(x)
-    function gamma_function(x) bind(c,name='gamma_function')
+    function gamma_function(x) bind(c,name='gsl_sf_gamma')
       import c_double
       real(c_double), value, intent(in) :: x
       real(c_double) :: gamma_function
     end function gamma_function
 
     ! spherical bessel function j_l(x)
-    function spherical_bessel(l,x) bind(c,name='spherical_bessel')
+    function spherical_bessel(l,x) bind(c,name='gsl_sf_bessel_jl')
       import c_int, c_double
       integer(c_int), value, intent(in) :: l
       real(c_double), value, intent(in) :: x
@@ -66,7 +66,7 @@ module MyLibrary
     end function spherical_bessel
 
     ! Legendre polynomial P_l(x)
-    function legendre_polynomial(l,x) bind(c,name='legendre_polynomial')
+    function legendre_polynomial(l,x) bind(c,name='gsl_sf_legendre_Pl')
       import c_int, c_double
       integer(c_int), value, intent(in) :: l
       real(c_double), value, intent(in) :: x
@@ -74,7 +74,7 @@ module MyLibrary
     end function legendre_polynomial
 
     ! associated Laguerre polynomial L^{n}_{a}(x)
-    function laguerre(n,a,x) bind(c,name='laguerre')
+    function laguerre(n,a,x) bind(c,name='gsl_sf_laguerre_n')
       import c_int, c_double
       integer(c_int), value, intent(in) :: n
       real(c_double), value, intent(in) :: a, x
@@ -82,12 +82,14 @@ module MyLibrary
     end function laguerre
 
     ! Gauss-Legendre quadrature
-    function gauss_legendre_allocate(n) bind(c,name='gauss_legendre_allocate')
+    function gauss_legendre_allocate(n) &
+          & bind(c,name='gsl_integration_glfixed_table_alloc')
       import c_int, c_ptr
       integer(c_int), value, intent(in) :: n
       type(c_ptr) :: gauss_legendre_allocate
     end function gauss_legendre_allocate
-    function gauss_legendre_ith_point_weight(a,b,i,xi,wi,t) bind(c,name='gauss_legendre_ith_point_weight')
+    function gauss_legendre_ith_point_weight(a,b,i,xi,wi,t) &
+          & bind(c,name='gsl_integration_glfixed_point')
       import c_int, c_double, c_ptr
       real(c_double), value, intent(in) :: a, b
       integer(c_int), value, intent(in) :: i
@@ -95,10 +97,37 @@ module MyLibrary
       type(c_ptr), value, intent(in) :: t
       integer(c_int) :: gauss_legendre_ith_point_weight
     end function gauss_legendre_ith_point_weight
-    subroutine gauss_legendre_release(t) bind(c,name='gauss_legendre_release')
+    subroutine gauss_legendre_release(t) &
+          & bind(c,name='gsl_integration_glfixed_table_free')
       import c_ptr
       type(c_ptr), value :: t
     end subroutine gauss_legendre_release
+
+    ! gzip
+    function gz_open(filename, mode) bind(c, name='gzopen')
+      import c_char, c_ptr
+      character(c_char) :: filename(*), mode(*)
+      type(c_ptr) :: gz_open
+    end function gz_open
+    function gzip_read(f, buf, len) bind(c, name='gzread')
+      import c_int, c_char, c_ptr
+      type(c_ptr), value :: f
+      character(c_char) :: buf(*)
+      integer(c_int), value, intent(in) :: len
+      type(c_ptr) :: gzip_read
+    end function gzip_read
+    function gzip_write(f, buf, len) bind(c, name='gzwrite')
+      import c_int, c_char, c_ptr
+      type(c_ptr), value :: f
+      character(c_char) :: buf(*)
+      integer(c_int), value, intent(in) :: len
+      integer(c_int) :: gzip_write
+    end function gzip_write
+    function gzip_close( f ) bind(c, name='gzclose')
+      import c_ptr
+      type(c_ptr), value :: f
+      type(c_ptr) :: gzip_close
+    end function gzip_close
   end interface
 contains
 
@@ -345,5 +374,11 @@ contains
     end do
     call gauss_legendre_release(t)
   end subroutine gauss_legendre
+
+  function gzip_open( filename, mode ) result(p)
+    character(*), intent(in) :: filename, mode
+    type(c_ptr) :: p
+    p = gz_open(trim(filename)//achar(0), trim(mode)//achar(0))
+  end function gzip_open
 end module MyLibrary
 

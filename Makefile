@@ -17,7 +17,7 @@ ifeq ($(HOST),other)
   FDEP=makedepf90
   CC=gcc
   FC=gfortran
-  LDFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl
+  LDFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl -lz
   OMP = -fopenmp
   FFLAGS=-O3 -Dsingle_precision
   CFLAGS=-O3
@@ -32,7 +32,7 @@ ifeq ($(HOST),apt)
   #FDEP=
   CC=gcc
   FC=ifort
-  LDFLAGS=-mkl -lgsl
+  LDFLAGS=-mkl -lgsl -lz
   OMP = -openmp
   FFLAGS=-O3 -no-ipo -static -Dsingle_precision
   CFLAGS=-O3
@@ -50,7 +50,7 @@ ifeq ($(strip $(HOST)),oak)
   CC=icc
   FC=ifort
   MKL=-L$(MKLROOT)/lib/ -L$(MKLROOT)/lib/intel64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -Wl,-rpath,$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/../compiler/lib/
-  LDFLAGS=$(MKL) -lgsl
+  LDFLAGS=$(MKL) -lgsl -lz
   OMP = -qopenmp
   FFLAGS=-O3 -heap-arrays
   CFLAGS=-O3
@@ -156,5 +156,3 @@ clean:
 
 #--------------------------------------------------
 -include $(wildcard $(DEPDIR)/*.d)
-$(OBJDIR)/MyLibrary.o : $(SRCDIR)/MyLibrary.f90 $(OBJDIR)/ClassSys.o $(OBJDIR)/gsl_functions.o
-

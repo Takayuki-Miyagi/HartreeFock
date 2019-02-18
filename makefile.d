@@ -1,4 +1,3 @@
-obj/gsl_functions.o : src/gsl_functions.c 
 obj/MyLibrary.o : src/MyLibrary.f90 obj/ClassSys.o 
 obj/ClassSys.o : src/ClassSys.f90 
 obj/WriteOperator.o : src/WriteOperator.F90 obj/HFInput.o obj/Profiler.o obj/ClassSys.o obj/Operators.o 

@@ -243,6 +243,9 @@ module NOperators
 
   end type ReadFiles
 
+  integer, private, parameter :: me2j_header_length = 43
+  integer, private, parameter :: me2j_me_length = 16
+
 contains
 
   subroutine FinNBodyPart(this)
@@ -2010,6 +2013,7 @@ contains
   end subroutine ReadScalar2BFile
 
   subroutine read_scalar_me2j_ascii(this,two,sps,ms)
+    use ClassSys, only: sys
     class(ReadFiles), intent(in) :: this
     type(NBodyPart), intent(inout) :: two
     type(Orbits), intent(in) :: sps
@@ -2027,17 +2031,24 @@ contains
     integer :: ap, bp, cp, dp
     integer :: an, bn, cn, dn
     real(8) :: me_00, me_pp, me_10, me_nn, fact
+    type(sys) :: s
 
     call sps_me2j%init(this%emax2, this%lmax2)
     nelm = count_scalar_me2j(sps_me2j,this%e2max2)
     allocate(v(nelm))
-    open(runit, file=this%file_nn, action='read',iostat=io)
-    if(io /= 0) then
-      write(*,'(2a)') 'File open error: ', trim(this%file_nn)
-      return
+    if( s%find(this%file_nn, '.gz') ) then
+      call get_vector_me2j_gz(this%file_nn,v)
     end if
-    call get_vector_me2j_formatted(runit,v)
-    close(runit)
+
+    if( .not. s%find(this%file_nn, '.gz') ) then
+      open(runit, file=this%file_nn, action='read',iostat=io)
+      if(io /= 0) then
+        write(*,'(2a)') 'File open error: ', trim(this%file_nn)
+        return
+      end if
+      call get_vector_me2j_formatted(runit,v)
+      close(runit)
+    end if
 
     icnt = 0
     do a = 1, sps_me2j%norbs
@@ -2312,6 +2323,51 @@ contains
     if(mod(nelm,10) == 0) return
     read(ut,*) v(lines*10+1:nelm)
   end subroutine get_vector_me2j_formatted
+
+  subroutine get_vector_me2j_gz(f,v)
+    use, intrinsic :: iso_c_binding
+    use ClassSys, only: sys
+    use MyLibrary, only: gzip_open, gzip_read, gzip_close
+    character(*), intent(in) :: f
+    real(8), intent(inout) :: v(:)
+    integer :: nelm, line, lines, i, nelm_tail, cnt
+    character(256) :: buffer
+    character(:), allocatable :: fm
+    type(c_ptr) :: p, buf
+    type(sys) :: s
+    nelm = size(v)
+    lines = nelm/10
+    nelm_tail = nelm - 10 * lines
+    p = gzip_open(f,'r')
+    buf = gzip_read(p, buffer, me2j_header_length)
+    cnt = 0
+    do line = 1, lines
+      buf = gzip_read(p, buffer, me2j_me_length*10+1)
+      do i = 1, 10
+        cnt = cnt + 1
+        read( buffer( (i-1)*me2j_me_length+2 : i*me2j_me_length+1), *) &
+            & v(cnt)
+      end do
+#ifdef NOperatorsDebug
+      write(*,'(10f12.6)') v(cnt-9:cnt)
+#endif
+    end do
+    if(nelm_tail == 0) then
+      buf = gzip_close(p)
+      return
+    end if
+    buf = gzip_read(p, buffer, me2j_me_length*nelm_tail+1)
+    do i = 1, nelm_tail
+      cnt = cnt + 1
+      read( buffer( (i-1)*me2j_me_length+2 : i*me2j_me_length+1), *) &
+          & v(cnt)
+    end do
+#ifdef NOperatorsDebug
+    fm = "("//trim(s%str(nelm_tail)) // 'f12.6'//")"
+    write(*,fm) v(lines*10:)
+#endif
+    buf = gzip_close(p)
+  end subroutine get_vector_me2j_gz
 
   subroutine read_scalar_myg_ascii(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this
