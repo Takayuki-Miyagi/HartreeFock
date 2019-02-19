@@ -57,6 +57,13 @@ module MyLibrary
       real(c_double) :: gamma_function
     end function gamma_function
 
+    ! log of Gamma function ln \Gamma(x)
+    function ln_gamma(x) bind(c,name='gsl_sf_lngamma')
+      import c_double
+      real(c_double), value, intent(in) :: x
+      real(c_double) :: ln_gamma
+    end function ln_gamma
+
     ! spherical bessel function j_l(x)
     function spherical_bessel(l,x) bind(c,name='gsl_sf_bessel_jl')
       import c_int, c_double
@@ -73,7 +80,7 @@ module MyLibrary
       real(c_double) :: legendre_polynomial
     end function legendre_polynomial
 
-    ! associated Laguerre polynomial L^{n}_{a}(x)
+    ! associated Laguerre polynomial L^{(a)}_{n}(x)
     function laguerre(n,a,x) bind(c,name='gsl_sf_laguerre_n')
       import c_int, c_double
       integer(c_int), value, intent(in) :: n
@@ -103,7 +110,7 @@ module MyLibrary
       type(c_ptr), value :: t
     end subroutine gauss_legendre_release
 
-    ! gzip
+    ! open, read, write, and close gzip file (additional interface gzip_open below)
     function gz_open(filename, mode) bind(c, name='gzopen')
       import c_char, c_ptr
       character(c_char) :: filename(*), mode(*)
@@ -202,7 +209,6 @@ contains
   subroutine init_dtrinomial()
     ! cache for Talmi-Moshinksy bracket
     integer :: i, j, k
-
     allocate(dtrinomial(0:n_trinomial, 0:n_trinomial, 0:n_trinomial))
     !$omp parallel do private( i, j, k ) schedule (dynamic)
     do k = 0, n_trinomial
@@ -340,16 +346,20 @@ contains
 
   function ho_radial_wf_norm(n,l,anu,r) result(s)
     ! R = sqrt( 2 * nu * Gamma(n+1) / Gamma(n+l+1.5) ) x^{l+1} e^{ -x^2/2 } L^{n}_{l+0.5}( x^2 )
-    ! x = r * nu
-    ! nu = sqrt(m w / h)
+    ! x = r * nu or p * nu
+    ! nu = sqrt(m w / h) or sqrt( h / mw )
     ! Note that anu = nu^2
     integer,intent(in) :: n,l
     real(8),intent(in) :: anu,r
-    real(8) :: norm, x, nu, s
+    real(8) :: s
+    real(8) :: prefact, exp_component, nu, x, a
     nu = sqrt(anu)
     x = nu * r
-    norm = sqrt(2.d0 * nu * Gamma_function(dble(n+1)) / Gamma_function(dble(n+l)+1.5d0))
-    s = norm * x**(l+1) * exp(-0.5d0*x**2) * laguerre(n,dble(l)+0.5d0,x**2)
+    a = dble(l)+0.5d0
+    prefact = sqrt( 2.d0 * nu )
+    exp_component = 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+l)+1.5d0) - 0.5d0*x**2 &
+        & + dble(l+1) * log(x)
+    s = prefact * exp(exp_component) * laguerre(n,a,x**2)
   end function ho_radial_wf_norm
 
   subroutine gauss_legendre(x1,x2,x,w,n)
