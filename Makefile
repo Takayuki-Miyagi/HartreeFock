@@ -121,7 +121,6 @@ $(TARGET): $(OBJS)
 	else \
 		mkdir $(INSTLDIR); \
 	fi
-	ln -sf $(PWD)/$(TARGET).exe $(INSTLDIR)
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -149,6 +148,9 @@ dirs:
 
 dep:
 	$(FDEP) $(SRCS) -b $(OBJDIR)/ > $(DEPDIR)/makefile.d
+
+install:
+	ln -sf $(PWD)/$(TARGET).exe $(INSTLDIR)
 
 clean:
 	rm -f $(MODDIR)/*.mod

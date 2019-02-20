@@ -76,9 +76,6 @@ module ModelSpace
   contains
     procedure :: init => InitOneBodySpace
     procedure :: fin => FinOneBodySpace
-    procedure :: GetOneBodyChannel
-    procedure :: GetOneBodyChannelJPZ
-    generic :: get => GetOneBodyChannel, GetOneBodyChannelJPZ
   end type OneBodySpace
 
   type, extends(jpz) :: TwoBodyChannel
@@ -102,9 +99,6 @@ module ModelSpace
   contains
     procedure :: init => InitTwoBodySpace
     procedure :: fin => FinTwoBodySpace
-    procedure :: GetTwoBodyChannel
-    procedure :: GetTwoBodyChannelJPZ
-    generic :: get => GetTwoBodyChannel, GetTwoBodyChannelJPZ
   end type TwoBodySpace
 
   type :: AdditionalQN
@@ -143,9 +137,6 @@ module ModelSpace
   contains
     procedure :: init => InitThreeBodySpace
     procedure :: fin => FinThreeBodySpace
-    procedure :: GetThreeBodyChannel
-    procedure :: GetThreeBodyChannelJPZ
-    generic :: get => GetThreeBodyChannel, GetThreeBodyChannelJPZ
   end type ThreeBodySpace
 
   type :: coef
@@ -292,7 +283,7 @@ contains
   subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax, beta, is_orth_three_body)
     use Profiler, only: timer
     use ClassSys, only: sys
-    class(MSpace), intent(inout) :: this
+    class(MSpace), intent(inout), target :: this
     real(8), intent(in) :: hw
     integer, intent(in) :: A, Z, N
     integer, intent(in) :: emax, e2max
@@ -302,6 +293,7 @@ contains
     type(sys) :: s
     integer :: i, l
     character(20) :: Nucl
+    type(SingleParticleOrbit), pointer :: o
     real(8) :: ti
 
     ti = omp_get_wtime()
@@ -338,15 +330,10 @@ contains
     write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
     do i = 1, this%nh ! print hole states
       l = this%holes(i)
-      write(*,'(a10,5i4,f14.6)') '     hole:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
-          & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
+      o => this%sps%orb(l)
+      write(*,'(a10,5i4,f14.6)') '     hole:', l, o%n, o%l, o%j, o%z, this%NOcoef(l)
     end do
 
-    !do i = 1, this%np ! print particle states
-    !  l = this%particles(i)
-    !  write(*,'(a10,5i4,f14.6)') ' particle:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
-    !      & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
-    !end do
     write(*,*)
     call this%InitMSpace()
     write(*,*)
@@ -357,7 +344,7 @@ contains
   subroutine InitMSpaceFromFile(this, Nucl, filename, hw, emax, e2max, e3max, lmax, beta, is_orth_three_body)
     use Profiler, only: timer
     use ClassSys, only: sys
-    class(MSpace), intent(inout) :: this
+    class(MSpace), intent(inout), target :: this
     character(*), intent(in) :: Nucl, filename
     real(8), intent(in) :: hw
     integer, intent(in) :: emax, e2max
@@ -366,6 +353,7 @@ contains
     logical, intent(in), optional :: is_orth_three_body
     type(sys) :: s
     integer :: A, Z, N, i, l
+    type(SingleParticleOrbit), pointer :: o
     real(8) :: ti
 
     ti = omp_get_wtime()
@@ -402,8 +390,8 @@ contains
     write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
     do i = 1, this%nh ! print hole states
       l = this%holes(i)
-      write(*,'(a10,5i4,f14.6)') '     hole:', l, this%sps%orb(l)%n, this%sps%orb(l)%l, &
-          & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
+      o => this%sps%orb(l)
+      write(*,'(a10,5i4,f14.6)') '     hole:', l, o%n, o%l, o%j, o%z, this%NOcoef(l)
     end do
     write(*,*)
     call this%InitMSpace()
@@ -432,11 +420,12 @@ contains
 
   subroutine GetConfFromFile(this, filename, A, Z, N)
     use MyLibrary, only: skip_comment
-    class(MSpace), intent(inout) :: this
+    class(MSpace), intent(inout), target :: this
     character(*), intent(in) :: filename
     integer, intent(out) :: A, Z, N
     integer :: nn, ll, jj, zz, idx, occ_num
     integer :: runit=20
+    type(SingleParticleOrbit), pointer :: o
 
     Z = 0
     N = 0
@@ -455,13 +444,14 @@ contains
     A = Z + N
 
     do idx = 1, this%sps%norbs
-      call this%sps%orb(idx)%SetOccupation(this%NOcoef(idx))
+      o => this%sps%orb(idx)
+      call o%SetOccupation(this%NOcoef(idx))
       if(this%NOcoef(idx) < 1.d-6) then
-        call this%sps%orb(idx)%SetParticleHole(1)
+        call o%SetParticleHole(1)
       elseif(abs(1.d0 - this%NOCoef(idx)) < 1.d-6) then
-        call this%sps%orb(idx)%SetParticleHole(0)
+        call o%SetParticleHole(0)
       else
-        call this%sps%orb(idx)%SetParticleHole(2)
+        call o%SetParticleHole(2)
       end if
     end do
 
@@ -469,11 +459,12 @@ contains
 
   subroutine GetNOCoef(this)
     ! This should be called after obtaining A, Z, N
-    class(MSpace), intent(inout) :: this
+    class(MSpace), intent(inout), target :: this
     integer :: Z, N
     integer :: e, l, j, g, ns
     integer :: zz, nn, vz, vn
     integer :: idxp, idxn
+    type(SingleParticleOrbit), pointer :: o
 
     allocate(this%NOCoef(this%sps%norbs))
     this%NOCoef(:) = 0.d0
@@ -518,13 +509,14 @@ contains
     end if
 
     do l = 1, this%sps%norbs
-      call this%sps%orb(l)%SetOccupation(this%NOcoef(l))
+      o => this%sps%orb(l)
+      call o%SetOccupation(this%NOcoef(l))
       if(this%NOcoef(l) < 1.d-6) then
-        call this%sps%orb(l)%SetParticleHole(1)
+        call o%SetParticleHole(1)
       elseif(abs(1.d0 - this%NOCoef(l)) < 1.d-6) then
-        call this%sps%orb(l)%SetParticleHole(0)
+        call o%SetParticleHole(0)
       else
-        call this%sps%orb(l)%SetParticleHole(2)
+        call o%SetParticleHole(2)
       end if
     end do
 
@@ -532,8 +524,8 @@ contains
     write(*,'(a)') "In GetNOCoef:"
     write(*,'(a)') "   n,  l,  j, tz,   occupation"
     do l = 1, this%sps%norbs
-      write(*,'(4i4,f14.6)') this%sps%orb(l)%n, this%sps%orb(l)%l, &
-          & this%sps%orb(l)%j, this%sps%orb(l)%z, this%NOcoef(l)
+      o => this%sps%orb(l)
+      write(*,'(4i4,f14.6)') o%n, o%l, o%j, o%z, this%NOcoef(l)
     end do
 #endif
   end subroutine GetNOCoef
@@ -713,22 +705,6 @@ contains
 
   end subroutine InitOneBodySpace
 
-  function GetOneBodyChannel(this,ch) result(one)
-    class(OneBodySpace), intent(in) :: this
-    integer, intent(in) :: ch
-    type(OneBodyChannel) :: one
-    one = this%jpz(ch)
-  end function GetOneBodyChannel
-
-  function GetOneBodyChannelJPZ(this,J,P,Z) result(one)
-    class(OneBodySpace), intent(in) :: this
-    integer, intent(in) :: J,P,Z
-    integer :: ch
-    type(OneBodyChannel) :: one
-    ch = this%jpz2ch(J,P,Z)
-    one = this%jpz(ch)
-  end function GetOneBodyChannelJPZ
-
   subroutine FinOneBodyChannel(this)
     class(OneBodyChannel), intent(inout) :: this
     deallocate(this%n2spi)
@@ -737,7 +713,8 @@ contains
 
   subroutine InitOneBodyChannel(this, j, p, z, n, sps)
     class(OneBodyChannel), intent(inout) :: this
-    type(Orbits), intent(in) :: sps
+    type(Orbits), intent(in), target :: sps
+    type(SingleParticleOrbit), pointer :: o
     integer, intent(in) :: j, p, z, n
     integer :: cnt, i
     this%j = j
@@ -752,9 +729,10 @@ contains
     this%spi2n(:) = 0
     cnt = 0
     do i = 1, sps%norbs
-      if(sps%orb(i)%j /= j) cycle
-      if((-1)**sps%orb(i)%l /= p) cycle
-      if(sps%orb(i)%z /= z) cycle
+      o => sps%orb(i)
+      if(o%j /= j) cycle
+      if((-1)**o%l /= p) cycle
+      if(o%z /= z) cycle
       cnt = cnt + 1
       this%n2spi(cnt) = i
       this%spi2n(i) = cnt
@@ -780,11 +758,11 @@ contains
   subroutine InitTwoBodySpace(this, sps, e2max)
     use MyLibrary, only: triag
     class(TwoBodySpace), intent(inout) :: this
-    type(Orbits), intent(in) :: sps
+    type(Orbits), intent(in), target :: sps
     integer, intent(in) :: e2max
     integer :: j, p, z, n, ich
-    integer :: i1, j1, l1, z1, e1
-    integer :: i2, j2, l2, z2, e2
+    integer :: i1, i2
+    type(SingleParticleOrbit), pointer :: o1, o2
     integer, allocatable :: jj(:), pp(:), zz(:), nn(:)
 
     allocate(this%jpz2ch(0:min(2*sps%lmax,e2max)+1,-1:1,-1:1))
@@ -796,21 +774,14 @@ contains
           n = 0
 
           do i1 = 1, sps%norbs
-            j1 = sps%orb(i1)%j
-            l1 = sps%orb(i1)%l
-            z1 = sps%orb(i1)%z
-            e1 = sps%orb(i1)%e
-
+            o1 => sps%orb(i1)
             do i2 = 1, i1
-              j2 = sps%orb(i2)%j
-              l2 = sps%orb(i2)%l
-              z2 = sps%orb(i2)%z
-              e2 = sps%orb(i2)%e
+              o2 => sps%orb(i2)
 
-              if(e1 + e2 > e2max) cycle
-              if(triag(j1, j2, 2*j)) cycle
-              if((-1) ** (l1+l2) /= p) cycle
-              if(z1 + z2 /= 2*z) cycle
+              if(o1%e + o2%e > e2max) cycle
+              if(triag(o1%j, o2%j, 2*j)) cycle
+              if((-1) ** (o1%l+o2%l) /= p) cycle
+              if(o1%z + o2%z /= 2*z) cycle
               if(i1 == i2 .and. mod(j,2) == 1) cycle
               n = n + 1
 
@@ -840,21 +811,14 @@ contains
           n = 0
 
           do i1 = 1, sps%norbs
-            j1 = sps%orb(i1)%j
-            l1 = sps%orb(i1)%l
-            z1 = sps%orb(i1)%z
-            e1 = sps%orb(i1)%e
-
+            o1 => sps%orb(i1)
             do i2 = 1, i1
-              j2 = sps%orb(i2)%j
-              l2 = sps%orb(i2)%l
-              z2 = sps%orb(i2)%z
-              e2 = sps%orb(i2)%e
+              o2 => sps%orb(i2)
 
-              if(e1 + e2 > e2max) cycle
-              if(triag(j1, j2, 2*j)) cycle
-              if((-1) ** (l1+l2) /= p) cycle
-              if(z1 + z2 /= 2*z) cycle
+              if(o1%e + o2%e > e2max) cycle
+              if(triag(o1%j, o2%j, 2*j)) cycle
+              if((-1) ** (o1%l+o2%l) /= p) cycle
+              if(o1%z + o2%z /= 2*z) cycle
               if(i1 == i2 .and. mod(j,2) == 1) cycle
               n = n + 1
 
@@ -874,24 +838,8 @@ contains
     do ich = 1, this%NChan
       call this%jpz(ich)%init(jj(ich),pp(ich),zz(ich),nn(ich),sps,e2max)
     end do
+    deallocate(jj,pp,zz,nn)
   end subroutine InitTwoBodySpace
-
-  function GetTwoBodyChannel(this,ch) result(two)
-    class(TwoBodySpace), intent(in) :: this
-    integer, intent(in) :: ch
-    type(TwoBodyChannel) :: two
-    two = this%jpz(ch)
-  end function GetTwoBodyChannel
-
-  function GetTwoBodyChannelJPZ(this,J,P,Z) result(two)
-    class(TwoBodySpace), intent(in) :: this
-    integer, intent(in) :: J,P,Z
-    integer :: ch
-    type(TwoBodyChannel) :: two
-    ch = this%jpz2ch(J,P,Z)
-    two = this%jpz(ch)
-  end function GetTwoBodyChannelJPZ
-
 
   subroutine FinTwoBodyChannel(this)
     class(TwoBodyChannel), intent(inout) :: this
@@ -905,9 +853,9 @@ contains
     use MyLibrary, only: triag
     class(TwoBodyChannel), intent(inout) :: this
     integer, intent(in) :: j, p, z, n, e2max
-    type(Orbits), intent(in) :: sps
-    integer :: i1, j1, l1, z1, e1
-    integer :: i2, j2, l2, z2, e2
+    type(Orbits), intent(in), target :: sps
+    integer :: i1, i2
+    type(SingleParticleOrbit), pointer :: o1, o2
     integer :: a, b
     integer :: cnt
 
@@ -924,20 +872,14 @@ contains
 #endif
     cnt = 0
     do i1 = 1, sps%norbs
-      j1 = sps%orb(i1)%j
-      l1 = sps%orb(i1)%l
-      z1 = sps%orb(i1)%z
-      e1 = sps%orb(i1)%e
+      o1 => sps%orb(i1)
       do i2 = 1, i1
-        j2 = sps%orb(i2)%j
-        l2 = sps%orb(i2)%l
-        z2 = sps%orb(i2)%z
-        e2 = sps%orb(i2)%e
+        o2 => sps%orb(i2)
 
-        if(e1 + e2 > e2max) cycle
-        if(triag(j1, j2, 2*j)) cycle
-        if((-1) ** (l1+l2) /= p) cycle
-        if(z1 + z2 /= 2*z) cycle
+        if(o1%e + o2%e > e2max) cycle
+        if(triag(o1%j, o2%j, 2*j)) cycle
+        if((-1) ** (o1%l+o2%l) /= p) cycle
+        if(o1%z + o2%z /= 2*z) cycle
         if(i1 == i2 .and. mod(j,2) == 1) cycle
 
         a = i1; b = i2
@@ -952,7 +894,7 @@ contains
         this%spis2n(a,b) = cnt
         this%spis2n(b,a) = cnt
         this%iphase(a,b) = 1
-        this%iphase(b,a) = -(-1) ** ((j1+j2)/2 - j)
+        this%iphase(b,a) = -(-1) ** ((o1%j+o2%j)/2 - j)
 #ifdef ModelSpaceDebug
         write(*,'(a,i3,a,i3,a,i6)') "i1=",a,", i2=",b,", Num=",cnt
 #endif
@@ -976,12 +918,11 @@ contains
   subroutine InitNonOrthIsospinThreeBodySpace(this, sps, e2max, e3max)
     use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodySpace), intent(inout) :: this
-    type(OrbitsIsospin), intent(in) :: sps
+    type(OrbitsIsospin), intent(in), target :: sps
     integer, intent(in) :: e2max, e3max
     integer :: j, p, t, ich, nidx, n
-    integer :: i1, j1, l1, e1
-    integer :: i2, j2, l2, e2
-    integer :: i3, j3, l3, e3
+    integer :: i1, i2, i3
+    type(SingleParticleOrbitIsospin), pointer :: o1, o2, o3
     integer :: j12, t12, j12min, j12max, t12min, t12max
     integer :: nj
     integer, allocatable :: jj(:), pp(:), tt(:), nn(:), nnidx(:)
@@ -999,30 +940,24 @@ contains
           n = 0
           nidx = 0
           do i1 = 1, sps%norbs
-            j1 = sps%orb(i1)%j
-            l1 = sps%orb(i1)%l
-            e1 = sps%orb(i1)%e
+            o1 => sps%orb(i1)
             do i2 = 1, i1
-              j2 = sps%orb(i2)%j
-              l2 = sps%orb(i2)%l
-              e2 = sps%orb(i2)%e
-              if(e1 + e2 > e2max) cycle
+              o2 => sps%orb(i2)
+              if(o1%e + o2%e > e2max) cycle
               do i3 = 1, i2
-                j3 = sps%orb(i3)%j
-                l3 = sps%orb(i3)%l
-                e3 = sps%orb(i3)%e
-                if(e1 + e3 > e2max) cycle
-                if(e2 + e3 > e2max) cycle
-                if(e1 + e2 + e3 > e3max) cycle
-                if((-1) ** (l1+l2+l3) /= p) cycle
+                o3 => sps%orb(i3)
+                if(o1%e + o3%e > e2max) cycle
+                if(o2%e + o3%e > e2max) cycle
+                if(o1%e + o2%e + o3%e > e3max) cycle
+                if((-1) ** (o1%l+o2%l+o3%l) /= p) cycle
 
                 nj = 0
-                j12min = (j1+j2)/2
-                j12max = abs(j1-j2)/2
+                j12min = (o1%j+o2%j)/2
+                j12max = abs(o1%j-o2%j)/2
                 t12min = 1
                 t12max = 0
-                do j12 = abs(j1-j2)/2, (j1+j2)/2
-                  if(triag(2*j12,j3,j)) cycle
+                do j12 = abs(o1%j-o2%j)/2, (o1%j+o2%j)/2
+                  if(triag(2*j12,o3%j,j)) cycle
                   do t12 = 0, 1
                     if(triag(2*t12, 1,t)) cycle
                     if(i1 == i2 .and. mod(j12+t12,2) == 0) cycle
@@ -1071,30 +1006,24 @@ contains
           n = 0
           nidx = 0
           do i1 = 1, sps%norbs
-            j1 = sps%orb(i1)%j
-            l1 = sps%orb(i1)%l
-            e1 = sps%orb(i1)%e
+            o1 => sps%orb(i1)
             do i2 = 1, i1
-              j2 = sps%orb(i2)%j
-              l2 = sps%orb(i2)%l
-              e2 = sps%orb(i2)%e
-              if(e1 + e2 > e2max) cycle
+              o2 => sps%orb(i2)
+              if(o1%e + o2%e > e2max) cycle
               do i3 = 1, i2
-                j3 = sps%orb(i3)%j
-                l3 = sps%orb(i3)%l
-                e3 = sps%orb(i3)%e
-                if(e1 + e3 > e2max) cycle
-                if(e2 + e3 > e2max) cycle
-                if(e1 + e2 + e3 > e3max) cycle
-                if((-1) ** (l1+l2+l3) /= p) cycle
+                o3 => sps%orb(i3)
+                if(o1%e + o3%e > e2max) cycle
+                if(o2%e + o3%e > e2max) cycle
+                if(o1%e + o2%e + o3%e > e3max) cycle
+                if((-1) ** (o1%l+o2%l+o3%l) /= p) cycle
 
                 nj = 0
-                j12min = (j1+j2)/2
-                j12max = abs(j1-j2)/2
+                j12min = (o1%j+o2%j)/2
+                j12max = abs(o1%j-o2%j)/2
                 t12min = 1
                 t12max = 0
-                do j12 = abs(j1-j2)/2, (j1+j2)/2
-                  if(triag(2*j12,j3,j)) cycle
+                do j12 = abs(o1%j-o2%j)/2, (o1%j+o2%j)/2
+                  if(triag(2*j12,o3%j,j)) cycle
                   do t12 = 0, 1
                     if(triag(2*t12, 1,t)) cycle
                     if(i1 == i2 .and. mod(j12+t12,2) == 0) cycle
@@ -1743,22 +1672,6 @@ contains
     end do
     deallocate(ch)
   end subroutine InitThreeBodySpace
-
-  function GetThreeBodyChannel(this,ch) result(thr)
-    class(ThreeBodySpace), intent(in) :: this
-    integer, intent(in) :: ch
-    type(ThreeBodyChannel) :: thr
-    thr = this%jpz(ch)
-  end function GetThreeBodyChannel
-
-  function GetThreeBodyChannelJPZ(this,J,P,Z) result(thr)
-    class(ThreeBodySpace), intent(in) :: this
-    integer, intent(in) :: J,P,Z
-    integer :: ch
-    type(ThreeBodyChannel) :: thr
-    ch = this%jpz2ch(J,P,Z)
-    thr = this%jpz(ch)
-  end function GetThreeBodyChannelJPZ
 
   subroutine FinThreeBodyChannel(this)
     class(ThreeBodyChannel), intent(inout) :: this

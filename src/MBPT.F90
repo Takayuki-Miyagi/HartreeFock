@@ -492,24 +492,24 @@ contains
     ! MBPT criteria is not clear, but it definitely gets worse in the proton-neutron unbalance system.
     !
     class(MBPTEnergy), intent(inout) :: this
-    type(MSPace), intent(in) :: ms
+    type(MSPace), intent(in), target :: ms
     type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
-    type(SingleParticleOrbit) :: oa, oi
+    type(SingleParticleOrbit), pointer :: oa, oi
     real(8) :: max_denom1b, max_denom2b, max_val, max_v, lowest_particle, highest_hole
 
     norbs = ms%sps%norbs
 
     lowest_particle = 100.d0
     do a = 1, norbs
-      oa = ms%sps%get(a)
+      oa => ms%sps%orb(a)
       if( oa%ph /= 1 ) cycle
       lowest_particle = min(lowest_particle, h%one%GetOBME(ms%sps,ms%one,a,a))
     end do
 
     highest_hole = -100.d0
     do a = 1, norbs
-      oa = ms%sps%get(a)
+      oa => ms%sps%orb(a)
       if( oa%ph /= 0 ) cycle
       highest_hole = max(highest_hole, h%one%GetOBME(ms%sps,ms%one,a,a))
     end do
@@ -518,10 +518,10 @@ contains
     ! -- check HF condition, max_denom1b should be 0
     max_denom1b = 0.d0
     do a = 1, norbs
-      oa = ms%sps%get(a)
+      oa => ms%sps%orb(a)
       if( oa%ph /= 1 ) cycle
       do i = 1, norbs
-      oi = ms%sps%get(i)
+      oi => ms%sps%orb(i)
       if( oi%ph /= 0 ) cycle
         max_denom1b = max(max_denom1b, h%one%GetOBME(ms%sps,ms%one,i,a) / abs(denom1b(ms%sps,ms%one,h%one,i,a)))
       end do

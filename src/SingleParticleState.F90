@@ -14,8 +14,6 @@ module SingleParticleState
   private :: FinOrbits
   private :: iso2pn
   private :: pn2iso
-  private :: GetOrbit
-  private :: GetOrbitIsospin
   private :: GetLabelFromIndex
   private :: GetLabelFromIndexIsospin
   private :: GetIndexFromLabel
@@ -55,7 +53,6 @@ module SingleParticleState
   contains
     procedure :: init => InitOrbitsIsospin
     procedure :: fin => FinOrbitsIsospin
-    procedure :: get => GetOrbitIsospin
     procedure :: iso2pn
     procedure :: GetLabelFromIndexIsospin
     procedure :: GetIndexFromLabelIsospin
@@ -69,7 +66,6 @@ module SingleParticleState
   contains
     procedure :: init => InitOrbits
     procedure :: fin => FinOrbits
-    procedure :: get => GetOrbit
     procedure :: pn2iso
     procedure :: GetLabelFromIndex
     procedure :: GetIndexFromLabel
@@ -136,13 +132,6 @@ contains
     this%is_constructed = .true.
   end subroutine InitOrbitsIsospin
 
-  function GetOrbitIsospin(this,idx) result(o)
-    class(OrbitsIsospin), intent(in) :: this
-    integer, intent(in) :: idx
-    type(SingleParticleOrbitIsospin) :: o
-    o = this%orb(idx)
-  end function GetOrbitIsospin
-
   subroutine FinOrbits(this)
     class(Orbits), intent(inout) :: this
     if(.not. this%is_constructed) return
@@ -201,13 +190,6 @@ contains
     end do
     this%is_constructed = .true.
   end subroutine InitOrbits
-
-  function GetOrbit(this,idx) result(o)
-    class(Orbits), intent(in) :: this
-    integer, intent(in) :: idx
-    type(SingleParticleOrbit) :: o
-    o = this%orb(idx)
-  end function GetOrbit
 
   subroutine SetSingleParticleOrbitIsospin(this, n, l, j, idx)
     class(SingleParticleOrbitIsospin), intent(inout) :: this
