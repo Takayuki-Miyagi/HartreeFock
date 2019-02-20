@@ -74,6 +74,7 @@ module NOperators
   private :: read_Scalar_myg_bin
   private :: read_scalar_snt_ascii
   private :: read_scalar_navratil_ascii
+  private :: read_scalar_navratil_ascii_gz
   ! two-body tensor
   private :: ReadTensor2BFile
   ! three-body scalar
@@ -224,6 +225,7 @@ module NOperators
     procedure :: read_scalar_myg_bin
     procedure :: read_scalar_snt_ascii
     procedure :: read_scalar_navratil_ascii
+    procedure :: read_scalar_navratil_ascii_gz
 
     ! methods for three-body marix element
     procedure :: ReadScalar3BFile
@@ -2005,6 +2007,11 @@ contains
       return
     end if
 
+    if(s%find(this%file_nn, 'TBMEA2') .and. s%find(this%file_nn, '.gz')) then
+      call this%read_scalar_navratil_ascii_gz(two,sps,ms)
+      return
+    end if
+
     if(s%find(this%file_nn, 'TBMEA2')) then
       call this%read_scalar_navratil_ascii(two,sps,ms)
       return
@@ -2327,44 +2334,40 @@ contains
   subroutine get_vector_me2j_gz(f,v)
     use, intrinsic :: iso_c_binding
     use ClassSys, only: sys
-    use MyLibrary, only: gzip_open, gzip_read, gzip_close
+    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     character(*), intent(in) :: f
     real(8), intent(inout) :: v(:)
     integer :: nelm, line, lines, i, nelm_tail, cnt
-    character(256) :: buffer
+    character(512) :: buffer = ''
     character(:), allocatable :: fm
     type(c_ptr) :: p, buf
+#ifdef NOperatorsDebug
     type(sys) :: s
+#endif
     nelm = size(v)
     lines = nelm/10
     nelm_tail = nelm - 10 * lines
     p = gzip_open(f,'r')
-    buf = gzip_read(p, buffer, me2j_header_length)
+    buf = gzip_readline(p, buffer, len(buffer))
     cnt = 0
     do line = 1, lines
-      buf = gzip_read(p, buffer, me2j_me_length*10+1)
-      do i = 1, 10
-        cnt = cnt + 1
-        read( buffer( (i-1)*me2j_me_length+2 : i*me2j_me_length+1), *) &
-            & v(cnt)
-      end do
+      buf = gzip_readline(p, buffer, len(buffer))
+      read(buffer,*) v(cnt+1:cnt+10)
 #ifdef NOperatorsDebug
-      write(*,'(10f12.6)') v(cnt-9:cnt)
+      write(*,'(10f12.6)') v(cnt+1:cnt+10)
 #endif
+      cnt = cnt + 10
     end do
     if(nelm_tail == 0) then
       buf = gzip_close(p)
       return
     end if
-    buf = gzip_read(p, buffer, me2j_me_length*nelm_tail+1)
-    do i = 1, nelm_tail
-      cnt = cnt + 1
-      read( buffer( (i-1)*me2j_me_length+2 : i*me2j_me_length+1), *) &
-          & v(cnt)
-    end do
+
+    buf = gzip_readline(p, buffer, len(buffer))
+    read(buffer,*) v(lines*10+1:nelm)
 #ifdef NOperatorsDebug
     fm = "("//trim(s%str(nelm_tail)) // 'f12.6'//")"
-    write(*,fm) v(lines*10:)
+    write(*,fm) v(lines*10+1:)
 #endif
     buf = gzip_close(p)
   end subroutine get_vector_me2j_gz
@@ -2494,6 +2497,78 @@ contains
     end do
     close(runit)
   end subroutine read_scalar_snt_ascii
+
+  subroutine read_scalar_navratil_ascii_gz(this,two,sps,ms)
+    use, intrinsic :: iso_c_binding
+    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
+    class(ReadFiles), intent(in) :: this
+    type(NBodyPart), intent(inout) :: two
+    type(Orbits), intent(in) :: sps
+    type(TwoBodySpace), intent(in) :: ms
+    type(OrbitsIsospin) :: isps
+    integer :: io
+    integer :: a, b, c, d, J, T
+    integer :: ap, bp, cp, dp
+    integer :: an, bn, cn, dn
+    integer :: iline, nlines
+    real(8) :: trel, horel, vcoul, vpn, vpp, vnn, fact
+    integer :: emax_in, e2max_in
+    real(8) :: hw_in, lambda_in
+    type(c_ptr) :: p, buf
+    character(512) :: buffer = ''
+
+
+    call isps%init(this%emax2, this%lmax2)
+
+    p = gzip_open(this%file_nn, 'r')
+    buf = gzip_readline(p, buffer, len(buffer))
+    read(buffer,*) nlines, emax_in, e2max_in, hw_in, lambda_in
+    if(emax_in /= this%emax2 ) write(*,'(a)') "Warning: file emax doesn't match"
+    if(e2max_in/= this%e2max2) write(*,'(a)') "Warning: file e2max doesn't match"
+    do iline = 1, nlines
+      buf = gzip_readline(p, buffer, len(buffer))
+      read(buffer,*) a, b, c, d, J, T, trel, horel, vcoul, vpn, vpp, vnn
+      if(J > min(2*sps%lmax+1, ms%e2max+1)) exit
+      if(isps%orb(a)%e > ms%emax) cycle
+      if(isps%orb(b)%e > ms%emax) cycle
+      if(isps%orb(c)%e > ms%emax) cycle
+      if(isps%orb(d)%e > ms%emax) cycle
+      if(isps%orb(a)%e + isps%orb(b)%e > ms%e2max) cycle
+      if(isps%orb(c)%e + isps%orb(d)%e > ms%e2max) cycle
+      ap = isps%iso2pn(sps,a,-1)
+      an = isps%iso2pn(sps,a, 1)
+      bp = isps%iso2pn(sps,b,-1)
+      bn = isps%iso2pn(sps,b, 1)
+      cp = isps%iso2pn(sps,c,-1)
+      cn = isps%iso2pn(sps,c, 1)
+      dp = isps%iso2pn(sps,d,-1)
+      dn = isps%iso2pn(sps,d, 1)
+      fact = 1.d0
+      if(a/=b) fact = fact / dsqrt(2.d0)
+      if(c/=d) fact = fact / dsqrt(2.d0)
+
+      if(T==1) then
+        call two%SetTwBME(sps,ms,ap,bp,cp,dp,J,vpp)
+        call two%SetTwBME(sps,ms,an,bn,cn,dn,J,vnn)
+        call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,fact*vpn)
+        if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,fact*vpn)
+        if(a/=b .and. c/=d) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
+        if(a/=b .and. (a/=c .or. b/=d)) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,fact*vpn)
+      end if
+
+      if(T==0) then
+        call two%AddToTwBME(sps,ms,ap,bn,cp,dn,J,fact*vpn)
+        if(c/=d) call two%AddToTwBME(sps,ms,ap,bn,cn,dp,J,-fact*vpn)
+        if(a/=b .and. c/=d) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cn,dp,J,fact*vpn)
+        if(a/=b .and. (a/=c .or. b/=d)) &
+            &    call two%AddToTwBME(sps,ms,an,bp,cp,dn,J,-fact*vpn)
+      end if
+    end do
+    buf = gzip_close(p)
+  end subroutine read_scalar_navratil_ascii_gz
 
   subroutine read_scalar_navratil_ascii(this,two,sps,ms)
     class(ReadFiles), intent(in) :: this

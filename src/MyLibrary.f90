@@ -123,6 +123,13 @@ module MyLibrary
       integer(c_int), value, intent(in) :: len
       type(c_ptr) :: gzip_read
     end function gzip_read
+    function gzip_readline(f, buf, len) bind(c, name='gzgets')
+      import c_int, c_char, c_ptr
+      type(c_ptr), value :: f
+      character(c_char) :: buf(*)
+      integer(c_int), value, intent(in) :: len
+      type(c_ptr) :: gzip_readline
+    end function gzip_readline
     function gzip_write(f, buf, len) bind(c, name='gzwrite')
       import c_int, c_char, c_ptr
       type(c_ptr), value :: f
