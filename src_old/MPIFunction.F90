@@ -18,10 +18,7 @@ contains
     end interface
     integer, intent(in) :: ntotal
     integer, allocatable, intent(inout) :: slranks(:)
-    integer :: num_loops
-#ifdef MPI
-    integer :: i
-#endif
+    integer :: num_loops, i
     if(.not.allocated(slranks)) allocate(slranks(ntotal))
     slranks = 0
 #ifdef MPI

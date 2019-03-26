@@ -81,34 +81,29 @@ module MBPT
   end type MBPTScalar
 contains
 
-  subroutine CalcEnergyCorr(this,hamil)
+  subroutine CalcEnergyCorr(this,ms,hamil)
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: hamil
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(in) :: hamil
 
     write(*,*)
     write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
     write(*,*)
 
-    if(.not. hamil%is_normal_ordered) then
-      write(*,"(a)") "In CalcEnergyCorr: "
-      write(*,"(a)") " Hamiltonian has to be normal ordered"
-      return
-    end if
-
-    call this%MBPTCriteria(hamil)
+    call this%MBPTCriteria(ms,hamil)
 
     this%e_0 = hamil%zero
-    call this%energy_second(hamil)
+    call this%energy_second(ms,hamil)
     write(*,'(a,f16.8)') "Second order correction: ", this%e_2
 
-    call this%energy_third(hamil)
+    call this%energy_third(ms,hamil)
     write(*,'(a,4f16.8)') "Third order corrections pp, hh, ph, and total: ", &
         & this%e_3_pp, this%e_3_hh, this%e_3_ph, this%e_3
     write(*,'(a,f16.8)') "Third order MBPT energy: ", this%e_0 + this%e_2 + this%e_3
 
   end subroutine CalcEnergyCorr
 
-  subroutine energy_second(this,h)
+  subroutine energy_second(this,ms,h)
     ! a, b : particle
     ! i, j : hole
     !     _____________
@@ -123,7 +118,8 @@ contains
     ! \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
     use Profiler, only: timer
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: h
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
     real(8) :: vsum, v, ti
@@ -131,26 +127,26 @@ contains
     ti = omp_get_wtime()
 
     vsum = 0.d0
-    do ch = 1, h%ms%two%NChan
-      J2 = h%ms%two%jpz(ch)%j
-      n = h%ms%two%jpz(ch)%n_state
+    do ch = 1, ms%two%NChan
+      J2 = ms%two%jpz(ch)%j
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
       do ab = 1, n
-        a = h%ms%two%jpz(ch)%n2spi1(ab)
-        b = h%ms%two%jpz(ch)%n2spi2(ab)
-        if( h%ms%sps%orb(a)%ph /= 1 ) cycle
-        if( h%ms%sps%orb(b)%ph /= 1 ) cycle
+        a = ms%two%jpz(ch)%n2spi1(ab)
+        b = ms%two%jpz(ch)%n2spi2(ab)
+        if( ms%sps%orb(a)%ph /= 1 ) cycle
+        if( ms%sps%orb(b)%ph /= 1 ) cycle
         do ij = 1, n
-          i = h%ms%two%jpz(ch)%n2spi1(ij)
-          j = h%ms%two%jpz(ch)%n2spi2(ij)
-          if( h%ms%sps%orb(i)%ph /= 0 ) cycle
-          if( h%ms%sps%orb(j)%ph /= 0 ) cycle
+          i = ms%two%jpz(ch)%n2spi1(ij)
+          j = ms%two%jpz(ch)%n2spi2(ij)
+          if( ms%sps%orb(i)%ph /= 0 ) cycle
+          if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-          v = v + h%two%GetTwBME(i,j,a,b,J2)**2 / &
-              & denom2b(h%one,i,j,a,b)
+          v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2)**2 / &
+              & denom2b(ms%sps,ms%one,h%one,i,j,a,b)
         end do
       end do
       !$omp end do
@@ -163,21 +159,25 @@ contains
     call timer%Add("Second order MBPT",omp_get_wtime()-ti)
   end subroutine energy_second
 
-  function denom1b(f,h1,p1) result(r)
-    type(OneBodyPart), intent(in) :: f
+  function denom1b(sps,one,f,h1,p1) result(r)
+    type(Orbits), intent(in) :: sps
+    type(OneBodySpace), intent(in) :: one
+    type(NBodyPart), intent(in) :: f
     integer, intent(in) :: h1, p1
     real(8) :: r
 
-    r = f%GetOBME(h1,h1) - f%GetOBME(p1,p1)
+    r = f%GetOBME(sps,one,h1,h1) - f%GetOBME(sps,one,p1,p1)
   end function denom1b
 
-  function denom2b(f,h1,h2,p1,p2) result(r)
-    type(OneBodyPart), intent(in) :: f
+  function denom2b(sps,one,f,h1,h2,p1,p2) result(r)
+    type(Orbits), intent(in) :: sps
+    type(OneBodySpace), intent(in) :: one
+    type(NBodyPart), intent(in) :: f
     integer, intent(in) :: h1, h2, p1, p2
     real(8) :: r
 
-    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) - &
-        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2)
+    r = f%GetOBME(sps,one,h1,h1) + f%GetOBME(sps,one,h2,h2) - &
+        & f%GetOBME(sps,one,p1,p1) - f%GetOBME(sps,one,p2,p2)
   end function denom2b
 
   function Eket(sps,a,b)
@@ -201,17 +201,18 @@ contains
     Tz = sps%orb(a)%z + sps%orb(b)%z
   end function Tz
 
-  subroutine energy_third(this,h)
+  subroutine energy_third(this,ms,h)
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: h
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h
 
-    call this%energy_third_hh(h)
-    call this%energy_third_pp(h)
-    call this%energy_third_ph(h)
+    call this%energy_third_hh(ms,h)
+    call this%energy_third_pp(ms,h)
+    call this%energy_third_ph(ms,h)
     this%e_3 = this%e_3_hh + this%e_3_pp + this%e_3_ph
   end subroutine energy_third
 
-  subroutine energy_third_pp(this,h)
+  subroutine energy_third_pp(this,ms,h)
     ! a, b, c, d: particle
     ! i, j      : hole
     !     _____________
@@ -227,18 +228,17 @@ contains
     ! <ij||ab> <ab||cd> <cd||ij> / 8 denominator
     use Profiler, only: timer
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: h
-    type(MSPace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
     real(8) :: v, vsum, ti
 
-    ms => h%ms
     ti = omp_get_wtime()
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -259,11 +259,11 @@ contains
             if( ms%sps%orb(i)%ph /= 0 ) cycle
             if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-            v = v + h%two%GetTwBME(i,j,a,b,J2) * &
-                & h%two%GetTwBME(a,b,c,d,J2) * &
-                & h%two%GetTwBME(c,d,i,j,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,i,j,c,d) )
+            v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) / &
+                & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                &   denom2b(ms%sps,ms%one,h%one,i,j,c,d) )
             !if(abs(v) > 1.d2) then
             !  write(*,'(5f18.8)') h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2), &
             !    & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) , &
@@ -282,7 +282,7 @@ contains
     call timer%Add("Third order MBPT pp ladder",omp_get_wtime()-ti)
   end subroutine energy_third_pp
 
-  subroutine energy_third_hh(this,h)
+  subroutine energy_third_hh(this,ms,h)
     ! a, b      : particle
     ! i, j, k, l: hole
     !     _____________
@@ -298,19 +298,18 @@ contains
     ! <ij||ab> <kl||ij> <ab||kl> / 8 denominator
     use Profiler, only: timer
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: h
-    type(MSPace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
     real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
 
-    ms => h%ms
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -330,11 +329,11 @@ contains
             l = ms%two%jpz(ch)%n2spi2(kl)
             if( ms%sps%orb(k)%ph /= 0 ) cycle
             if( ms%sps%orb(l)%ph /= 0 ) cycle
-            v = v + h%two%GetTwBME(a,b,i,j,J2) * &
-                & h%two%GetTwBME(i,j,k,l,J2) * &
-                & h%two%GetTwBME(k,l,a,b,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,k,l,a,b) )
+            v = v + h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,i,j,k,l,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,k,l,a,b,J2) / &
+                & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                &   denom2b(ms%sps,ms%one,h%one,k,l,a,b) )
           end do
         end do
       end do
@@ -348,7 +347,7 @@ contains
     call timer%Add("Third order MBPT hh ladder",omp_get_wtime()-ti)
   end subroutine energy_third_hh
 
-  subroutine energy_third_ph(this,h)
+  subroutine energy_third_ph(this,ms,h)
     ! a, b, c : particle
     ! i, j, k : hole
     !     _____________
@@ -368,8 +367,8 @@ contains
     use Profiler, only: timer
     use MyLibrary, only: triag
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: h
-    type(MSPace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h
     integer :: J2
     integer :: a, b, c, i, j, k
     integer :: ia, ib, ic, ii, ij, ik
@@ -377,7 +376,7 @@ contains
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
+
     vsum = 0.d0
     !$omp parallel
     !$omp do private(ia,ib,ic,ii,ij,ik, &
@@ -430,15 +429,15 @@ contains
                 do J2 = max(abs(ja-jj),abs(jb-ji),abs(jc-jk))/2, &
                       & min(   (ja+jj),   (jb+ji),   (jc+jk))/2
                   v = v + dble(2*J2+1) * &
-                    & cross_couple(h%two,i,j,a,b,J2) * &
-                    & cross_couple(h%two,k,b,i,c,J2) * &
-                    & cross_couple(h%two,a,c,k,j,J2)
+                    & cross_couple(ms%sps,ms%two,h%two,i,j,a,b,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,k,b,i,c,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2)
 
                 end do
 
                 vsum = vsum + norm * v / &
-                    & ( denom2b(h%one,k,j,a,c) * &
-                    &   denom2b(h%one,i,j,a,b) )
+                    & ( denom2b(ms%sps,ms%one,h%one,k,j,a,c) * &
+                    &   denom2b(ms%sps,ms%one,h%one,i,j,a,b) )
 
               end do
             end do
@@ -454,19 +453,17 @@ contains
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
   end subroutine energy_third_ph
 
-  function cross_couple(v,i,j,a,b,L) result(r)
+  function cross_couple(sps,two,v,i,j,a,b,L) result(r)
     use MyLibrary, only: triag,sjs
-    type(TwoBodyPart), intent(in) :: v
+    type(Orbits), intent(in) :: sps
+    type(TwoBodySpace), intent(in) :: two
+    type(NBodyPart), intent(in) :: v
     integer, intent(in) :: i, j, a, b, L
-    type(TwoBodySpace), pointer :: two
-    type(Orbits), pointer :: sps
     integer :: ji, jj, ja, jb
     integer :: J2
     real(8) :: r
 
     r = 0.d0
-    two => v%two
-    sps => two%sps
 
     if(Eket(sps,i,j) > two%e2max) return
     if(Eket(sps,a,b) > two%e2max) return
@@ -486,35 +483,35 @@ contains
       if(a==b .and. mod(J2,2)==1) cycle
       r = r + dble(2*J2+1) * &
           & sjs(ji, jj, 2*J2, ja, jb, 2*L) * &
-          & v%GetTwBME(i,j,a,b,J2)
+          & v%GetTwBME(sps,two,i,j,a,b,J2)
     end do
   end function cross_couple
 
-  subroutine MBPTCriteria(this,h)
+  subroutine MBPTCriteria(this, ms,h)
     !
     ! MBPT criteria is not clear, but it definitely gets worse in the proton-neutron unbalance system.
     !
     class(MBPTEnergy), intent(inout) :: this
-    type(Ops), intent(in) :: h
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in), target :: ms
+    type(Op), intent(in) :: h
     integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
     type(SingleParticleOrbit), pointer :: oa, oi
     real(8) :: max_denom1b, max_denom2b, max_val, max_v, lowest_particle, highest_hole
 
-    ms => h%ms
     norbs = ms%sps%norbs
+
     lowest_particle = 100.d0
     do a = 1, norbs
       oa => ms%sps%orb(a)
       if( oa%ph /= 1 ) cycle
-      lowest_particle = min(lowest_particle, h%one%GetOBME(a,a))
+      lowest_particle = min(lowest_particle, h%one%GetOBME(ms%sps,ms%one,a,a))
     end do
 
     highest_hole = -100.d0
     do a = 1, norbs
       oa => ms%sps%orb(a)
       if( oa%ph /= 0 ) cycle
-      highest_hole = max(highest_hole, h%one%GetOBME(a,a))
+      highest_hole = max(highest_hole, h%one%GetOBME(ms%sps,ms%one,a,a))
     end do
     this%energy_gap = lowest_particle - highest_hole
 
@@ -526,7 +523,7 @@ contains
       do i = 1, norbs
       oi => ms%sps%orb(i)
       if( oi%ph /= 0 ) cycle
-        max_denom1b = max(max_denom1b, h%one%GetOBME(i,a) / abs(denom1b(h%one,i,a)))
+        max_denom1b = max(max_denom1b, h%one%GetOBME(ms%sps,ms%one,i,a) / abs(denom1b(ms%sps,ms%one,h%one,i,a)))
       end do
     end do
 
@@ -534,7 +531,7 @@ contains
     max_v = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       !$omp parallel
       !$omp do private(ab, a, b, ij, i, j) reduction(max:max_val) schedule(dynamic)
@@ -549,7 +546,7 @@ contains
           if( ms%sps%orb(i)%ph /= 0 ) cycle
           if( ms%sps%orb(j)%ph /= 0 ) cycle
           max_val = max(max_val, &
-              & h%two%GetTwBME(i,j,a,b,J2) / abs(denom2b(h%one,i,j,a,b)))
+              & h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) / abs(denom2b(ms%sps,ms%one,h%one,i,j,a,b)))
 
         end do
       end do
@@ -570,35 +567,22 @@ contains
     this%perturbativity2b = max_denom2b
   end subroutine MBPTCriteria
 
-  subroutine CalcScalarCorr(this,hamil,opr,is_MBPT_full)
+  subroutine CalcScalarCorr(this,ms,hamil,opr,is_MBPT_full)
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: hamil, opr
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(in) :: hamil, opr
     logical, intent(in) :: is_MBPT_full
-    type(MSpace), pointer :: ms
     write(*,*)
     write(*,'(a)') " Many-body perturbation calculation up to 2nd order (scalar)"
     write(*,*)
 
-    if(.not. hamil%is_normal_ordered) then
-      write(*,"(a)") "In CalcScalarCorr: "
-      write(*,"(a)") " Hamiltonian has to be normal ordered"
-      return
-    end if
-
-    if(.not. opr%is_normal_ordered) then
-      write(*,"(a)") "In CalcScalarCorr: "
-      write(*,"(a)") " Operator has to be normal ordered"
-      return
-    end if
-
-    ms => hamil%ms
     this%s_0 = opr%zero
     if(is_MBPT_full) then
-      call this%scalar_first(hamil,opr)
+      call this%scalar_first(ms,hamil,opr)
       write(*,'(a,f16.8)') "First order correction: ", this%s_1
     end if
 
-    call this%scalar_second(hamil,opr,is_MBPT_full)
+    call this%scalar_second(ms,hamil,opr,is_MBPT_full)
     write(*,'(a)') "Second order corrections: "
     write(*,'(a,f16.8)') "s1 p ladder  = ", this%s_2_s1p
     write(*,'(a,f16.8)') "s1 h ladder  = ", this%s_2_s1h
@@ -615,7 +599,7 @@ contains
 
   end subroutine CalcScalarCorr
 
-  subroutine scalar_first(this,h,s)
+  subroutine scalar_first(this,ms,h,s)
     ! a, b : particle
     ! i, j : hole
     !
@@ -630,19 +614,18 @@ contains
     ! 2 \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSPace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
     real(8) :: vsum, v, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
 
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -658,9 +641,9 @@ contains
           if( ms%sps%orb(i)%ph /= 0 ) cycle
           if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-          v = v + h%two%GetTwBME(i,j,a,b,J2) * &
-              &   s%two%GetTwBME(a,b,i,j,J2) / &
-              &   denom2b(h%one,i,j,a,b)
+          v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
+              &   s%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) / &
+              &   denom2b(ms%sps,ms%one,h%one,i,j,a,b)
         end do
       end do
       !$omp end do
@@ -672,20 +655,21 @@ contains
     call timer%Add("First order MBPT for Scalar",omp_get_wtime()-ti)
   end subroutine scalar_first
 
-  subroutine scalar_second(this,h,s, is_MBPT_full)
+  subroutine scalar_second(this,ms,h,s, is_MBPT_full)
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     logical, intent(in) :: is_MBPT_full
-    call this%scalar_second_s1p( h,s)
-    call this%scalar_second_s1h( h,s)
-    call this%scalar_second_s1ph(h,s)
+    call this%scalar_second_s1p( ms,h,s)
+    call this%scalar_second_s1h( ms,h,s)
+    call this%scalar_second_s1ph(ms,h,s)
     if(is_MBPT_full) then
-      call this%scalar_second_s2pp(h,s)
-      call this%scalar_second_s2hh(h,s)
-      call this%scalar_second_s2ph(h,s)
-      call this%scalar_second_v2pp(h,s)
-      call this%scalar_second_v2hh(h,s)
-      call this%scalar_second_v2ph(h,s)
+      call this%scalar_second_s2pp(ms,h,s)
+      call this%scalar_second_s2hh(ms,h,s)
+      call this%scalar_second_s2ph(ms,h,s)
+      call this%scalar_second_v2pp(ms,h,s)
+      call this%scalar_second_v2hh(ms,h,s)
+      call this%scalar_second_v2ph(ms,h,s)
     end if
 
     this%s_2 = this%s_2_s1h + this%s_2_s1p + this%s_2_s1ph + &
@@ -693,7 +677,7 @@ contains
         & this%s_2_v2pp + this%s_2_v2hh + this%s_2_v2ph
   end subroutine scalar_second
 
-  subroutine scalar_second_s1p(this,h,s)
+  subroutine scalar_second_s1p(this,ms,h,s)
     ! a, b, c : particle
     ! i, j    : hole
     !     ____________
@@ -708,15 +692,15 @@ contains
     ! <ab||ij> <ij||ac> <b|x|c> / 2 denominator
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSPace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ia, ib, ic, ii, ij
     integer :: a, b, c, i, j
     integer :: ja, jb, ji, jj, J2
     real(8) :: vsum, v, norm, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
+
     vsum = 0.d0
     do ia = 1, size(ms%particles)
       do ib = 1, size(ms%particles)
@@ -751,14 +735,14 @@ contains
               v = 0.d0
               do J2 = max(abs(ja-jb), abs(ji-jj))/2, min(ja+jb, ji+jj)/2
                 v = v + dble(2*J2+1) * &
-                    & h%two%GetTwBME(a,b,i,j,J2) * &
-                    & h%two%GetTwBME(i,j,a,c,J2) * &
-                    & s%one%GetOBME(b,c)
+                    & h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                    & h%two%GetTwBME(ms%sps,ms%two,i,j,a,c,J2) * &
+                    & s%one%GetOBME(ms%sps,ms%one,b,c)
               end do
 
               vsum = vsum + norm * v / &
-                  & ( denom2b(h%one,i,j,a,b) * &
-                  &   denom2b(h%one,i,j,a,c) )
+                  & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                  &   denom2b(ms%sps,ms%one,h%one,i,j,a,c) )
             end do
           end do
         end do
@@ -768,7 +752,7 @@ contains
     call timer%Add("Second order MBPT s1 p ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s1p
 
-  subroutine scalar_second_s1h(this,h,s)
+  subroutine scalar_second_s1h(this,ms,h,s)
     ! a, b    : particle
     ! i, j, k : hole
     !     ____________
@@ -783,15 +767,14 @@ contains
     ! - <ab||ij> <ik||ac> <j|x|k> / 2 denominator
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ia, ib, ii, ij, ik
     integer :: a, b, i, j, k
     integer :: ja, jb, ji, jj, J2
     real(8) :: vsum, v, norm, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
 
     vsum = 0.d0
     do ia = 1, size(ms%particles)
@@ -827,14 +810,14 @@ contains
               v = 0.d0
               do J2 = max(abs(ja-jb), abs(ji-jj))/2, min(ja+jb, ji+jj)/2
                 v = v + dble(2*J2+1) * &
-                    & h%two%GetTwBME(a,b,i,j,J2) * &
-                    & h%two%GetTwBME(i,k,a,b,J2) * &
-                    & s%one%GetOBME(j,k)
+                    & h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                    & h%two%GetTwBME(ms%sps,ms%two,i,k,a,b,J2) * &
+                    & s%one%GetOBME(ms%sps,ms%one,j,k)
               end do
 
               vsum = vsum - norm * v / &
-                  & ( denom2b(h%one,i,j,a,b) * &
-                  &   denom2b(h%one,i,k,a,b) )
+                  & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                  &   denom2b(ms%sps,ms%one,h%one,i,k,a,b) )
             end do
           end do
         end do
@@ -844,7 +827,7 @@ contains
     call timer%Add("Second order MBPT s1 h ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s1h
 
-  subroutine scalar_second_s1ph(this,h,s)
+  subroutine scalar_second_s1ph(this,ms,h,s)
     ! a, b, c : particle
     ! i, j, k : hole
     !
@@ -860,15 +843,15 @@ contains
     ! + <ab||ij> <cj||ab> <c|x|i> / denominator
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSPace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ia, ib, ic, ii, ij, ik
     integer :: a, b, c, i, j, k
     integer :: ja, jb, ji, jj, J2
     real(8) :: vsum, v, norm, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
+
     vsum = 0.d0
     do ia = 1, size(ms%particles)
       do ib = 1, size(ms%particles)
@@ -902,14 +885,14 @@ contains
               v = 0.d0
               do J2 = max(abs(ja-jb), abs(ji-jj))/2, min(ja+jb, ji+jj)/2
                 v = v + dble(2*J2+1) * &
-                    & h%two%GetTwBME(a,b,i,j,J2) * &
-                    & h%two%GetTwBME(i,j,k,b,J2) * &
-                    & s%one%GetOBME(a,k)
+                    & h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                    & h%two%GetTwBME(ms%sps,ms%two,i,j,k,b,J2) * &
+                    & s%one%GetOBME(ms%sps,ms%one,a,k)
               end do
 
               vsum = vsum - norm * v / &
-                  & ( denom2b(h%one,i,j,a,b) * &
-                  &   denom1b(h%one,k,a) )
+                  & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                  &   denom1b(ms%sps,ms%one,h%one,k,a) )
             end do
 
             do ic = 1, size(ms%particles)
@@ -931,14 +914,14 @@ contains
               v = 0.d0
               do J2 = max(abs(ja-jb), abs(ji-jj))/2, min(ja+jb, ji+jj)/2
                 v = v + dble(2*J2+1) * &
-                    & h%two%GetTwBME(a,b,i,j,J2) * &
-                    & h%two%GetTwBME(c,j,a,b,J2) * &
-                    & s%one%GetOBME(c,i)
+                    & h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                    & h%two%GetTwBME(ms%sps,ms%two,c,j,a,b,J2) * &
+                    & s%one%GetOBME(ms%sps,ms%one,c,i)
               end do
 
               vsum = vsum + norm * v / &
-                  & ( denom2b(h%one,i,j,a,b) * &
-                  &   denom1b(h%one,i,c) )
+                  & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                  &   denom1b(ms%sps,ms%one,h%one,i,c) )
             end do
 
 
@@ -950,7 +933,7 @@ contains
     call timer%Add("Second order MBPT s1 ph bubble",omp_get_wtime()-ti)
   end subroutine scalar_second_s1ph
 
-  subroutine scalar_second_s2pp(this,h,s)
+  subroutine scalar_second_s2pp(this,ms,h,s)
     ! a, b, c, d: particle
     ! i, j      : hole
     !     _____________
@@ -965,18 +948,17 @@ contains
     !
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
     real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -997,11 +979,11 @@ contains
             if( ms%sps%orb(i)%ph /= 0 ) cycle
             if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-            v = v + h%two%GetTwBME(i,j,a,b,J2) * &
-                & s%two%GetTwBME(a,b,c,d,J2) * &
-                & h%two%GetTwBME(c,d,i,j,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,i,j,c,d) )
+            v = v + h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
+                & s%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) / &
+                & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                &   denom2b(ms%sps,ms%one,h%one,i,j,c,d) )
           end do
         end do
       end do
@@ -1013,7 +995,7 @@ contains
     call timer%Add("Second order MBPT s2 pp ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s2pp
 
-  subroutine scalar_second_s2hh(this,h,s)
+  subroutine scalar_second_s2hh(this,ms,h,s)
     ! a, b      : particle
     ! i, j, k, l: hole
     !     _____________
@@ -1028,19 +1010,18 @@ contains
     !
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
     real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
 
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -1060,11 +1041,11 @@ contains
             l = ms%two%jpz(ch)%n2spi2(kl)
             if( ms%sps%orb(k)%ph /= 0 ) cycle
             if( ms%sps%orb(l)%ph /= 0 ) cycle
-            v = v + h%two%GetTwBME(a,b,i,j,J2) * &
-                & s%two%GetTwBME(i,j,k,l,J2) * &
-                & h%two%GetTwBME(k,l,a,b,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,k,l,a,b) )
+            v = v + h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                & s%two%GetTwBME(ms%sps,ms%two,i,j,k,l,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,k,l,a,b,J2) / &
+                & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                &   denom2b(ms%sps,ms%one,h%one,k,l,a,b) )
           end do
         end do
       end do
@@ -1078,7 +1059,7 @@ contains
     call timer%Add("Second order MBPT s2 hh ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s2hh
 
-  subroutine scalar_second_s2ph(this,h,s)
+  subroutine scalar_second_s2ph(this,ms,h,s)
     ! a, b, c : particle
     ! i, j, k : hole
     !     _____________
@@ -1093,8 +1074,8 @@ contains
     !
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: J2
     integer :: a, b, c, i, j, k
     integer :: ia, ib, ic, ii, ij, ik
@@ -1102,7 +1083,6 @@ contains
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
 
     vsum = 0.d0
     !$omp parallel
@@ -1156,15 +1136,15 @@ contains
                 do J2 = max(abs(ja-jj),abs(jb-ji),abs(jc-jk))/2, &
                       & min(   (ja+jj),   (jb+ji),   (jc+jk))/2
                   v = v + dble(2*J2+1) * &
-                    & cross_couple(h%two,i,j,a,b,J2) * &
-                    & cross_couple(s%two,k,b,i,c,J2) * &
-                    & cross_couple(h%two,a,c,k,j,J2)
+                    & cross_couple(ms%sps,ms%two,h%two,i,j,a,b,J2) * &
+                    & cross_couple(ms%sps,ms%two,s%two,k,b,i,c,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2)
 
                 end do
 
                 vsum = vsum + norm * v / &
-                    & ( denom2b(h%one,k,j,a,c) * &
-                    &   denom2b(h%one,i,j,a,b) )
+                    & ( denom2b(ms%sps,ms%one,h%one,k,j,a,c) * &
+                    &   denom2b(ms%sps,ms%one,h%one,i,j,a,b) )
 
               end do
             end do
@@ -1180,7 +1160,7 @@ contains
     call timer%Add("Second order MBPT s2 ph ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s2ph
 
-  subroutine scalar_second_v2pp(this,h,s)
+  subroutine scalar_second_v2pp(this,ms,h,s)
     ! a, b, c, d: particle
     ! i, j      : hole
     !
@@ -1195,18 +1175,17 @@ contains
     !
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
     real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -1227,11 +1206,11 @@ contains
             if( ms%sps%orb(i)%ph /= 0 ) cycle
             if( ms%sps%orb(j)%ph /= 0 ) cycle
 
-            v = v + s%two%GetTwBME(i,j,a,b,J2) * &
-                & h%two%GetTwBME(a,b,c,d,J2) * &
-                & h%two%GetTwBME(c,d,i,j,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,i,j,c,d) )
+            v = v + s%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) / &
+                & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                &   denom2b(ms%sps,ms%one,h%one,i,j,c,d) )
           end do
         end do
       end do
@@ -1243,7 +1222,7 @@ contains
     call timer%Add("Second order MBPT v2 pp ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_v2pp
 
-  subroutine scalar_second_v2hh(this,h,s)
+  subroutine scalar_second_v2hh(this,ms,h,s)
     ! a, b      : particle
     ! i, j, k, l: hole
     !
@@ -1258,19 +1237,18 @@ contains
     !
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
     real(8) :: v, vsum, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
 
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
 
       v = 0.d0
       !$omp parallel
@@ -1290,11 +1268,11 @@ contains
             l = ms%two%jpz(ch)%n2spi2(kl)
             if( ms%sps%orb(k)%ph /= 0 ) cycle
             if( ms%sps%orb(l)%ph /= 0 ) cycle
-            v = v + h%two%GetTwBME(a,b,i,j,J2) * &
-                & s%two%GetTwBME(i,j,k,l,J2) * &
-                & h%two%GetTwBME(k,l,a,b,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,k,l,a,b) )
+            v = v + h%two%GetTwBME(ms%sps,ms%two,a,b,i,j,J2) * &
+                & s%two%GetTwBME(ms%sps,ms%two,i,j,k,l,J2) * &
+                & h%two%GetTwBME(ms%sps,ms%two,k,l,a,b,J2) / &
+                & ( denom2b(ms%sps,ms%one,h%one,i,j,a,b) * &
+                &   denom2b(ms%sps,ms%one,h%one,k,l,a,b) )
           end do
         end do
       end do
@@ -1308,7 +1286,7 @@ contains
     call timer%Add("Second order MBPT v2 hh ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_v2hh
 
-  subroutine scalar_second_v2ph(this,h,s)
+  subroutine scalar_second_v2ph(this,ms,h,s)
     ! a, b, c : particle
     ! i, j, k : hole
     !
@@ -1323,8 +1301,8 @@ contains
     !
     use Profiler, only: timer
     class(MBPTScalar), intent(inout) :: this
-    type(Ops), intent(in) :: h, s
-    type(MSpace), pointer :: ms
+    type(MSPace), intent(in) :: ms
+    type(Op), intent(in) :: h, s
     integer :: J2
     integer :: a, b, c, i, j, k
     integer :: ia, ib, ic, ii, ij, ik
@@ -1332,7 +1310,6 @@ contains
     real(8) :: v, vsum, norm, ti
 
     ti = omp_get_wtime()
-    ms => h%ms
 
     vsum = 0.d0
     !$omp parallel
@@ -1386,15 +1363,15 @@ contains
                 do J2 = max(abs(ja-jj),abs(jb-ji),abs(jc-jk))/2, &
                       & min(   (ja+jj),   (jb+ji),   (jc+jk))/2
                   v = v + dble(2*J2+1) * &
-                    & cross_couple(s%two,i,j,a,b,J2) * &
-                    & cross_couple(h%two,k,b,i,c,J2) * &
-                    & cross_couple(h%two,a,c,k,j,J2)
+                    & cross_couple(ms%sps,ms%two,s%two,i,j,a,b,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,k,b,i,c,J2) * &
+                    & cross_couple(ms%sps,ms%two,h%two,a,c,k,j,J2)
 
                 end do
 
                 vsum = vsum + norm * v / &
-                    & ( denom2b(h%one,k,j,a,c) * &
-                    &   denom2b(h%one,i,j,a,b) )
+                    & ( denom2b(ms%sps,ms%one,h%one,k,j,a,c) * &
+                    &   denom2b(ms%sps,ms%one,h%one,i,j,a,b) )
 
               end do
             end do

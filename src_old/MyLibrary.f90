@@ -13,9 +13,7 @@ module MyLibrary
   integer, private, parameter :: n_trinomial = 100
   real(8), private, allocatable  :: dtrinomial(:,:,:)
 
-  !
   ! C interfaces
-  !
   interface
     ! 3-j symbol
     function coupling_3j(j1,j2,j3,m1,m2,m3) bind(c,name='gsl_sf_coupling_3j')
@@ -113,26 +111,31 @@ module MyLibrary
     end subroutine gauss_legendre_release
 
     ! open, read, write, and close gzip file (additional interface gzip_open below)
-    ! When you pass string to C, you need add NULL (achar(0)) in the end of strings.
-    ! It is done in gzip_open.
     function gz_open(filename, mode) bind(c, name='gzopen')
       import c_char, c_ptr
       character(c_char) :: filename(*), mode(*)
       type(c_ptr) :: gz_open
     end function gz_open
-    function gzip_read(f, buf, len) bind(c, name='gzgets')
+    function gzip_read(f, buf, len) bind(c, name='gzread')
       import c_int, c_char, c_ptr
       type(c_ptr), value :: f
       character(c_char) :: buf(*)
       integer(c_int), value, intent(in) :: len
       type(c_ptr) :: gzip_read
     end function gzip_read
+    function gzip_readline(f, buf, len) bind(c, name='gzgets')
+      import c_int, c_char, c_ptr
+      type(c_ptr), value :: f
+      character(c_char) :: buf(*)
+      integer(c_int), value, intent(in) :: len
+      type(c_ptr) :: gzip_readline
+    end function gzip_readline
     function gzip_write(f, buf, len) bind(c, name='gzwrite')
       import c_int, c_char, c_ptr
       type(c_ptr), value :: f
       character(c_char) :: buf(*)
       integer(c_int), value, intent(in) :: len
-      type(c_ptr) :: gzip_write
+      integer(c_int) :: gzip_write
     end function gzip_write
     function gzip_close( f ) bind(c, name='gzclose')
       import c_ptr
@@ -140,9 +143,6 @@ module MyLibrary
       type(c_ptr) :: gzip_close
     end function gzip_close
   end interface
-  !
-  ! end C interfaces
-  !
 contains
 
   subroutine skip_comment(nfile, comment)
@@ -379,15 +379,10 @@ contains
     ! w     : the corresponding weights
     integer, intent(in) :: n
     real(8), intent(in) :: x1, x2
-    real(8), intent(out), allocatable :: x(:), w(:)
+    real(8), intent(inout) :: x(:), w(:)
     real(8) :: xi, wi
     integer :: info, i
     type(c_ptr) :: t
-
-    if(allocated(x)) deallocate(x)
-    if(allocated(w)) deallocate(w)
-    allocate(x(n))
-    allocate(w(n))
     t = gauss_legendre_allocate(n)
     do i = 1, n
       info = gauss_legendre_ith_point_weight(x1,x2,i-1,xi,wi,t)
@@ -402,23 +397,5 @@ contains
     type(c_ptr) :: p
     p = gz_open(trim(filename)//achar(0), trim(mode)//achar(0))
   end function gzip_open
-
-  function gzip_writeline( f, buf, len) result(p)
-    type(c_ptr) :: f, p
-    character(*), intent(in) :: buf
-    integer, intent(in) :: len
-    p = gzip_write( f, trim(buf)//achar(10), len+1)
-  end function gzip_writeline
-
-  function gzip_readline( f, buf, len) result(p)
-    ! note
-    ! len_trim returns length removed space (32 in ascii code)
-    ! -2 means removing null (0) and line feed (10)
-    type(c_ptr) :: f, p
-    character(*), intent(inout) :: buf
-    integer, intent(in) :: len
-    p = gzip_read( f, buf, len)
-    buf = buf(1:len_trim(buf) - 2)
-  end function gzip_readline
 end module MyLibrary
 

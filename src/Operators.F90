@@ -1,236 +1,259 @@
 module Operators
   use omp_lib
   use ModelSpace
-  use NOperators
+  use OneBodyOperator
+  use TwoBodyOperator
+  use ThreeBodyOperator
+  use ThreeBodyInteraction
   implicit none
 
-  public :: Op
+  public :: Ops
 
-  private :: FinOp
-  private :: InitOp
-  private :: InitOpFromString
+  private :: FinOps
+  private :: InitOps
+  private :: InitOpsFromString
   private :: SetOperatorFromFile
   private :: SetOperator
   private :: PrintOperator
-  private :: CopyOp
-  private :: SumOp
-  private :: SubtractOp
-  private :: ScaleOp
+  private :: CopyOps
+  private :: SumOps
+  private :: SubtractOps
+  private :: ScaleOps
   private :: NormalOrdering
-  private :: UnNormalOrdering
+  private :: NO2BApprox
+  !private :: UnNormalOrdering
+  private :: DiscardThreeBodyForce
   private :: DiscardThreeBodyPart
-  private :: NO2BApproximation
+  !private :: NO2BApproximation
 
-  type :: Op
-    character(32) :: optr
+  type :: Ops
+    character(32) :: oprtr
     real(8) :: zero
-    type(NBodyPart) :: one, two
-#ifdef single_precision
-    type(NBodyPartSp) :: thr21, thr
-#else
-    type(NBodyPart) :: thr21, thr
-#endif
+    type(MSpace), pointer :: ms
+    type(OneBodyPart) :: one
+    type(TwoBodyPart) :: two
+    type(ThreeBodyPart) :: thr
+    type(ThreeBodyForce) :: thr21
+    logical :: Scalar=.false.
     logical :: is_normal_ordered = .false.
-    logical :: Scalar
-    logical :: is_three_body = .false.
-    logical :: is_orth_three_body = .false.
     integer :: jr, pr, zr
+    integer :: rank
   contains
-    procedure :: fin => FinOp
-    procedure :: InitOp
-    procedure :: InitOpFromString
-    generic :: init => InitOp, InitOpFromString
-
+    procedure :: FinOps
+    procedure :: InitOps
+    procedure :: InitOpsFromString
     procedure :: SetOperatorFromFile
     procedure :: SetOperator
-    generic :: set => SetOperatorFromFile, SetOperator
-
-    procedure :: prt => PrintOperator
-
-    procedure :: CopyOp
-    procedure :: SumOp
-    procedure :: SubtractOp
-    procedure :: ScaleOp
-    generic :: assignment(=) => CopyOp
-    generic :: operator(+) => SumOp
-    generic :: operator(-) => SubtractOp
-    generic :: operator(*) => ScaleOp
+    procedure :: PrintOperator
+    procedure :: CopyOps
+    procedure :: SumOps
+    procedure :: SubtractOps
+    procedure :: ScaleOps
 
     procedure :: NormalOrdering
-    procedure :: UnNormalOrdering
+    procedure :: NO2BApprox
+    procedure :: UnNormalOrdering2B
+    procedure :: DiscardThreeBodyForce
     procedure :: DiscardThreeBodyPart
-    procedure :: NO2BApproximation
-  end type Op
+
+    generic :: init => InitOps, InitOpsFromString
+    generic :: fin => FinOps
+    generic :: set => SetOperatorFromFile, SetOperator
+    generic :: prt => PrintOperator
+    generic :: assignment(=) => CopyOps
+    generic :: operator(+) => SumOps
+    generic :: operator(-) => SubtractOps
+    generic :: operator(*) => ScaleOps
+  end type Ops
 
 contains
-  subroutine FinOp(this)
-    class(Op), intent(inout) :: this
+  subroutine FinOps(this)
+    class(Ops), intent(inout) :: this
     this%zero = 0.d0
     call this%one%fin()
     call this%two%fin()
-    if(.not. this%is_three_body) return
-    call this%thr21%fin()
-    if(.not. this%is_orth_three_body) return
-    call this%thr%fin()
-  end subroutine FinOp
+    if(this%rank == 3 .and. this%ms%is_three_body_jt) call this%thr21%fin()
+    if(this%rank == 3 .and. this%ms%is_three_body) call this%thr%fin()
+    this%ms => null()
+    this%is_normal_ordered = .false.
+  end subroutine FinOps
 
-  subroutine InitOpFromString(this, optr, ms, is_three)
+  subroutine InitOpsFromString(this, optr, ms, rank)
     use DefineOperators, only: GetOperatorRank
-    class(Op), intent(inout) :: this
+    class(Ops), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     character(*), intent(in) :: optr
-    logical, intent(in) :: is_three
+    integer, intent(in) :: rank
     integer :: jr, pr, zr
 
     call GetOperatorRank(optr,jr,pr,zr)
-    call this%init(jr,pr,zr,optr,ms,is_three)
-  end subroutine InitOpFromString
+    call this%init(jr,pr,zr,optr,ms,rank)
+  end subroutine InitOpsFromString
 
-  subroutine InitOp(this, jr, pr, zr, optr, ms, is_three)
+  subroutine InitOps(this, jr, pr, zr, optr, ms, rank)
     use Profiler, only: timer
-    class(Op), intent(inout) :: this
-    integer, intent(in) :: jr, pr, zr
+    class(Ops), intent(inout) :: this
+    integer, intent(in) :: jr, pr, zr, rank
     character(*), intent(in) :: optr
-    type(MSpace), intent(in) :: ms
-    logical, intent(in) :: is_three
+    type(MSpace), intent(in), target :: ms
     real(8) :: ti
 
     ti = omp_get_wtime()
     call timer%cmemory()
 
+    this%is_normal_ordered = .false.
+    this%ms => ms
     this%jr = jr
     this%pr = pr
     this%zr = zr
-    this%optr = optr
-    this%is_orth_three_body = ms%is_orth_three_body
+    this%oprtr = optr
+    this%rank = rank
     if(this%jr == 0 .and. this%pr == 1 .and. this%zr == 0) this%Scalar = .true.
     if(this%jr /= 0 .or.  this%pr /= 1 .or.  this%zr /= 0) this%Scalar = .false.
 
     this%zero = 0.d0
     call this%one%init(ms%one, this%Scalar, optr, jr, pr, zr)
     call this%two%init(ms%two, this%Scalar, optr, jr, pr, zr)
-    if(.not. is_three) then
-      call timer%countup_memory(trim(optr))
-      call timer%Add('Construct '//trim(optr), omp_get_wtime()-ti)
-      return
+
+    if(rank == 3 .and. this%ms%is_three_body_jt) then
+      call this%thr21%init(ms%thr21) ! Three-body interaction
     end if
-    this%is_three_body = .true.
-    call this%thr21%init(ms%thr21, this%Scalar, optr, jr, pr, zr)
-    if(this%is_orth_three_body) then
+
+    if(rank == 3 .and. this%ms%is_three_body) then
       call this%thr%init(ms%thr, this%Scalar, optr, jr, pr, zr)
     end if
 
     call timer%countup_memory(trim(optr))
     call timer%Add('Construct '//trim(optr), omp_get_wtime()-ti)
-  end subroutine InitOp
+  end subroutine InitOps
 
-  subroutine CopyOp(a, b)
-    class(Op), intent(inout) :: a
-    type(Op), intent(in) :: b
+  subroutine CopyOps(a, b)
+    class(Ops), intent(inout) :: a
+    type(Ops), intent(in) :: b
 
-    a%optr = b%optr
+    a%oprtr = b%oprtr
     a%Scalar = b%Scalar
-    a%is_three_body = b%is_three_body
+    a%is_normal_ordered = b%is_normal_ordered
     a%jr = b%jr
     a%pr = b%pr
     a%zr = b%zr
+    a%rank = b%rank
+
+    a%ms => b%ms
     a%zero = b%zero
     a%one = b%one
     a%two = b%two
-    if(.not. a%is_three_body) return
-    a%thr21 = b%thr21
-    if(.not. a%is_orth_three_body) return
-    a%thr = b%thr
-  end subroutine CopyOp
 
-  function SumOp(a, b) result(c)
-    class(Op), intent(in) :: a, b
-    type(Op) :: c
+    if(a%rank == 3 .and. a%ms%is_three_body_jt) then
+      a%thr21 = b%thr21
+    end if
+
+    if(a%rank == 3 .and. a%ms%is_three_body) then
+      a%thr = b%thr
+    end if
+  end subroutine CopyOps
+
+  function SumOps(a, b) result(c)
+    class(Ops), intent(in) :: a, b
+    type(Ops) :: c
 
     c = a
     c%zero = a%zero + b%zero
     c%one = a%one + b%one
     c%two = a%two + b%two
-    if(.not. a%is_three_body) return
-    c%thr21 = a%thr21 + b%thr21
-    if(.not. a%is_orth_three_body) return
-    c%thr = a%thr + b%thr
-  end function SumOp
+    if(a%rank == 3 .and. a%ms%is_three_body_jt) then
+      c%thr21 = a%thr21 + b%thr21
+    end if
 
-  function SubtractOp(a, b) result(c)
-    class(Op), intent(in) :: a, b
-    type(Op) :: c
+    if(a%rank == 3 .and. a%ms%is_three_body) then
+      c%thr = a%thr + b%thr
+    end if
+  end function SumOps
+
+  function SubtractOps(a, b) result(c)
+    class(Ops), intent(in) :: a, b
+    type(Ops) :: c
 
     c = a
     c%zero = a%zero - b%zero
     c%one = a%one - b%one
     c%two = a%two - b%two
-    if(.not. a%is_three_body) return
-    c%thr21 = a%thr21 - b%thr21
-    if(.not. a%is_orth_three_body) return
-    c%thr = a%thr - b%thr
-  end function SubtractOp
 
-  function ScaleOp(a, b) result(c)
-    class(Op), intent(in) :: a
+    if(a%rank == 3 .and. a%ms%is_three_body_jt) then
+      c%thr21 = a%thr21 - b%thr21
+    end if
+
+    if(a%rank == 3 .and. a%ms%is_three_body) then
+      c%thr = a%thr - b%thr
+    end if
+  end function SubtractOps
+
+  function ScaleOps(a, b) result(c)
+    class(Ops), intent(in) :: a
     real(8), intent(in) :: b
-    type(Op) :: c
+    type(Ops) :: c
 
     c = a
     c%zero = a%zero * b
     c%one = a%one * b
     c%two = a%two * b
-    if(.not. a%is_three_body) return
-    c%thr21 = a%thr21 * b
-    if(.not. a%is_orth_three_body) return
-    c%thr = a%thr * b
-  end function ScaleOp
+    if(a%rank == 3 .and. a%ms%is_three_body_jt) then
+      c%thr21 = a%thr21 * b
+    end if
 
-  subroutine SetOperatorFromFile(this, ms, file_nn, file_3n, &
+    if(a%rank == 3 .and. a%ms%is_three_body) then
+      c%thr = a%thr * b
+    end if
+  end function ScaleOps
+
+  subroutine SetOperatorFromFile(this, file_nn, file_3n, &
         & bound_2b_file, bound_3b_file)
-    class(Op), intent(inout) :: this
-    type(MSpace), intent(in) :: ms
+    class(Ops), intent(inout), target :: this
     character(*), intent(in) :: file_nn, file_3n
     integer, intent(in), optional :: bound_2b_file(3), bound_3b_file(4)
-    type(NBodyPart) :: Tcm_one, Tcm_two
-    type(NBodyPart) :: Hcm_one, Hcm_two
-    type(ReadFiles) :: rd
+    type(OneBodyPart) :: Tcm_one, Hcm_one
+    type(TwoBodyPart) :: Tcm_two, Hcm_two
+    type(Read2BodyFiles) :: rd2
+    type(Read3BodyFiles) :: rd3
+    type(MSpace), pointer :: ms
 
     if(file_nn == 'none' .and. file_3n == 'none') return
-
-    write(*,'(3a)') "Set ", trim(this%optr), " operator from files"
-    call rd%set(file_nn, file_3n)
+    ms => this%ms
+    write(*,'(3a)') "Set ", trim(this%oprtr), " operator from files"
+    call rd2%set(file_nn)
     ! -- boundary for two-body file
-    call rd%set(ms%emax, ms%e2max, ms%lmax)
+    call rd2%set(this%ms%emax, this%ms%e2max, this%ms%e3max)
     if(present(bound_2b_file)) then
-    call rd%set(bound_2b_file(1), bound_2b_file(2), bound_2b_file(3))
+      call rd2%set(bound_2b_file(1), bound_2b_file(2), bound_2b_file(3))
     end if
 
     ! -- boundary for three-body file
-    call rd%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
+    call rd3%set(file_3n)
+    call rd3%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
     if(present(bound_3b_file)) then
-    call rd%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
+      call rd3%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
     end if
 
-    call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
+    call this%one%set(ms%hw, ms%A, ms%Z, ms%N)
     write(*,'(2a)') "2B file: ", trim(file_nn)
-    call this%two%ReadFile(ms%sps, ms%two, rd)
-    if(this%is_three_body) then
+    call rd2%ReadScalar2BFile(this%two)
+    if(this%rank == 3 .and. this%ms%is_three_body_jt) then
       write(*,'(2a)') "3B file: ", trim(file_3n)
-      call this%thr21%ReadFile(ms%isps, ms%thr21, rd)
+      call rd3%ReadScalar3BFile(this%thr21)
     end if
 
-    if(this%is_three_body .and. this%is_orth_three_body) then
-      call this%thr%TransToOrthogonal(this%thr21, ms)
+    if(this%rank == 3 .and. this%ms%is_three_body_jt .and. this%ms%is_three_body) then
+      call this%thr%set(this%thr21)
+      call this%DiscardThreeBodyForce()
     end if
 
-    select case(this%optr)
+    select case(this%oprtr)
     case('hamil', 'Hamil')
       call Tcm_one%init(ms%one, .true., 'Tcm', 0, 1, 0)
       call Tcm_two%init(ms%two, .true., 'Tcm', 0, 1, 0)
 
-      call Tcm_one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
-      call Tcm_two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
+      call Tcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
+      call Tcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
 
       this%one = this%one - Tcm_one
       this%two = this%two - Tcm_two
@@ -239,8 +262,8 @@ contains
         call Hcm_one%init(ms%one, .true., 'Hcm', 0, 1, 0)
         call Hcm_two%init(ms%two, .true., 'Hcm', 0, 1, 0)
 
-        call Hcm_one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
-        call Hcm_two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
+        call Hcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
+        call Hcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
 
         this%zero = this%zero - (1.5d0 * ms%hw * ms%beta)
         this%one = this%one + (Hcm_one * ms%beta)
@@ -251,27 +274,25 @@ contains
     end select
   end subroutine SetOperatorFromFile
 
-  subroutine SetOperator(this, ms)
+  subroutine SetOperator(this)
     use Profiler, only: timer
-    class(Op), intent(inout) :: this
-    type(MSpace), intent(in) :: ms
+    class(Ops), intent(inout), target :: this
     real(8) :: ti
 
     ti = omp_get_wtime()
-    select case(this%optr)
+    select case(this%oprtr)
     case('Hcm', 'HCM')
-      this%zero = - 1.5d0 * ms%hw
+      this%zero = - 1.5d0 * this%ms%hw
     case default
     end select
-    call this%one%set(ms%one, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
-    call this%two%set(ms%two, ms%sps, ms%hw, ms%A, ms%Z, ms%N)
-    this%is_three_body = .false.
 
-    call timer%Add("Set operator "//trim(this%optr), omp_get_wtime()-ti)
+    call this%one%set(this%ms%hw, this%ms%A, this%ms%Z, this%ms%N)
+    call this%two%set(this%ms%hw, this%ms%A, this%ms%Z, this%ms%N)
+    call timer%Add("Set operator "//trim(this%oprtr), omp_get_wtime()-ti)
   end subroutine SetOperator
 
   subroutine PrintOperator(this, iunit)
-    class(Op), intent(in) :: this
+    class(Ops), intent(in) :: this
     integer, intent(in), optional :: iunit
     integer :: ut
     ut = 6
@@ -286,106 +307,110 @@ contains
     write(ut,'(a)') "## Two-body part"
     call this%two%prt(iunit)
 
-    if(.not. this%is_three_body) return
-    write(ut,'(a)') "## Three-body part (2+1, isospin assumed) "
-    call this%thr21%prt(iunit)
-    if(.not. this%is_orth_three_body) return
-    write(ut,'(a)') "## Three-body part"
-    call this%thr%prt(iunit)
+    if(this%rank==3 .and. this%ms%is_three_body_jt) then
+      write(ut,'(a)') "## Three-body part (2+1, isospin assumed) "
+      call this%thr21%prt(iunit)
+    end if
+
+    if(this%rank==3 .and. this%ms%is_three_body) then
+      write(ut,'(a)') "## Three-body part"
+      call this%thr%prt(iunit)
+    end if
   end subroutine PrintOperator
 
-  subroutine NormalOrdering(this, ms) ! NO2B approx
-    class(Op), intent(inout) :: this
-    type(MSpace), intent(in) :: ms
-    type(NBodyPart) :: op2from3, op1from3, op1from2
-    real(8) :: op0from1, op0from2, op0from3
+  subroutine NormalOrdering(this) ! Normal ordering w.r.t. refernece state
+    class(Ops), intent(inout), target :: this
+    type(TwoBodyPart) :: op2from3
+    type(OneBodyPart) :: op1from3, op1from2
+    real(8) :: op0from1=0.d0, op0from2=0.d0, op0from3=0.d0
 
     if(this%is_normal_ordered) then
-      write(*,*) "Operator ", trim(this%optr), " is already normal ordered!"
+      write(*,*) "Operator ", trim(this%oprtr), " is already normal ordered!"
       return
     end if
 
-    if(this%is_three_body) then
-#ifdef single_precision
-      op2from3 = this%thr21%NormalOrderingFromSp3To2(ms)
-#else
-      op2from3 = this%thr21%NormalOrderingFrom3To2(ms)
-#endif
+
+    op1from2 = this%two%NormalOrderingFrom2To1(this%ms%one)
+
+    op0from2 = op1from2%NormalOrderingFrom1To0()
+    op0from1 = this%one%NormalOrderingFrom1To0()
+
+    this%one = this%one + op1from2
+    this%zero = this%zero + op0from1 + op0from2 * 0.5d0
+
+    if(this%rank == 3) then
+      if(this%ms%is_three_body_jt) then
+        op2from3 = this%thr21%NormalOrderingFrom3To2(this%ms%two)
+        op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
+        op0from3 = op1from3%NormalOrderingFrom1To0()
+        this%two = this%two + op2from3
+        this%one = this%one + op1from3 * 0.5d0
+        this%zero = this%zero + op0from3 / 6.d0
+      end if
+
+      if(this%ms%is_three_body) then
+        op2from3 = this%thr%NormalOrderingFrom3To2(this%ms%two)
+        op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
+        op0from3 = op1from3%NormalOrderingFrom1To0()
+        this%two = this%two + op2from3
+        this%one = this%one + op1from3 * 0.5d0
+        this%zero = this%zero + op0from3 / 6.d0
+      end if
     end if
-
-    op1from3 = op2from3%NormalOrderingFrom2To1(ms)
-    op1from2 = this%two%NormalOrderingFrom2To1(ms)
-
-    op0from3 = op1from3%NormalOrderingFrom1To0(ms)
-    op0from2 = op1from2%NormalOrderingFrom1To0(ms)
-    op0from1 = this%one%NormalOrderingFrom1To0(ms)
-
-    this%two = this%two + op2from3
-    this%one = this%one + op1from2 + op1from3 * 0.5d0
-    this%zero = this%zero + op0from1 + op0from2 * 0.5d0 + op0from3 / 6.d0
-
     this%is_normal_ordered = .true.
-
   end subroutine NormalOrdering
 
-  subroutine UnNormalOrdering(this, ms) ! From NO2B approx. Op
-    class(Op), intent(inout) :: this
-    type(MSpace), intent(in) :: ms
-    type(NBodyPart) :: op1from2
+  subroutine NO2BApprox(this) ! Normal ordering w.r.t. refernece state
+    class(Ops), intent(inout), target :: this
+    call this%NormalOrdering()
+    if(this%rank==3) then
+      call this%DiscardThreeBodyForce()
+      call this%DiscardThreeBodyPart()
+    end if
+    this%rank = 2
+    this%is_normal_ordered = .true.
+  end subroutine NO2BApprox
+
+  subroutine UnNormalOrdering2B(this) ! From NO2B approx. Op
+    class(Ops), intent(inout), target :: this
+    type(OneBodyPart) :: op1from2
     real(8) :: op0from1, op0from2
 
-    if(this%is_three_body) then
-      write(*,'(a)') "Warning: this unnormal ordering process is only for the NO2B approximated Operators."
+    if(this%rank /= 2) then
+      write(*,'(a)') "Warning: UnNormalOrdering2B is only for the NO2B approximated Operators."
     end if
 
     if(.not. this%is_normal_ordered) then
-      write(*,*) "Operator ", trim(this%optr), " is already unnormal ordered!"
+      write(*,*) "Operator ", trim(this%oprtr), " is already unnormal ordered!"
       return
     end if
 
-    op1from2 = this%two%NormalOrderingFrom2To1(ms)
+    op1from2 = this%two%NormalOrderingFrom2To1(this%ms%one)
 
-    op0from2 = op1from2%NormalOrderingFrom1To0(ms)
-    op0from1 = this%one%NormalOrderingFrom1To0(ms)
+    op0from2 = op1from2%NormalOrderingFrom1To0()
+    op0from1 = this%one%NormalOrderingFrom1To0()
 
-    ! this%two  is unchanged
+    ! this%two is unchanged
     this%one = this%one - op1from2
     this%zero = this%zero - op0from1 + op0from2 * 0.5d0
 
+    call op1from2%fin()
     this%is_normal_ordered = .false.
+  end subroutine UnNormalOrdering2B
 
-  end subroutine UnNormalOrdering
+  subroutine DiscardThreeBodyForce(this)
+    class(Ops), intent(inout) :: this
+    if(.not. this%ms%is_three_body_jt) return
+    call this%thr21%fin()
+    call this%ms%ReleaseThreeBody21()
+  end subroutine DiscardThreeBodyFOrce
 
   subroutine DiscardThreeBodyPart(this)
-    class(Op), intent(inout) :: this
-    if(.not. this%is_three_body) then
-      write(*,'(a)') "This operator does not include three-body part."
-      write(*,'(a)') "No need to discard three-body part."
-      return
-    end if
-    call this%thr21%fin()
-    if(this%is_orth_three_body) call this%thr%fin()
-    this%is_three_body = .false.
-    this%is_orth_three_body = .false.
+    class(Ops), intent(inout) :: this
+    if(.not. this%ms%is_three_body) return
+    call this%thr%fin()
+    call this%ms%ReleaseThreeBody()
   end subroutine DiscardThreeBodyPart
-
-  subroutine NO2BApproximation(this,ms)
-    class(Op), intent(inout) :: this
-    type(MSpace), intent(in) :: ms
-    if(.not. this%is_three_body) then
-      write(*,'(a)') "This operator does not include three-body part."
-      write(*,'(a)') "No need to do NO2B approximation."
-      return
-    end if
-
-    if(this%is_normal_ordered) then
-      call this%DiscardThreeBodyPart()
-      return
-    end if
-    call this%NormalOrdering(ms)
-    call this%DiscardThreeBodyPart()
-
-  end subroutine NO2BApproximation
 
 end module Operators
 
@@ -397,36 +422,22 @@ end module Operators
 !  implicit none
 !
 !  type(MSpace) :: ms
-!  type(Op) :: h_me2j
-!  type(Op) :: h_myg
-!  type(Op) :: h_diff
+!  type(Ops) :: h
 !  character(:), allocatable :: file_nn, file_3n
 !
 !  call timer%init()
-!  call init_dbinomial_triangle()
+!  call ms%init('O16', 35.d0, 4, 8, e3max=6, is_three_body_jt=.true.)
+!  call h%init('hamil',ms, 3)
 !
-!  call ms%init('O16', 35.d0, 2, 4, e3max=2)
-!  call h_me2j%init('hamil',ms,.false.)
-!  call h_myg%init('hamil',ms,.false.)
+!  file_nn = '/home/takayuki/MtxElmnt/2BME/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw35_emax8_e2max16.me2j.gz'
+!  file_3n = '/home/takayuki/MtxElmnt/3BME/ThBME_srg2.00_N3LO_EM500_ChEFT_N2LO_cD-0.20cE0.098_Local2_IS_hw35_ms6_6_6.me3j'
 !
-!  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.txt.me2j'
-!  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.bin.me2j'
-!  file_3n = 'none'
-!  call h_me2j%set(ms,file_nn,file_3n,[6,12,6],[2,2,2,2])
-!
-!  file_nn = '/home/takayuki/TwBME-HO_NN-only_N3LO_EM500_bare_hw35_emax6_e2max12.txt.myg'
-!  file_3n = 'none'
-!  call h_myg%set(ms,file_nn,file_3n,[6,12,6],[2,2,2,2])
-!
-!  h_diff = h_myg - h_me2j
-!  call h_diff%prt()
-!
-!  call h_diff%fin()
-!  call h_me2j%fin()
-!  call h_myg%fin()
+!  call h%set(file_nn,file_3n,[8,16,8],[6,6,6,6])
+!  call h%NormalOrdering()
+!  write(*,*) h%zero
+!  call h%fin()
 !  call ms%fin()
 !
-!  call fin_dbinomial_triangle()
 !  call timer%fin()
 !
 !end program test

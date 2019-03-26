@@ -3,6 +3,8 @@
 #--------------------------------------------------
 TARGET=HartreeFock
 INSTLDIR= $(HOME)/bin
+EXEDIR=$(PWD)/exe
+DEBUG_MODE=on
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
   elif hostname|grep -q cedar; then echo cedar; \
@@ -19,13 +21,15 @@ ifeq ($(HOST),other)
   FC=gfortran
   LDFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl -lz
   OMP = -fopenmp
-  FFLAGS=-O3 -Dsingle_precision
+  FFLAGS=-O3 -Dsingle_precision_three_body_force
   CFLAGS=-O3
   FF2C= -ff2c
   FDFLAGS=
-  #FDFLAGS+=-DModelSpaceDebug
-  #FDFLAGS+=-DNOperatorsDebug
-  FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+  ifeq ($(DEBUG_MODE),on)
+    FDFLAGS+=-DModelSpaceDebug
+    #FDFLAGS+=-DTwoBodyOperatorDebug
+    FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+  endif
 endif
 
 ifeq ($(HOST),apt)
@@ -116,11 +120,16 @@ endif
 all: dirs $(TARGET)
 $(TARGET): $(OBJS)
 	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $(TARGET).exe $^ $(LDFLAGS)
-	if test -d $(INSTLDIR); then \
+	if test -d $(EXEDIR); then \
 		: ; \
 	else \
-		mkdir $(INSTLDIR); \
+		mkdir -p $(EXEDIR); \
 	fi
+	mv $(TARGET).exe $(EXEDIR)
+	@echo "#####################################################################################"
+	@echo "To complete the installation, do 'make install'."
+	@echo "Edit '$(PWD)/exe/run_hf_mbpt.py' and excecute."
+	@echo "#####################################################################################"
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -150,7 +159,7 @@ dep:
 	$(FDEP) $(SRCS) -b $(OBJDIR)/ > $(DEPDIR)/makefile.d
 
 install:
-	ln -sf $(PWD)/$(TARGET).exe $(INSTLDIR)
+	ln -sf $(EXEDIR)/$(TARGET).exe $(INSTLDIR)
 
 clean:
 	rm -f $(MODDIR)/*.mod

@@ -21,6 +21,7 @@ module HartreeFock
 
 
   private :: InitMonopole2
+  private :: InitMonopole3_sp
   private :: InitMonopole3
   private :: FinMonopole
   private :: GetIndex2
@@ -35,6 +36,7 @@ module HartreeFock
     logical :: constructed = .false.
   contains
     procedure :: InitMonopole2
+    procedure :: InitMonopole3_sp
     procedure :: InitMonopole3
     procedure :: FinMonopole
   end type Monopole
@@ -46,7 +48,6 @@ module HartreeFock
   type :: HFSolver
     logical :: is_three_body
     integer :: n_iter_max = 1000
-    integer :: rank
     real(8) :: alpha = 1.d0
     real(8) :: tol = 1.d-8
     real(8) :: diff
@@ -56,13 +57,13 @@ module HartreeFock
     real(8) :: e3  ! 3n int. term
     real(8) :: ehf ! hf energy
 
-    type(OneBodyPart) :: F   ! Fock opeartor
-    type(OneBodyPart) :: T   ! kinetic term
-    type(OneBodyPart) :: V   ! one-body filed from 2body interaction
-    type(OneBOdyPart) :: W   ! one-body filed form 3body interaction
-    type(OneBodyPart) :: rho ! density matrix
-    type(OneBodyPart) :: C   ! F's diagonalization coefficient, (HO|HF)
-    type(OneBodyPart) :: Occ ! diagonal Occupation matrix
+    type(NBodyPart) :: F   ! Fock opeartor
+    type(NBodyPart) :: T   ! kinetic term
+    type(NBodyPart) :: V   ! one-body filed from 2body interaction
+    type(NBOdyPart) :: W   ! one-body filed form 3body interaction
+    type(NBodyPart) :: rho ! density matrix
+    type(NBodyPart) :: C   ! F's diagonalization coefficient, (HO|HF)
+    type(NBodyPart) :: Occ ! diagonal Occupation matrix
     type(Monopole) :: V2, V3
   contains
     procedure :: fin => FinHFSolver
@@ -93,17 +94,16 @@ contains
     call this%V3%FinMonopole()
   end subroutine FinHFSolver
 
-  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha)
+  subroutine InitHFSolver(this,ms,hamil,n_iter_max,tol,alpha)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
-    type(Ops), intent(in) :: hamil
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(in) :: hamil
     integer, intent(in), optional :: n_iter_max
     real(8), intent(in), optional :: tol, alpha
-    type(MSpace), pointer :: ms
     real(8) :: ti
-    integer :: ch, ndim
+    integer :: ich
 
-    ms => hamil%ms
     if(hamil%is_normal_ordered) then
       write(*,'(a)') "Hamiltonian has to be normal ordered w.r.t the vacuum."
       return
@@ -117,8 +117,7 @@ contains
     if(present(n_iter_max)) this%n_iter_max = n_iter_max
     if(present(tol)) this%tol = tol
     if(present(alpha)) this%alpha = alpha
-    this%is_three_body = hamil%ms%is_three_body_jt
-    this%rank = hamil%rank
+    this%is_three_body = hamil%is_three_body
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occ',     0, 1, 0)
     call this%rho%init(ms%one, .true., 'DenMat',  0, 1, 0)
@@ -131,31 +130,37 @@ contains
 
     ti = omp_get_wtime()
     call timer%cmemory()
-    call this%V2%InitMonopole2(hamil%two)
+    call this%V2%InitMonopole2(ms, hamil%two)
     call timer%countup_memory('Monople 2Body int.')
     call timer%Add("Construct Monopole 2Body int.", omp_get_wtime() - ti)
 
-    if(this%rank == 3 .and. this%is_three_body) then
+    if(this%is_three_body) then
+
       ti = omp_get_wtime()
       call timer%cmemory()
-      call this%V3%InitMonopole3(hamil%thr21)
+#ifdef single_precision
+      call this%V3%InitMonopole3_sp(ms, hamil%thr21)
+#else
+      call this%V3%InitMonopole3(ms, hamil%thr21)
+#endif
       call timer%countup_memory('Monople 3Body int.')
       call timer%Add("Construct Monopole 3Body int.", omp_get_wtime() - ti)
     end if
 
-    do ch = 1, this%C%one%NChan
-      ndim = this%C%one%jpz(ch)%n_state
-      call this%C%MatCh(ch,ch)%eye( ndim )
+    do ich = 1, this%C%NChan
+      call this%C%MatCh(ich,ich)%eye( this%C%MatCh(ich,ich)%ndims(1) )
     end do
-    call this%SetOccupationMatrix(ms%NOcoef)
+    call this%SetOccupationMatrix(ms%one, ms%NOcoef)
     call this%UpdateDensityMatrix()
-    call this%UpdateFockMatrix()
+    call this%UpdateFockMatrix(ms%sps, ms%one)
 
   end subroutine InitHFSolver
 
-  subroutine SolveHFSolver(this)
+  subroutine SolveHFSolver(this, sps, one)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
+    type(Orbits), intent(in) :: sps
+    type(OneBodySpace), intent(in) :: one
     integer :: iter
     real(8) :: ti
 
@@ -164,16 +169,16 @@ contains
         & "one-body ", "two-body ", &
         & "three-body ", "Ehf"
 
-    call this%CalcEnergy()
+    call this%CalcEnergy(one)
     write(*,'(4x,a,5f18.6)') "HO", this%e0, this%e1, &
         &  this%e2, this%e3,this%ehf
     do iter = 1, this%n_iter_max
 
       call this%DiagonalizeFockMatrix()
       call this%UpdateDensityMatrix()
-      call this%UpdateFockMatrix()
+      call this%UpdateFockMatrix(sps, one)
 
-      call this%CalcEnergy()
+      call this%CalcEnergy(one)
 
       write(*,'(2x,i4,5f18.6)') iter, this%e0, this%e1, &
           &  this%e2, this%e3,this%ehf
@@ -190,26 +195,25 @@ contains
     call timer%Add("Hartree-Fock iteration",omp_get_wtime() - ti)
   end subroutine SolveHFSolver
 
-  subroutine TransformToHF(HF,Optr)
+  subroutine TransformToHF(HF,ms,Optr)
     !  Input: Operator is HO basis operator (not normal ordered)
     ! Output: Operator is HF basis operator (normal ordred, NO2B approximated)
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Optr
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(inout) :: Optr
 
     if(Optr%is_normal_ordered) then
-      write(*,'(a)') "In TransformToHF, input operator should not be normal ordered w.r.t. vacuum."
+      write(*,'(a)') "In TransformToHF, input operator should not be normal ordered wrt target nucleus."
       return
     end if
 
-    if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
-      call HF%HFBasisHamiltonian(Optr)
-      Optr%is_normal_ordered = .true.
+    if(Optr%optr=='hamil' .or. Optr%optr=='Hamil') then
+      call HF%HFBasisHamiltonian(ms,Optr)
       return
     end if
 
     if(Optr%Scalar) then
-      call HF%HFBasisScalar(Optr)
-      Optr%is_normal_ordered = .true.
+      call HF%HFBasisScalar(ms,Optr)
       return
     end if
 
@@ -221,11 +225,11 @@ contains
 
   end subroutine TransformToHF
 
-  subroutine HFBasisHamiltonian(HF,H)
+  subroutine HFBasisHamiltonian(HF,ms,H)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: H
-    type(MSpace), pointer :: ms
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(inout) :: H
     integer :: ch, J, n, bra, ket, a, b, c, d, e, f, JJJ
     integer :: ea, eb, ec, ed
     integer :: je, le, ze, ee
@@ -234,7 +238,7 @@ contains
     type(DMat) :: UT, V2, V3
 
     ti = omp_get_wtime()
-    ms => H%ms
+
     H%zero = HF%ehf
     do ch = 1, ms%one%NChan
       H%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
@@ -243,7 +247,7 @@ contains
 
     do ch = 1, ms%two%NChan
       J = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
       call UT%zeros(n,n)
       call V3%zeros(n,n)
       V2 = H%two%MatCh(ch,ch)%DMat
@@ -263,14 +267,14 @@ contains
           ec = ms%sps%orb(c)%e
           ed = ms%sps%orb(d)%e
 
-          UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
+          UT%m(bra,ket) = HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
-              & HF%C%GetOBME(a,d) * HF%C%GetOBME(b,c)
+              & HF%C%GetOBME(ms%sps,ms%one,a,d) * HF%C%GetOBME(ms%sps,ms%one,b,c)
           if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
-          if(H%rank/=3 .or. .not. H%ms%is_three_body_jt) cycle
+          if(.not. H%is_three_body) cycle
           do e = 1, ms%sps%norbs
             je = ms%sps%orb(e)%j
             le = ms%sps%orb(e)%l
@@ -288,8 +292,8 @@ contains
               if(ec+ed+ef > ms%e3max) cycle
 
               do JJJ = abs(2*J-je), (2*J+je), 2
-                V3%m(bra,ket) = V3%m(bra,ket) + HF%rho%GetOBME(e,f) * &
-                    & dble(JJJ+1) * H%thr21%GetThBME(a,b,e,J,c,d,f,J,JJJ)
+                V3%m(bra,ket) = V3%m(bra,ket) + HF%rho%GetOBME(ms%sps,ms%one,e,f) * &
+                    & dble(JJJ+1) * H%thr21%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
               end do
 
             end do
@@ -313,13 +317,12 @@ contains
 
   end subroutine HFBasisHamiltonian
 
-  subroutine HFBasisScalar(HF,Opr)
+  subroutine HFBasisScalar(HF,ms,Opr)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Opr
-    type(MSpace), pointer :: ms
-    type(TwoBodyPart) :: o2from3
-    type(OneBodyPart) :: o1from3, o1from2
+    type(MSpace), intent(in) :: ms
+    type(Op), intent(inout) :: Opr
+    type(NBodyPart) :: o2from3, o1from3, o1from2
     integer :: ch, J, n, bra, ket, a, b, c, d, e, f, JJJ
     integer :: ea, eb, ec, ed
     integer :: je, le, ze, ee
@@ -327,17 +330,16 @@ contains
     real(8) :: ph, ti, o0from1, o0from2, o0from3
     type(DMat) :: UT, V2, V3
 
-    ms => Opr%ms
     ti = omp_get_wtime()
     do ch = 1, ms%one%NChan
       Opr%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
           &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
     end do
 
-    call o2from3%init(ms%two, .true., Opr%oprtr, 0, 1, 0)
+    call o2from3%init(ms%two, .true., Opr%optr, 0, 1, 0)
     do ch = 1, ms%two%NChan
       J = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      n = ms%two%jpz(ch)%nst
       call UT%zeros(n,n)
       call V3%zeros(n,n)
 
@@ -356,14 +358,14 @@ contains
           ec = ms%sps%orb(c)%e
           ed = ms%sps%orb(d)%e
 
-          UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
+          UT%m(bra,ket) = HF%C%GetOBME(ms%sps,ms%one,a,c) * HF%C%GetOBME(ms%sps,ms%one,b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
-              & HF%C%GetOBME(a,d) * HF%C%GetOBME(b,c)
+              & HF%C%GetOBME(ms%sps,ms%one,a,d) * HF%C%GetOBME(ms%sps,ms%one,b,c)
           if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
-          if(Opr%rank/=3 .or. .not. Opr%ms%is_three_body_jt) cycle
+          if(.not. Opr%is_three_body) cycle
           do e = 1, ms%sps%norbs
             je = ms%sps%orb(e)%j
             le = ms%sps%orb(e)%l
@@ -383,8 +385,8 @@ contains
               do JJJ = abs(2*J-je), (2*J+je), 2
                 o2from3%MatCh(ch,ch)%m(bra,ket) = &
                     & o2from3%MatCh(ch,ch)%m(bra,ket) + &
-                    & HF%rho%GetOBME(e,f) * &
-                    & dble(JJJ+1) * Opr%thr21%GetThBME(a,b,e,J,c,d,f,J,JJJ)
+                    & HF%rho%GetOBME(ms%sps,ms%one,e,f) * &
+                    & dble(JJJ+1) * Opr%thr21%GetThBME(ms,a,b,e,J,c,d,f,J,JJJ)
               end do
 
             end do
@@ -410,12 +412,12 @@ contains
     end do
     call Opr%DiscardThreeBodyPart()
 
-    o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
-    o1from2 = Opr%two%NormalOrderingFrom2To1(ms%one)
+    o1from3 = o2from3%NormalOrderingFrom2To1(ms)
+    o1from2 = Opr%two%NormalOrderingFrom2To1(ms)
 
-    o0from3 = o1from3%NormalOrderingFrom1To0()
-    o0from2 = o1from2%NormalOrderingFrom1To0()
-    o0from1 = Opr%one%NormalOrderingFrom1To0()
+    o0from3 = o1from3%NormalOrderingFrom1To0(ms)
+    o0from2 = o1from2%NormalOrderingFrom1To0(ms)
+    o0from1 = Opr%one%NormalOrderingFrom1To0(ms)
 
     Opr%zero = Opr%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
     Opr%one = Opr%one + o1from2 + o1from3 * 0.5d0
@@ -541,19 +543,18 @@ contains
 
   !end subroutine HFBasisTensor
 
-  subroutine CalcEnergy(this)
+  subroutine CalcEnergy(this,one)
     class(HFSolver), intent(inout) :: this
-    type(OneBodySpace), pointer :: one
+    type(OneBodySpace), intent(in) :: one
     integer :: ch, bra, ket, j
 
-    one => this%F%one
     this%e1 = 0.d0
     this%e2 = 0.d0
     this%e3 = 0.d0
-    do ch = 1, one%NChan
+    do ch = 1, this%F%NChan
       j = one%jpz(ch)%j
-      do bra = 1, one%jpz(ch)%n_state
-        do ket = 1, one%jpz(ch)%n_state
+      do bra = 1, this%F%MatCh(ch,ch)%ndims(1)
+        do ket = 1, this%F%MatCh(ch,ch)%ndims(1)
           this%e1 = this%e1 + this%rho%MatCh(ch,ch)%m(bra,ket) * this%T%MatCh(ch,ch)%m(bra,ket) * dble(j+1)
           this%e2 = this%e2 + this%rho%MatCh(ch,ch)%m(bra,ket) * this%V%MatCh(ch,ch)%m(bra,ket) * dble(j+1) * 0.5d0
           this%e3 = this%e3 + this%rho%MatCh(ch,ch)%m(bra,ket) * this%W%MatCh(ch,ch)%m(bra,ket) * dble(j+1) / 6.d0
@@ -568,7 +569,7 @@ contains
     type(EigenSolSymD) :: sol
     integer :: ch
 
-    do ch = 1, this%F%one%NChan
+    do ch = 1, this%F%NChan
       call sol%init(this%F%MatCh(ch,ch)%DMat)
       call sol%DiagSym(this%F%MatCh(ch,ch)%DMat)
       this%C%MatCh(ch,ch)%DMat = sol%vec
@@ -576,15 +577,14 @@ contains
     end do
   end subroutine DiagonalizeFockMatrix
 
-  subroutine SetOccupationMatrix(this,NOcoef)
+  subroutine SetOccupationMatrix(this,one,NOcoef)
     class(HFSolver), intent(inout) :: this
+    type(OneBodySpace), intent(in) :: one
     real(8), intent(in) :: NOCoef(:)
-    type(OneBodySpace), pointer :: one
     integer :: i, ich, io
 
-    one => this%F%one
     do ich = 1, one%NChan
-      do i = 1, one%jpz(ich)%n_state
+      do i = 1, one%jpz(ich)%nst
         io = one%jpz(ich)%n2spi(i)
         this%Occ%MatCh(ich,ich)%m(i,i) = NOcoef(io)
       end do
@@ -595,7 +595,7 @@ contains
     class(HFSolver), intent(inout) :: this
     integer :: ich
 
-    do ich = 1, this%rho%one%NChan
+    do ich = 1, this%rho%NChan
       this%rho%MatCh(ich,ich)%DMat = &
           & this%rho%MatCh(ich,ich)%DMat * (1.d0-this%alpha) + &
           & (this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
@@ -604,20 +604,18 @@ contains
 
   end subroutine UpdateDensityMatrix
 
-  subroutine UpdateFockMatrix(this)
+  subroutine UpdateFockMatrix(this, sps, one)
     class(HFSolver), intent(inout) :: this
-    type(OneBodyPart) :: Fold
-    type(Orbits), pointer :: sps
-    type(OneBodySpace), pointer :: one
+    type(Orbits), intent(in) :: sps
+    type(OneBodySpace), intent(in) :: one
+    type(NBodyPart) :: Fold
     integer(8) :: i1, i2, i3, i4, i5, i6, idx
     integer :: num, ch1, ch2, ch3
     integer :: ii1, ii2, ii3, ii4, ii5, ii6
     integer :: bra, ket
 
-    one => this%F%one
-    sps => one%sps
     Fold = this%F
-    do ch1 = 1, one%NChan
+    do ch1 = 1, this%F%NChan
       this%V%Match(ch1,ch1)%m = 0.d0
       this%W%Match(ch1,ch1)%m = 0.d0
     end do
@@ -635,7 +633,7 @@ contains
           & this%rho%MatCh(ch2,ch2)%m(ii2,ii4) * this%V2%v(num)
     end do
 
-    if(this%rank == 3 .and. this%is_three_body) then
+    if(this%is_three_body) then
       do num = 1, this%V3%nidx
         idx = this%V3%idx(num)
         call GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)
@@ -658,8 +656,8 @@ contains
       end do
     end if
 
-    do ch1 = 1, one%NChan
-      do bra = 1, one%jpz(ch1)%n_state
+    do ch1 = 1, this%F%NChan
+      do bra = 1, this%F%MatCh(ch1,ch1)%ndims(1)
         do ket = 1, bra
           this%V%MatCh(ch1,ch1)%m(ket,bra) = this%V%MatCh(ch1,ch1)%m(bra,ket)
           this%W%MatCh(ch1,ch1)%m(ket,bra) = this%W%MatCh(ch1,ch1)%m(bra,ket)
@@ -669,7 +667,7 @@ contains
 
     this%diff = 0.d0
     this%F = this%T + this%V + this%W * 0.5d0
-    do ch1 = 1, one%NChan
+    do ch1 = 1, this%F%NChan
       this%diff = max(maxval(this%F%MatCh(ch1,ch1)%m - Fold%MatCh(ch1,ch1)%m), this%diff)
     end do
     call Fold%fin()
@@ -680,7 +678,7 @@ contains
     class(HFSolver), intent(in) :: this
     type(MSpace), intent(in) :: ms
     integer :: i, io, ch
-    type(OneBodyPart) :: F_HF
+    type(NBodyPart) :: F_HF
 
     F_HF = this%F
     do ch = 1, ms%one%NChan
@@ -693,13 +691,13 @@ contains
     do i = 1, size(ms%holes)
       io = ms%holes(i)
       write(*,'(a,a10,i4,f12.6)') 'hole:     ', trim(ms%sps%GetLabelFromIndex(io)), io, &
-          & F_HF%GetOBME(io,io)
+          & F_HF%GetOBME(ms%sps,ms%one,io,io)
     end do
 
     do i = 1, size(ms%particles)
       io = ms%particles(i)
       write(*,'(a,a10,i4,f12.6)') 'particle: ', trim(ms%sps%GetLabelFromIndex(io)), io, &
-          & F_HF%GetOBME(io,io)
+          & F_HF%GetOBME(ms%sps,ms%one,io,io)
     end do
     call F_HF%fin()
   end subroutine PrintSPEs
@@ -712,10 +710,10 @@ contains
     this%constructed = .false.
   end subroutine FinMonopole
 
-  subroutine InitMonopole2(this, vnn)
+  subroutine InitMonopole2(this, ms, vnn)
     class(Monopole), intent(inout) :: this
-    type(TwoBodyPart), intent(in) :: vnn
-    type(TwoBodySpace), pointer :: ms
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart), intent(in) :: vnn
     integer :: n, idx
     integer(8) :: i1, num
     integer(8) :: i2
@@ -729,7 +727,7 @@ contains
     real(8) :: v, norm
 
     if(this%constructed) return
-    ms => vnn%two
+
     n = 0
     do i1 = 1, ms%sps%norbs
       l1 = ms%sps%orb(i1)%l
@@ -832,7 +830,7 @@ contains
         if(i1 == i2 .and. mod(JJ,2) == 1) cycle
         if(i3 == i4 .and. mod(JJ,2) == 1) cycle
         v = v + dble(2*JJ+1) * &
-            & vnn%GetTwBME(&
+            & vnn%GetTwBME(ms%sps,ms%two,&
             & int(i1,kind(JJ)), int(i2,kind(JJ)), int(i3,kind(JJ)), int(i4,kind(JJ)),JJ)
         ! need to convert integer(8) -> integer(4)
       end do
@@ -843,11 +841,11 @@ contains
     this%constructed = .true.
   end subroutine InitMonopole2
 
-  subroutine InitMonopole3(this, v3n)
+  subroutine InitMonopole3(this, ms, v3n)
     use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
-    type(ThreeBodyForce), intent(in) :: v3n
-    type(NonOrthIsospinThreeBodySpace), pointer :: ms
+    type(MSpace), intent(in) :: ms
+    type(NBodyPart), intent(in) :: v3n
     integer :: n, idx, JJ, JJJ
     integer(8) :: i1, i2, i3, i4, i5, i6, num
     integer :: l1, j1, z1, e1
@@ -859,7 +857,6 @@ contains
     real(8) :: v
 
     if(this%constructed) return
-    ms => v3n%thr
     n = 0
     do i1 = 1, ms%sps%norbs
       l1 = ms%sps%orb(i1)%l
@@ -1011,7 +1008,7 @@ contains
         if(i4 == i5 .and. mod(JJ,2) == 1) cycle
         do JJJ = abs(2*JJ-j3), (2*JJ+j3), 2
           v = v + dble(JJJ+1) * &
-              & v3n%GetThBME(&
+              & v3n%GetThBME(ms,&
               & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
               & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
           ! need to convert integer(8) -> integer(4)
@@ -1024,6 +1021,187 @@ contains
     !$omp end parallel
     this%constructed = .true.
   end subroutine InitMonopole3
+
+  subroutine InitMonopole3_sp(this, ms, v3n)
+    use MyLibrary, only: triag
+    class(Monopole), intent(inout) :: this
+    type(MSpace), intent(in) :: ms
+    type(NBodyPartSp), intent(in) :: v3n
+    integer :: n, idx, JJ, JJJ
+    integer(8) :: i1, i2, i3, i4, i5, i6, num
+    integer :: l1, j1, z1, e1
+    integer :: l2, j2, z2, e2
+    integer :: l3, j3, z3, e3
+    integer :: l4, j4, z4, e4
+    integer :: l5, j5, z5, e5
+    integer :: l6, j6, z6, e6
+    real(8) :: v
+
+    if(this%constructed) return
+    n = 0
+    do i1 = 1, ms%sps%norbs
+      l1 = ms%sps%orb(i1)%l
+      j1 = ms%sps%orb(i1)%j
+      z1 = ms%sps%orb(i1)%z
+      e1 = ms%sps%orb(i1)%e
+
+      do i4 = 1, i1
+        l4 = ms%sps%orb(i4)%l
+        j4 = ms%sps%orb(i4)%j
+        z4 = ms%sps%orb(i4)%z
+        e4 = ms%sps%orb(i4)%e
+
+        if(j1 /= j4) cycle
+        if((-1)**l1 /= (-1)**l4) cycle
+        if(z1 /= z4) cycle
+
+        do i2 = 1, ms%sps%norbs
+          l2 = ms%sps%orb(i2)%l
+          j2 = ms%sps%orb(i2)%j
+          z2 = ms%sps%orb(i2)%z
+          e2 = ms%sps%orb(i2)%e
+
+          do i5 = 1, ms%sps%norbs
+            l5 = ms%sps%orb(i5)%l
+            j5 = ms%sps%orb(i5)%j
+            z5 = ms%sps%orb(i5)%z
+            e5 = ms%sps%orb(i5)%e
+            if(j2 /= j5) cycle
+            if((-1)**l2 /= (-1)**l5) cycle
+            if(z2 /= z5) cycle
+
+            if(e1 + e2 > ms%e2max) cycle
+            if(e4 + e5 > ms%e2max) cycle
+
+            do i3 = 1, ms%sps%norbs
+              l3 = ms%sps%orb(i3)%l
+              j3 = ms%sps%orb(i3)%j
+              z3 = ms%sps%orb(i3)%z
+              e3 = ms%sps%orb(i3)%e
+              do i6 = 1, ms%sps%norbs
+                l6 = ms%sps%orb(i6)%l
+                j6 = ms%sps%orb(i6)%j
+                z6 = ms%sps%orb(i6)%z
+                e6 = ms%sps%orb(i6)%e
+                if(j3 /= j6) cycle
+                if((-1)**l3 /= (-1)**l6) cycle
+                if(z3 /= z6) cycle
+
+                if(e1+e3 > ms%e2max) cycle
+                if(e2+e3 > ms%e2max) cycle
+                if(e4+e6 > ms%e2max) cycle
+                if(e5+e6 > ms%e2max) cycle
+                if(e1+e2+e3 > ms%e3max) cycle
+                if(e4+e5+e6 > ms%e3max) cycle
+
+                n = n + 1
+              end do
+            end do
+
+          end do
+        end do
+      end do
+    end do
+
+    this%nidx = n
+    allocate(this%idx(n))
+    allocate(this%v(n))
+
+
+    n = 0
+    do i1 = 1, ms%sps%norbs
+      l1 = ms%sps%orb(i1)%l
+      j1 = ms%sps%orb(i1)%j
+      z1 = ms%sps%orb(i1)%z
+      e1 = ms%sps%orb(i1)%e
+
+      do i4 = 1, i1
+        l4 = ms%sps%orb(i4)%l
+        j4 = ms%sps%orb(i4)%j
+        z4 = ms%sps%orb(i4)%z
+        e4 = ms%sps%orb(i4)%e
+
+        if(j1 /= j4) cycle
+        if((-1)**l1 /= (-1)**l4) cycle
+        if(z1 /= z4) cycle
+
+        do i2 = 1, ms%sps%norbs
+          l2 = ms%sps%orb(i2)%l
+          j2 = ms%sps%orb(i2)%j
+          z2 = ms%sps%orb(i2)%z
+          e2 = ms%sps%orb(i2)%e
+
+          do i5 = 1, ms%sps%norbs
+            l5 = ms%sps%orb(i5)%l
+            j5 = ms%sps%orb(i5)%j
+            z5 = ms%sps%orb(i5)%z
+            e5 = ms%sps%orb(i5)%e
+            if(j2 /= j5) cycle
+            if((-1)**l2 /= (-1)**l5) cycle
+            if(z2 /= z5) cycle
+
+            if(e1 + e2 > ms%e2max) cycle
+            if(e4 + e5> ms%e2max) cycle
+
+            do i3 = 1, ms%sps%norbs
+              l3 = ms%sps%orb(i3)%l
+              j3 = ms%sps%orb(i3)%j
+              z3 = ms%sps%orb(i3)%z
+              e3 = ms%sps%orb(i3)%e
+              do i6 = 1, ms%sps%norbs
+                l6 = ms%sps%orb(i6)%l
+                j6 = ms%sps%orb(i6)%j
+                z6 = ms%sps%orb(i6)%z
+                e6 = ms%sps%orb(i6)%e
+                if(j3 /= j6) cycle
+                if((-1)**l3 /= (-1)**l6) cycle
+                if(z3 /= z6) cycle
+
+                if(e1+e3 > ms%e2max) cycle
+                if(e2+e3 > ms%e2max) cycle
+                if(e4+e6 > ms%e2max) cycle
+                if(e5+e6 > ms%e2max) cycle
+                if(e1+e2+e3 > ms%e3max) cycle
+                if(e4+e5+e6 > ms%e3max) cycle
+
+                n = n + 1
+                this%idx(n) = GetIndex3(i1,i2,i3,i4,i5,i6)
+              end do
+            end do
+
+          end do
+        end do
+
+      end do
+    end do
+
+    !$omp parallel
+    !$omp do private(idx,num,i1,i2,i3,i4,i5,i6,j1,j2,j3,v,JJ,JJJ)
+    do idx = 1, this%nidx
+      num = this%idx(idx)
+      call GetSpLabels3(num,i1,i2,i3,i4,i5,i6)
+      j1 = ms%sps%orb(i1)%j
+      j2 = ms%sps%orb(i2)%j
+      j3 = ms%sps%orb(i3)%j
+      v = 0.d0
+      do JJ = abs(j1-j2)/2, (j1+j2)/2
+        if(i1 == i2 .and. mod(JJ,2) == 1) cycle
+        if(i4 == i5 .and. mod(JJ,2) == 1) cycle
+        do JJJ = abs(2*JJ-j3), (2*JJ+j3), 2
+          v = v + dble(JJJ+1) * &
+              & v3n%GetThBME(ms,&
+              & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
+              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
+          ! need to convert integer(8) -> integer(4)
+          !write(*,'(8i4,f12.6)') i1,i2,i3,i4,i5,i6,JJ,JJJ,v
+        end do
+      end do
+      this%v(idx) = v / dble(j1+1)
+    end do
+    !$omp end do
+    !$omp end parallel
+    this%constructed = .true.
+  end subroutine InitMonopole3_sp
 
   function GetIndex2(i1,i2,i3,i4) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4
@@ -1061,31 +1239,44 @@ end module HartreeFock
 
 !program test
 !  use Profiler, only: timer
+!  use ClassSys, only: sys
+!  use MyLibrary, only: &
+!      &init_dbinomial_triangle, fin_dbinomial_triangle
+!  use ModelSpace, only: MSpace
 !  use Operators
-!  use HartreeFock
-!
+!  use HartreeFock, only: HFSolver
+!  use MBPT
 !  implicit none
 !
 !  type(MSpace) :: ms
-!  type(Ops) :: h
-!  type(HFSolver) :: hf
+!  type(Op) :: h
 !  character(:), allocatable :: file_nn, file_3n
+!  type(HFsolver) :: HF
+!  type(sys) :: s
+!  type(MBPTEnergy) :: PT
 !
 !  call timer%init()
-!  call ms%init('O16', 35.d0, 8, 16, e3max=6, is_three_body_jt=.true.)
-!  call h%init('hamil',ms, 3)
+!  call init_dbinomial_triangle()
 !
-!  file_nn = '/home/takayuki/MtxElmnt/2BME/TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw35_emax8_e2max16.me2j.gz'
-!  file_3n = '/home/takayuki/MtxElmnt/3BME/ThBME_srg2.00_N3LO_EM500_ChEFT_N2LO_cD-0.20cE0.098_Local2_IS_hw35_ms6_6_6.me3j'
+!  call ms%init('O16', 25.d0, 6, 12, e3max=6)
+!  !call h%init('hamil',ms,.false.) ! nn-only
+!  call h%init('hamil',ms,.true.)  ! nn+3n
 !
-!  call h%set(file_nn,file_3n,[8,16,8],[6,6,6,6])
-!  call hf%init(h)
-!  call hf%solve()
-!  !call h%NormalOrdering()
-!  call hf%fin()
+!  call h%set(ms,file_nn,file_3n,[8,12,8],[8,8,8,8])
+!
+!  call HF%init(ms,h,alpha=1.0d0)
+!  call HF%solve(ms%sps,ms%one)
+!
+!  call HF%TransformToHF(ms,H)
+!
+!  call PT%calc(ms,H)
+!
+!  call HF%fin()
+!
 !  call h%fin()
 !  call ms%fin()
 !
+!  call fin_dbinomial_triangle()
 !  call timer%fin()
 !
 !end program test

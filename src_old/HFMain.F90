@@ -10,7 +10,7 @@ program HFMain
   implicit none
   type(InputParameters) :: p
   type(MSpace) :: ms
-  type(Ops) :: h, opr
+  type(Op) :: h, opr
   type(HFSolver) :: HF
   type(MBPTEnergy) :: PT
   type(MBPTScalar) :: PTs
@@ -48,33 +48,26 @@ program HFMain
     if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
     if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
   case default
-    if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm,&
-        & is_three_body_jt=.true.)
-    if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm, &
-        & is_three_body_jt=.true.)
+    if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
   end select
   call w%init(p%emax, p%e2max)
 
   ! Hamiltonian -----
-  select case(p%int_3n_file)
-  case('none', 'None', 'NONE')
-    call h%init('hamil',ms, 2)
-  case default
-    call h%init('hamil',ms, 3)
-  end select
-  call h%set(p%int_nn_file,p%int_3n_file,&
+  call h%init('hamil',ms,ms%is_three_body)
+  call h%set(ms,p%int_nn_file,p%int_3n_file,&
       & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
       & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
-  call HF%init(h,alpha=p%alpha)
-  call HF%solve()
+  call HF%init(ms,h,alpha=p%alpha)
+  call HF%solve(ms%sps,ms%one)
 
   ! print single-particle energies
   !call HF%PrintSPEs(ms)
-  call HF%TransformToHF(h)
+  call HF%TransformToHF(ms,h)
 
   if(p%is_MBPTEnergy) then
-    call PT%calc(H)
+    call PT%calc(ms,H)
     open(wunit, file = p%summary_file, action='write',status='replace')
     call p%PrintInputParameters(wunit)
     write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
@@ -89,10 +82,7 @@ program HFMain
         & PT%e_0+PT%e_2+PT%e_3
     close(wunit)
   end if
-  if(p%is_Op_out) then
-    call w%SetFileName(p%out_dir, p%Op_file_format, h)
-    call w%writef(p,h)
-  end if
+  if(p%is_Op_out) call w%writef(p,ms,h)
   ! Hamiltonian -----
 
   if(p%Ops(1) /= 'none' .or. p%Ops(1) /= '') then
@@ -106,20 +96,17 @@ program HFMain
   do n = 1, size(p%Ops)
     if(p%Ops(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
-    call opr%init(p%Ops(n),ms,2)
-    call opr%set()
-    call HF%TransformToHF(opr)
+    call opr%init(p%Ops(n),ms,.false.)
+    call opr%set(ms)
+    call HF%TransformToHF(ms,opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(h,opr,p%is_MBPTScalar_full)
+      call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
       write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
       close(wunit)
     end if
-    if(p%is_Op_out) then
-      call w%SetFileName(p%out_dir, p%Op_file_format, opr)
-      call w%writef(p,opr)
-    end if
+    if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()
   end do
 
@@ -127,22 +114,19 @@ program HFMain
   do n = 1, size(p%files_nn)
     if(p%files_nn(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n))
-    call opr%init(p%Ops(n),ms, 2)
-    call opr%set(p%files_nn(n), 'none', &
+    call opr%init(p%Ops(n),ms,.false.)
+    call opr%set(ms, p%files_nn(n), 'none', &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
-    call HF%TransformToHF(opr)
+    call HF%TransformToHF(ms,opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(h,opr,p%is_MBPTScalar_full)
+      call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
       write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
       close(wunit)
     end if
-    if(p%is_Op_out) then
-      call w%SetFileName(p%out_dir, p%Op_file_format, opr)
-      call w%writef(p,opr)
-    end if
+    if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()
   end do
 
@@ -151,13 +135,13 @@ program HFMain
     if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n)), &
         & " and ", trim(p%files_3n(n))
-    call opr%init(p%Ops(n),ms, 3)
-    call opr%set(p%files_nn(n), p%files_3n(n), &
+    call opr%init(p%Ops(n),ms,.true.)
+    call opr%set(ms, p%files_nn(n), p%files_3n(n), &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-    call HF%TransformToHF(opr)
+    call HF%TransformToHF(ms,opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(h,opr,p%is_MBPTScalar_full)
+      call PTs%calc(ms,h,opr,p%is_MBPTScalar_full)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
@@ -166,10 +150,7 @@ program HFMain
       write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
       close(wunit)
     end if
-    if(p%is_Op_out) then
-      call w%SetFileName(p%out_dir, p%Op_file_format, opr)
-      call w%writef(p,opr)
-    end if
+    if(p%is_Op_out) call w%writef(p,ms,opr)
     call opr%fin()
   end do
 

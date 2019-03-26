@@ -107,6 +107,7 @@ module NOperators
 
   type :: NBodyPartSp
     type(NBodyChannelSp), allocatable :: MatCh(:,:)
+    type(MSpace), pointer :: ms
     character(32) :: optr='none'
     integer :: NChan
     logical :: Scalar
@@ -150,6 +151,7 @@ module NOperators
 
   type :: NBodyPart
     type(NBodyChannel), allocatable :: MatCh(:,:)
+    type(MSpace), pointer :: ms
     character(32) :: optr = 'none'
     integer :: NChan
     logical :: Scalar
@@ -276,10 +278,11 @@ contains
     deallocate(this%MatCh)
   end subroutine FinNBodyPartSp
 
-  subroutine InitOneBodyPart(this, one, Scalar, optr, jr, pr, zr)
+  subroutine InitOneBodyPart(this, ms, Scalar, optr, jr, pr, zr)
     use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
-    type(OneBodySpace), intent(in) :: one
+    type(MSpace), intent(in), pointer :: ms
+    type(OneBodySpace), pointer :: one
     logical, intent(in) :: Scalar
     character(*), intent(in) :: optr
     integer, intent(in) :: jr, pr, zr
@@ -287,6 +290,8 @@ contains
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
 
+    this%ms => ms
+    one => ms%one
     this%optr = optr
     this%Scalar = Scalar
     this%jr = jr
@@ -318,10 +323,11 @@ contains
     end do
   end subroutine InitOneBodyPart
 
-  subroutine InitTwoBodyPart(this, two, Scalar, optr, jr, pr, zr)
+  subroutine InitTwoBodyPart(this, ms, Scalar, optr, jr, pr, zr)
     use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
-    type(TwoBodySpace), intent(in) :: two
+    type(MSpace), intent(in), pointer :: ms
+    type(TwoBodySpace), pointer :: two
     logical, intent(in) :: Scalar
     character(*), intent(in) :: optr
     integer, intent(in) :: jr, pr, zr
@@ -329,6 +335,8 @@ contains
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
 
+    this%ms => ms
+    two => ms%two
     this%optr = optr
     this%Scalar = Scalar
     this%jr = jr
@@ -360,10 +368,11 @@ contains
     end do
   end subroutine InitTwoBodyPart
 
-  subroutine InitThreeBodyPart(this, thr, Scalar, optr, jr, pr, zr)
+  subroutine InitThreeBodyPart(this, ms, Scalar, optr, jr, pr, zr)
     use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
-    type(ThreeBodySpace), intent(in) :: thr
+    type(MSpace), intent(in), pointer :: ms
+    type(ThreeBodySpace), pointer :: thr
     logical, intent(in) :: Scalar
     character(*), intent(in) :: optr
     integer, intent(in) :: jr, pr, zr
@@ -371,6 +380,8 @@ contains
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
 
+    this%ms => ms
+    thr => ms%thr
     this%optr = optr
     this%Scalar = Scalar
     this%jr = jr
@@ -403,10 +414,11 @@ contains
 
   end subroutine InitThreeBodyPart
 
-  subroutine InitNonOrthIsospinThreeBodyPart(this, thr, Scalar, optr, jr, pr, tr)
+  subroutine InitNonOrthIsospinThreeBodyPart(this, ms, Scalar, optr, jr, pr, tr)
     use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
-    type(NonOrthIsospinThreeBodySpace), intent(in) :: thr
+    type(MSpace), intent(in), pointer :: ms
+    type(NonOrthIsospinThreeBodySpace), pointer :: thr
     logical, intent(in) :: Scalar
     character(*), intent(in) :: optr
     integer, intent(in) :: jr, pr, tr
@@ -414,6 +426,8 @@ contains
     integer :: jbra, pbra, tbra, nbra
     integer :: jket, pket, tket, nket
 
+    this%ms => ms
+    thr => ms%thr21
     this%optr = optr
     this%Scalar = Scalar
     this%jr = jr
@@ -445,10 +459,11 @@ contains
     end do
   end subroutine InitNonOrthIsospinThreeBodyPart
 
-  subroutine InitNonOrthIsospinThreeBodyPartSp(this, thr, Scalar, optr, jr, pr, tr)
+  subroutine InitNonOrthIsospinThreeBodyPartSp(this, ms, Scalar, optr, jr, pr, tr)
     use MyLibrary, only: triag
     class(NBodyPartSp), intent(inout) :: this
-    type(NonOrthIsospinThreeBodySpace), intent(in) :: thr
+    type(MSpace), intent(in), pointer :: ms
+    type(NonOrthIsospinThreeBodySpace), pointer :: thr
     logical, intent(in) :: Scalar
     character(*), intent(in) :: optr
     integer, intent(in) :: jr, pr, tr
@@ -456,6 +471,8 @@ contains
     integer :: jbra, pbra, tbra, nbra
     integer :: jket, pket, tket, nket
 
+    this%ms => ms
+    thr => ms%thr21
     this%optr = optr
     this%Scalar = Scalar
     this%jr = jr
@@ -487,10 +504,11 @@ contains
     end do
   end subroutine InitNonOrthIsospinThreeBodyPartSp
 
-  subroutine InitThreeBodyPartSp(this, thr, Scalar, optr, jr, pr, zr)
+  subroutine InitThreeBodyPartSp(this, ms, Scalar, optr, jr, pr, zr)
     use MyLibrary, only: triag
     class(NBodyPartSp), intent(inout) :: this
-    type(ThreeBodySpace), intent(in) :: thr
+    type(MSpace), intent(in), pointer :: ms
+    type(ThreeBodySpace), pointer :: thr
     logical, intent(in) :: Scalar
     character(*), intent(in) :: optr
     integer, intent(in) :: jr, pr, zr
@@ -498,6 +516,8 @@ contains
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
 
+    this%ms => ms
+    thr => ms%thr
     this%optr = optr
     this%Scalar = Scalar
     this%jr = jr
@@ -536,6 +556,7 @@ contains
     integer :: chbra, chket
 
     if(allocated(a%MatCh)) call a%fin()
+    a%ms => b%ms
     a%NChan = b%NChan
     a%optr = b%optr
     a%Scalar = b%Scalar
@@ -677,58 +698,66 @@ contains
     end do
   end function ScaleNBodyPartSp
 
-  function GetOBME(this,sps,ms,i1,i2) result(r)
+  function GetOBME(this,i1,i2) result(r)
     class(NBodyPart), intent(in) :: this
-    type(Orbits), intent(in) :: sps
-    type(OneBodySpace), intent(in) :: ms
     integer, intent(in) :: i1, i2
+    type(OneBodySpace), pointer :: one
+    type(SingleParticleOrbit), pointer :: o1, o2
     integer :: chbra, chket, bra, ket
     real(8) :: r
 
     r = 0.d0
-    chbra = ms%jpz2ch(sps%orb(i1)%j, (-1)**sps%orb(i1)%l, sps%orb(i1)%z)
-    chket = ms%jpz2ch(sps%orb(i2)%j, (-1)**sps%orb(i2)%l, sps%orb(i2)%z)
+    one => this%ms%one
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    chbra = one%jpz2ch(o1%j, (-1)**o1%l, o1%z)
+    chket = one%jpz2ch(o2%j, (-1)**o2%l, o2%z)
     if(.not. this%MatCh(chbra,chket)%is) return
-    bra = ms%jpz(chbra)%spi2n(i1)
-    ket = ms%jpz(chket)%spi2n(i2)
+    bra = one%jpz(chbra)%spi2n(i1)
+    ket = one%jpz(chket)%spi2n(i2)
     r = this%MatCh(chbra,chket)%m(bra,ket)
-
   end function GetOBME
 
-  subroutine SetOneBodyPart(this, ms, sps, hw, A, Z, N)
+  subroutine SetOneBodyPart(this, hw, A, Z, N)
     class(NBodyPart), intent(inout) :: this
-    type(OneBodySpace), intent(in) :: ms
-    type(Orbits), intent(in) :: sps
+    type(Orbits), pointer :: sps
+    type(OneBodySpace), pointer :: obs
     real(8), intent(in) :: hw
     integer, intent(in) :: A, Z, N
     integer :: chbra
     integer :: chket
-
+    sps => this%ms%sps
+    obs => this%ms%one
     do chbra = 1, this%NChan
       do chket = 1, this%NChan
         if(.not. this%MatCh(chbra,chket)%is) cycle
         call this%MatCh(chbra,chket)%set(this%optr, sps, &
-            & ms%jpz(chbra), ms%jpz(chket), hw, A, Z, N)
+            & obs%jpz(chbra), obs%jpz(chket), hw, A, Z, N)
       end do
     end do
   end subroutine SetOneBodyPart
 
-  function GetTwBME_general(this,sps,ms,i1,i2,i3,i4,J12,J34) result(r)
+  function GetTwBME_general(this,i1,i2,i3,i4,J12,J34) result(r)
     use MyLibrary, only: triag
     real(8) :: r
     class(NBodyPart), intent(in) :: this
-    type(Orbits), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,J12,J34
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
     integer :: P12, P34
     integer :: Z12, Z34
     integer :: chbra, chket, bra, ket, iphase
 
     r = 0.d0
-    P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
-    P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z)/2
-    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z)/2
+    tbs => this%ms%two
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
 
     if(triag(J12, J34, this%jr)) then
       write(*,*) "Warning: in GetTwBME_general: J"
@@ -745,36 +774,41 @@ contains
       return
     end if
 
-    chbra = ms%jpz2ch(J12,P12,Z12)
-    chket = ms%jpz2ch(J34,P34,Z34)
+    chbra = tbs%jpz2ch(J12,P12,Z12)
+    chket = tbs%jpz2ch(J34,P34,Z34)
     if(chbra * chket == 0) return
 
-    bra = ms%jpz(chbra)%spis2n(i1,i2)
-    ket = ms%jpz(chket)%spis2n(i3,i4)
+    bra = tbs%jpz(chbra)%spis2n(i1,i2)
+    ket = tbs%jpz(chket)%spis2n(i3,i4)
     if(bra * ket == 0) return
 
-    iphase = ms%jpz(chbra)%iphase(i1,i2) * &
-        &    ms%jpz(chket)%iphase(i3,i4)
+    iphase = tbs%jpz(chbra)%iphase(i1,i2) * &
+        &    tbs%jpz(chket)%iphase(i3,i4)
 
     r = dble(iphase) * this%MatCh(chbra,chket)%m(bra,ket)
   end function GetTwBME_general
 
-  function GetTwBME_scalar(this,sps,ms,i1,i2,i3,i4,J) result(r)
+  function GetTwBME_scalar(this,i1,i2,i3,i4,J) result(r)
     use MyLibrary, only: triag
     real(8) :: r
     class(NBodyPart), intent(in) :: this
-    type(Orbits), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,J
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
     integer :: P12, P34
     integer :: Z12, Z34
     integer :: ch, bra, ket, iphase
 
     r = 0.d0
-    P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
-    P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z)/2
-    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z)/2
+    tbs => this%ms%two
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
 
     if(P12 * P34 /= 1) then
       write(*,*) "Warning: in GetTwBME_scalar: P"
@@ -786,34 +820,39 @@ contains
       return
     end if
 
-    ch = ms%jpz2ch(J,P12,Z12)
+    ch = tbs%jpz2ch(J,P12,Z12)
     if(ch == 0) return
 
-    bra = ms%jpz(ch)%spis2n(i1,i2)
-    ket = ms%jpz(ch)%spis2n(i3,i4)
+    bra = tbs%jpz(ch)%spis2n(i1,i2)
+    ket = tbs%jpz(ch)%spis2n(i3,i4)
     if(bra * ket == 0) return
 
-    iphase = ms%jpz(ch)%iphase(i1,i2) * &
-        &    ms%jpz(ch)%iphase(i3,i4)
+    iphase = tbs%jpz(ch)%iphase(i1,i2) * &
+        &    tbs%jpz(ch)%iphase(i3,i4)
 
     r = dble(iphase) * this%MatCh(ch,ch)%m(bra,ket)
   end function GetTwBME_scalar
 
-  subroutine SetTwBME_general(this,sps,ms,i1,i2,i3,i4,J12,J34,me)
+  subroutine SetTwBME_general(this,i1,i2,i3,i4,J12,J34,me)
     use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
-    type(Orbits), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,J12,J34
     real(8), intent(in) :: me
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
     integer :: P12, P34
     integer :: Z12, Z34
     integer :: chbra, chket, bra, ket, iphase
 
-    P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
-    P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
-    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
+    tbs => this%ms%two
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
 
     if(triag(J12, J34, this%jr)) then
       write(*,*) "Warning: in SetTwBME_general: J"
@@ -830,35 +869,40 @@ contains
       return
     end if
 
-    chbra = ms%jpz2ch(J12,P12,Z12)
-    chket = ms%jpz2ch(J34,P34,Z34)
+    chbra = tbs%jpz2ch(J12,P12,Z12)
+    chket = tbs%jpz2ch(J34,P34,Z34)
     if(chbra * chket == 0) return
 
-    bra = ms%jpz(chbra)%spis2n(i1,i2)
-    ket = ms%jpz(chket)%spis2n(i3,i4)
+    bra = tbs%jpz(chbra)%spis2n(i1,i2)
+    ket = tbs%jpz(chket)%spis2n(i3,i4)
     if(bra * ket == 0) return
 
-    iphase = ms%jpz(chbra)%iphase(i1,i2) * &
-        &    ms%jpz(chket)%iphase(i3,i4)
+    iphase = tbs%jpz(chbra)%iphase(i1,i2) * &
+        &    tbs%jpz(chket)%iphase(i3,i4)
 
     this%MatCh(chbra,chket)%m(bra,ket) = dble(iphase) * me
     this%MatCh(chket,chbra)%m(ket,bra) = dble(iphase) * me
   end subroutine SetTwBME_general
 
-  subroutine SetTwBME_scalar(this,sps,ms,i1,i2,i3,i4,J,me)
+  subroutine SetTwBME_scalar(this,i1,i2,i3,i4,J,me)
     class(NBodyPart), intent(inout) :: this
-    type(Orbits), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,J
     real(8), intent(in) :: me
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
     integer :: P12, P34
     integer :: Z12, Z34
     integer :: ch, bra, ket, iphase
 
-    P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
-    P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
-    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
+    tbs => this%ms%two
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
 
     if(P12 * P34 /= 1) then
       write(*,*) "Warning: in SetTwBME_general: P"
@@ -870,35 +914,40 @@ contains
       return
     end if
 
-    ch = ms%jpz2ch(J,P12,Z12)
+    ch = tbs%jpz2ch(J,P12,Z12)
     if(ch == 0) return
 
-    bra = ms%jpz(ch)%spis2n(i1,i2)
-    ket = ms%jpz(ch)%spis2n(i3,i4)
+    bra = tbs%jpz(ch)%spis2n(i1,i2)
+    ket = tbs%jpz(ch)%spis2n(i3,i4)
     if(bra * ket == 0) return
 
-    iphase = ms%jpz(ch)%iphase(i1,i2) * &
-        &    ms%jpz(ch)%iphase(i3,i4)
+    iphase = tbs%jpz(ch)%iphase(i1,i2) * &
+        &    tbs%jpz(ch)%iphase(i3,i4)
 
     this%MatCh(ch,ch)%m(bra,ket) = dble(iphase) * me
     this%MatCh(ch,ch)%m(ket,bra) = dble(iphase) * me
   end subroutine SetTwBME_scalar
 
-  subroutine AddToTwBME_general(this,sps,ms,i1,i2,i3,i4,J12,J34,me)
+  subroutine AddToTwBME_general(this,i1,i2,i3,i4,J12,J34,me)
     use MyLibrary, only: triag
     class(NBodyPart), intent(inout) :: this
-    type(Orbits), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,J12,J34
     real(8), intent(in) :: me
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
     integer :: P12, P34
     integer :: Z12, Z34
     integer :: chbra, chket, bra, ket, iphase
 
-    P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
-    P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
-    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
+    tbs => this%ms%two
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
 
     if(triag(J12, J34, this%jr)) then
       write(*,*)"Warning: in AddToTwBME_general: J"
@@ -915,36 +964,41 @@ contains
       return
     end if
 
-    chbra = ms%jpz2ch(J12,P12,Z12)
-    chket = ms%jpz2ch(J34,P34,Z34)
+    chbra = tbs%jpz2ch(J12,P12,Z12)
+    chket = tbs%jpz2ch(J34,P34,Z34)
     if(chbra * chket == 0) return
 
-    bra = ms%jpz(chbra)%spis2n(i1,i2)
-    ket = ms%jpz(chket)%spis2n(i3,i4)
+    bra = tbs%jpz(chbra)%spis2n(i1,i2)
+    ket = tbs%jpz(chket)%spis2n(i3,i4)
     if(bra * ket == 0) return
 
-    iphase = ms%jpz(chbra)%iphase(i1,i2) * &
-        &    ms%jpz(chket)%iphase(i3,i4)
+    iphase = tbs%jpz(chbra)%iphase(i1,i2) * &
+        &    tbs%jpz(chket)%iphase(i3,i4)
 
     this%MatCh(chbra,chket)%m(bra,ket) = &
         & this%MatCh(chbra,chket)%m(bra,ket) + dble(iphase) * me
     this%MatCh(chket,chbra)%m(ket,bra) = this%MatCh(chbra,chket)%m(bra,ket)
   end subroutine AddToTwBME_general
 
-  subroutine AddToTwBME_scalar(this,sps,ms,i1,i2,i3,i4,J,me)
+  subroutine AddToTwBME_scalar(this,i1,i2,i3,i4,J,me)
     class(NBodyPart), intent(inout) :: this
-    type(Orbits), intent(in) :: sps
-    type(TwoBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,J
     real(8), intent(in) :: me
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
     integer :: P12, P34
     integer :: Z12, Z34
     integer :: ch, bra, ket, iphase
 
-    P12 = (-1) ** (sps%orb(i1)%l + sps%orb(i2)%l)
-    P34 = (-1) ** (sps%orb(i3)%l + sps%orb(i4)%l)
-    Z12 = (sps%orb(i1)%z + sps%orb(i2)%z) / 2
-    Z34 = (sps%orb(i3)%z + sps%orb(i4)%z) / 2
+    tbs => this%ms%two
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
 
     if(P12 * P34 /= 1) then
       write(*,*) "Warning: in AddToTwBME_general: P"
@@ -956,46 +1010,47 @@ contains
       return
     end if
 
-    ch = ms%jpz2ch(J,P12,Z12)
+    ch = tbs%jpz2ch(J,P12,Z12)
     if(ch == 0) return
 
-    bra = ms%jpz(ch)%spis2n(i1,i2)
-    ket = ms%jpz(ch)%spis2n(i3,i4)
+    bra = tbs%jpz(ch)%spis2n(i1,i2)
+    ket = tbs%jpz(ch)%spis2n(i3,i4)
     if(bra * ket == 0) return
 
-    iphase = ms%jpz(ch)%iphase(i1,i2) * &
-        &    ms%jpz(ch)%iphase(i3,i4)
+    iphase = tbs%jpz(ch)%iphase(i1,i2) * &
+        &    tbs%jpz(ch)%iphase(i3,i4)
 
     this%MatCh(ch,ch)%m(bra,ket) = this%MatCh(ch,ch)%m(bra,ket) + &
         & me * dble(iphase)
     this%MatCh(ch,ch)%m(ket,bra) = this%MatCh(ch,ch)%m(bra,ket)
   end subroutine AddToTwBME_scalar
 
-  subroutine SetTwoBodyPart(this, ms, sps, hw, A, Z, N)
+  subroutine SetTwoBodyPart(this, hw, A, Z, N)
     class(NBodyPart), intent(inout) :: this
-    type(TwoBodySpace), intent(in) :: ms
-    type(Orbits), intent(in) :: sps
+    type(Orbits), pointer :: sps
     real(8), intent(in) :: hw
     integer, intent(in) :: A, Z, N
-    integer :: chbra
-    integer :: chket
+    type(TwoBodySpace), pointer :: tbs
+    integer :: chbra, chket
 
+    tbs => this%ms%two
+    sps => this%ms%sps
     do chbra = 1, this%NChan
       do chket = 1, this%NChan
         if(.not. this%MatCh(chbra,chket)%is) cycle
         call this%MatCh(chbra,chket)%set(this%optr, sps, &
-            & ms%jpz(chbra), ms%jpz(chket), hw, A, Z, N)
+            & tbs%jpz(chbra), tbs%jpz(chket), hw, A, Z, N)
       end do
     end do
   end subroutine SetTwoBodyPart
 
-  function GetThBMEIso_scalar(this,sps,ms,i1,i2,i3,J12,T12,&
+  function GetThBMEIso_scalar(this,i1,i2,i3,J12,T12,&
         & i4,i5,i6,J45,T45,J,T) result(r)
     class(NBodyPart), intent(in) :: this
-    type(OrbitsIsospin), intent(in) :: sps
-    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,T12,J45,T45,J,T
+    type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
+    type(NonOrthIsospinThreeBodySpace), pointer :: tbs
     integer :: ch, idxbra, idxket, bra, ket
     integer :: P123, P456
     integer :: isorted_bra, isorted_ket
@@ -1003,42 +1058,51 @@ contains
     real(8) :: r
 
     r = 0.d0
-    P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
-    P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
+    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
+    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
+    o1 => this%ms%isps%orb(i1)
+    o2 => this%ms%isps%orb(i2)
+    o3 => this%ms%isps%orb(i3)
+    o4 => this%ms%isps%orb(i4)
+    o5 => this%ms%isps%orb(i5)
+    o6 => this%ms%isps%orb(i6)
+    tbs => this%ms%thr21
+    P123 = (-1) ** (o1%l+o2%l+o3%l)
+    P456 = (-1) ** (o4%l+o5%l+o6%l)
     if(P123 * P456 /= 1) then
       write(*,*) 'Warning: in GetThBMEIso_scalar: P'
       return
     end if
-    ch = ms%jpt2ch(J,P123,T)
+    ch = tbs%jpt2ch(J,P123,T)
     if(ch == 0) return
-    idxbra = ms%jpt(ch)%sorting(i1,i2,i3)
-    idxket = ms%jpt(ch)%sorting(i4,i5,i6)
+    idxbra = tbs%jpt(ch)%sorting(i1,i2,i3)
+    idxket = tbs%jpt(ch)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
     if(i1 == i2 .and. mod(J12+T12,2) == 0) return
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
-    isorted_bra = ms%jpt(ch)%sort(idxbra)%idx_sorted
-    isorted_ket = ms%jpt(ch)%sort(idxket)%idx_sorted
+    isorted_bra = tbs%jpt(ch)%sort(idxbra)%idx_sorted
+    isorted_ket = tbs%jpt(ch)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
 
-    do ibra = 1, ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%n
-      bra = ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
-      do iket = 1, ms%jpt(ch)%sort(idxket)%JT(J45,T45)%n
-        ket = ms%jpt(ch)%sort(idxket)%JT(J45,T45)%idx2num(iket)
+    do ibra = 1, tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%n
+      bra = tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
+      do iket = 1, tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%n
+        ket = tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%idx2num(iket)
         r = r + dble(this%MatCh(ch,ch)%m(bra,ket) * &
-            & ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
-            & ms%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
+            & tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
+            & tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
       end do
     end do
   end function GetThBMEIso_scalar
 
-  function GetThBMEIso_general(this,sps,ms,i1,i2,i3,J12,T12,&
+  function GetThBMEIso_general(this,i1,i2,i3,J12,T12,&
         & i4,i5,i6,J45,T45,Jbra,Jket,Tbra,Tket) result(r)
     use MyLibrary, only: triag
     class(NBodyPart), intent(in) :: this
-    type(OrbitsIsospin), intent(in) :: sps
-    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,T12,J45,T45,Jbra,Jket,Tbra,Tket
+    type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
+    type(NonOrthIsospinThreeBodySpace), pointer :: tbs
     integer :: chbra, chket, idxbra, idxket, bra, ket
     integer :: P123, P456
     integer :: isorted_bra, isorted_ket
@@ -1046,8 +1110,15 @@ contains
     real(8) :: r
 
     r = 0.d0
-    P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
-    P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
+    o1 => this%ms%isps%orb(i1)
+    o2 => this%ms%isps%orb(i2)
+    o3 => this%ms%isps%orb(i3)
+    o4 => this%ms%isps%orb(i4)
+    o5 => this%ms%isps%orb(i5)
+    o6 => this%ms%isps%orb(i6)
+    tbs => this%ms%thr21
+    P123 = (-1) ** (o1%l+o2%l+o3%l)
+    P456 = (-1) ** (o4%l+o5%l+o6%l)
     if(P123 * P456 * this%pr /= 1) then
       write(*,*) 'Warning: in GetThBMEIso_general: P'
       return
@@ -1056,60 +1127,66 @@ contains
       write(*,*) 'Warning: in GetThBMEIso_general: T'
       return
     end if
-    chbra = ms%jpt2ch(Jbra,P123,Tbra)
-    chket = ms%jpt2ch(Jket,P456,Tket)
+    chbra = tbs%jpt2ch(Jbra,P123,Tbra)
+    chket = tbs%jpt2ch(Jket,P456,Tket)
     if(chbra*chket == 0) return
-    idxbra = ms%jpt(chbra)%sorting(i1,i2,i3)
-    idxket = ms%jpt(chket)%sorting(i4,i5,i6)
+    idxbra = tbs%jpt(chbra)%sorting(i1,i2,i3)
+    idxket = tbs%jpt(chket)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
     if(i1 == i2 .and. mod(J12+T12,2) == 0) return
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
-    isorted_bra = ms%jpt(chbra)%sort(idxbra)%idx_sorted
-    isorted_ket = ms%jpt(chket)%sort(idxket)%idx_sorted
+    isorted_bra = tbs%jpt(chbra)%sort(idxbra)%idx_sorted
+    isorted_ket = tbs%jpt(chket)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
 
-    do ibra = 1, ms%jpt(chbra)%sort(idxbra)%JT(J12,T12)%n
-      bra = ms%jpt(chbra)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
-      do iket = 1, ms%jpt(chket)%sort(idxket)%JT(J45,T45)%n
-        ket = ms%jpt(chket)%sort(idxket)%JT(J45,T45)%idx2num(iket)
+    do ibra = 1, tbs%jpt(chbra)%sort(idxbra)%JT(J12,T12)%n
+      bra = tbs%jpt(chbra)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
+      do iket = 1, tbs%jpt(chket)%sort(idxket)%JT(J45,T45)%n
+        ket = tbs%jpt(chket)%sort(idxket)%JT(J45,T45)%idx2num(iket)
         r = r + dble(this%MatCh(chbra,chket)%m(bra,ket) * &
-            & ms%jpt(chbra)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
-            & ms%jpt(chket)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
+            & tbs%jpt(chbra)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
+            & tbs%jpt(chket)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
       end do
     end do
   end function GetThBMEIso_general
 
-  function GetThBMEpn_scalar(this,ms,i1,i2,i3,J12,&
+  function GetThBMEpn_scalar(this,i1,i2,i3,J12,&
         & i4,i5,i6,J45,J) result(r)
     use MyLibrary, only: dcg
     class(NBodyPart), intent(in) :: this
-    type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,J45,J
+    type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, T
     integer :: a, b, c, d, e, f
     integer :: P, Z, ch
     real(8) :: r
     r = 0.d0
-    if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
-    if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    o5 => this%ms%sps%orb(i5)
+    o6 => this%ms%sps%orb(i6)
+    if(o1%e + o2%e + o3%e > this%ms%e3max) return
+    if(o4%e + o5%e + o6%e > this%ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
     if(i4 == i5 .and. mod(J45, 2) == 1) return
-    z1 = ms%sps%orb(i1)%z
-    z2 = ms%sps%orb(i2)%z
-    z3 = ms%sps%orb(i3)%z
-    z4 = ms%sps%orb(i4)%z
-    z5 = ms%sps%orb(i5)%z
-    z6 = ms%sps%orb(i6)%z
+    z1 = o1%z
+    z2 = o2%z
+    z3 = o3%z
+    z4 = o4%z
+    z5 = o5%z
+    z6 = o6%z
 
-    a = ms%isps%nlj2idx( ms%sps%orb(i1)%n, ms%sps%orb(i1)%l, ms%sps%orb(i1)%j )
-    b = ms%isps%nlj2idx( ms%sps%orb(i2)%n, ms%sps%orb(i2)%l, ms%sps%orb(i2)%j )
-    c = ms%isps%nlj2idx( ms%sps%orb(i3)%n, ms%sps%orb(i3)%l, ms%sps%orb(i3)%j )
-    d = ms%isps%nlj2idx( ms%sps%orb(i4)%n, ms%sps%orb(i4)%l, ms%sps%orb(i4)%j )
-    e = ms%isps%nlj2idx( ms%sps%orb(i5)%n, ms%sps%orb(i5)%l, ms%sps%orb(i5)%j )
-    f = ms%isps%nlj2idx( ms%sps%orb(i6)%n, ms%sps%orb(i6)%l, ms%sps%orb(i6)%j )
+    a = this%ms%isps%nlj2idx( o1%n, o1%l, o1%j )
+    b = this%ms%isps%nlj2idx( o2%n, o2%l, o2%j )
+    c = this%ms%isps%nlj2idx( o3%n, o3%l, o3%j )
+    d = this%ms%isps%nlj2idx( o4%n, o4%l, o4%j )
+    e = this%ms%isps%nlj2idx( o5%n, o5%l, o5%j )
+    f = this%ms%isps%nlj2idx( o6%n, o6%l, o6%j )
 
-    P = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
+    P = (-1) ** (o1%l+o2%l+o3%l)
     Z = z1 + z2 + z3
     do T12 = 0, 1
       if(abs(z1+z2) > 2*T12) cycle
@@ -1117,10 +1194,10 @@ contains
         if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
-          ch = ms%thr21%jpt2ch(J,P,T)
+          ch = this%ms%thr21%jpt2ch(J,P,T)
           if(ch == 0) cycle
           r = r + &
-              & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
+              & this%GetThBME(a,b,c,J12,T12,&
               & d,e,f,J45,T45,J,T) * &
               & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
               & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
@@ -1129,38 +1206,44 @@ contains
     end do
   end function GetThBMEpn_scalar
 
-  function GetThBMEpn_general(this,ms,i1,i2,i3,J12,&
+  function GetThBMEpn_general(this,i1,i2,i3,J12,&
         & i4,i5,i6,J45,Jbra,Jket) result(r)
     use MyLibrary, only: dcg
     class(NBodyPart), intent(in) :: this
-    type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,J45,Jbra,Jket
+    type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, Tbra, Tket
     integer :: a, b, c, d, e, f
     integer :: Pbra, Pket, Zbra, Zket, chbra, chket
     real(8) :: r
     r = 0.d0
-    if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
-    if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    o5 => this%ms%sps%orb(i5)
+    o6 => this%ms%sps%orb(i6)
+    if(o1%e + o2%e + o3%e > this%ms%e3max) return
+    if(o4%e + o5%e + o6%e > this%ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
     if(i4 == i5 .and. mod(J45, 2) == 1) return
-    z1 = ms%sps%orb(i1)%z
-    z2 = ms%sps%orb(i2)%z
-    z3 = ms%sps%orb(i3)%z
-    z4 = ms%sps%orb(i4)%z
-    z5 = ms%sps%orb(i5)%z
-    z6 = ms%sps%orb(i6)%z
+    z1 = o1%z
+    z2 = o2%z
+    z3 = o3%z
+    z4 = o4%z
+    z5 = o5%z
+    z6 = o6%z
 
-    a = ms%isps%nlj2idx( ms%sps%orb(i1)%n, ms%sps%orb(i1)%l, ms%sps%orb(i1)%j )
-    b = ms%isps%nlj2idx( ms%sps%orb(i2)%n, ms%sps%orb(i2)%l, ms%sps%orb(i2)%j )
-    c = ms%isps%nlj2idx( ms%sps%orb(i3)%n, ms%sps%orb(i3)%l, ms%sps%orb(i3)%j )
-    d = ms%isps%nlj2idx( ms%sps%orb(i4)%n, ms%sps%orb(i4)%l, ms%sps%orb(i4)%j )
-    e = ms%isps%nlj2idx( ms%sps%orb(i5)%n, ms%sps%orb(i5)%l, ms%sps%orb(i5)%j )
-    f = ms%isps%nlj2idx( ms%sps%orb(i6)%n, ms%sps%orb(i6)%l, ms%sps%orb(i6)%j )
+    a = this%ms%isps%nlj2idx( o1%n, o1%l, o1%j )
+    b = this%ms%isps%nlj2idx( o2%n, o2%l, o2%j )
+    c = this%ms%isps%nlj2idx( o3%n, o3%l, o3%j )
+    d = this%ms%isps%nlj2idx( o4%n, o4%l, o4%j )
+    e = this%ms%isps%nlj2idx( o5%n, o5%l, o5%j )
+    f = this%ms%isps%nlj2idx( o6%n, o6%l, o6%j )
 
-    Pbra = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
-    Pket = (-1) ** (ms%sps%orb(i4)%l+ms%sps%orb(i5)%l+ms%sps%orb(i6)%l)
+    Pbra = (-1) ** (o1%l+o2%l+o3%l)
+    Pket = (-1) ** (o4%l+o5%l+o6%l)
     Zbra = z1 + z2 + z3
     Zket = z4 + z5 + z6
     do T12 = 0, 1
@@ -1171,11 +1254,11 @@ contains
             if(abs(Zbra) > Tbra) cycle
           do Tket = abs(2*T45-1), 2*T45+1, 2
             if(abs(Zket) > Tket) cycle
-            chbra = ms%thr21%jpt2ch(Jbra,Pbra,Tbra)
-            chket = ms%thr21%jpt2ch(Jket,Pket,Tket)
+            chbra = this%ms%thr21%jpt2ch(Jbra,Pbra,Tbra)
+            chket = this%ms%thr21%jpt2ch(Jket,Pket,Tket)
             if(chbra*chket == 0) cycle
             r = r + &
-                & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
+                & this%GetThBME(a,b,c,J12,T12,&
                 & d,e,f,J45,T45,Jbra,Jket,Tbra,Tket) * &
                 & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,Tbra,Zbra) * &
                 & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,Tket,Zket)
@@ -1185,11 +1268,11 @@ contains
     end do
   end function GetThBMEpn_general
 
-  function GetThBMEIso_scalar_sp(this,sps,ms,i1,i2,i3,J12,T12,&
+  function GetThBMEIso_scalar_sp(this,i1,i2,i3,J12,T12,&
         & i4,i5,i6,J45,T45,J,T) result(r)
     class(NBodyPartSp), intent(in) :: this
-    type(OrbitsIsospin), intent(in) :: sps
-    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
+    type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
+    type(NonOrthIsospinThreeBodySpace), pointer :: tbs
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,T12,J45,T45,J,T
     integer :: ch, idxbra, idxket, bra, ket
@@ -1201,40 +1284,47 @@ contains
     r = 0.d0
     if(i1 == i2 .and. mod(J12+T12,2) == 0) return
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
-    P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
-    P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
+    o1 => this%ms%isps%orb(i1)
+    o2 => this%ms%isps%orb(i2)
+    o3 => this%ms%isps%orb(i3)
+    o4 => this%ms%isps%orb(i4)
+    o5 => this%ms%isps%orb(i5)
+    o6 => this%ms%isps%orb(i6)
+    tbs => this%ms%thr21
+    P123 = (-1) ** (o1%l+o2%l+o3%l)
+    P456 = (-1) ** (o4%l+o5%l+o6%l)
     if(P123 * P456 /= 1) stop 'Error in GetThBMEIso_scalar: P'
-    ch = ms%jpt2ch(J,P123,T)
+    ch = tbs%jpt2ch(J,P123,T)
     if(ch == 0) return
-    idxbra = ms%jpt(ch)%sorting(i1,i2,i3)
-    idxket = ms%jpt(ch)%sorting(i4,i5,i6)
+    idxbra = tbs%jpt(ch)%sorting(i1,i2,i3)
+    idxket = tbs%jpt(ch)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
-    isorted_bra = ms%jpt(ch)%sort(idxbra)%idx_sorted
-    isorted_ket = ms%jpt(ch)%sort(idxket)%idx_sorted
+    isorted_bra = tbs%jpt(ch)%sort(idxbra)%idx_sorted
+    isorted_ket = tbs%jpt(ch)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
 
-    do ibra = 1, ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%n
-      bra = ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
-      do iket = 1, ms%jpt(ch)%sort(idxket)%JT(J45,T45)%n
-        ket = ms%jpt(ch)%sort(idxket)%JT(J45,T45)%idx2num(iket)
+    do ibra = 1, tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%n
+      bra = tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
+      do iket = 1, tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%n
+        ket = tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%idx2num(iket)
         r = r + dble(this%MatCh(ch,ch)%m(bra,ket) * &
-            & ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
-            & ms%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
+            & tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
+            & tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
         !write(*,*) this%MatCh(ch,ch)%m(bra,ket), &
-        !    & ms%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra), &
-        !    & ms%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket)
+        !    & tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra), &
+        !    & tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket)
       end do
     end do
   end function GetThBMEIso_scalar_sp
 
-  function GetThBMEIso_general_sp(this,sps,ms,i1,i2,i3,J12,T12,&
+  function GetThBMEIso_general_sp(this,i1,i2,i3,J12,T12,&
         & i4,i5,i6,J45,T45,Jbra,Jket,Tbra,Tket) result(r)
     use MyLibrary, only: triag
     class(NBodyPartSp), intent(in) :: this
-    type(OrbitsIsospin), intent(in) :: sps
-    type(NonOrthIsospinThreeBodySpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,T12,J45,T45,Jbra,Jket,Tbra,Tket
+    type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
+    type(NonOrthIsospinThreeBodySpace), pointer :: tbs
     integer :: chbra, chket, idxbra, idxket, bra, ket
     integer :: P123, P456
     integer :: isorted_bra, isorted_ket
@@ -1244,8 +1334,15 @@ contains
     r = 0.d0
     if(i1 == i2 .and. mod(J12+T12,2) == 0) return
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
-    P123 = (-1) ** (sps%orb(i1)%l+sps%orb(i2)%l+sps%orb(i3)%l)
-    P456 = (-1) ** (sps%orb(i4)%l+sps%orb(i5)%l+sps%orb(i6)%l)
+    o1 => this%ms%isps%orb(i1)
+    o2 => this%ms%isps%orb(i2)
+    o3 => this%ms%isps%orb(i3)
+    o4 => this%ms%isps%orb(i4)
+    o5 => this%ms%isps%orb(i5)
+    o6 => this%ms%isps%orb(i6)
+    tbs => this%ms%thr21
+    P123 = (-1) ** (o1%l+o2%l+o3%l)
+    P456 = (-1) ** (o4%l+o5%l+o6%l)
     if(P123 * P456 * this%pr /= 1) then
       write(*,*) 'Warning: in GetThBMEIso_general: P'
       return
@@ -1254,59 +1351,65 @@ contains
       write(*,*) 'Warning: in GetThBMEIso_general: T'
       return
     end if
-    chbra = ms%jpt2ch(Jbra,P123,Tbra)
-    chket = ms%jpt2ch(Jket,P456,Tket)
+    chbra = tbs%jpt2ch(Jbra,P123,Tbra)
+    chket = tbs%jpt2ch(Jket,P456,Tket)
     if(chbra*chket == 0) return
-    idxbra = ms%jpt(chbra)%sorting(i1,i2,i3)
-    idxket = ms%jpt(chket)%sorting(i4,i5,i6)
+    idxbra = tbs%jpt(chbra)%sorting(i1,i2,i3)
+    idxket = tbs%jpt(chket)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
-    isorted_bra = ms%jpt(chbra)%sort(idxbra)%idx_sorted
-    isorted_ket = ms%jpt(chket)%sort(idxket)%idx_sorted
+    isorted_bra = tbs%jpt(chbra)%sort(idxbra)%idx_sorted
+    isorted_ket = tbs%jpt(chket)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
 
-    do ibra = 1, ms%jpt(chbra)%sort(idxbra)%JT(J12,T12)%n
-      bra = ms%jpt(chbra)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
-      do iket = 1, ms%jpt(chket)%sort(idxket)%JT(J45,T45)%n
-        ket = ms%jpt(chket)%sort(idxket)%JT(J45,T45)%idx2num(iket)
+    do ibra = 1, tbs%jpt(chbra)%sort(idxbra)%JT(J12,T12)%n
+      bra = tbs%jpt(chbra)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
+      do iket = 1, tbs%jpt(chket)%sort(idxket)%JT(J45,T45)%n
+        ket = tbs%jpt(chket)%sort(idxket)%JT(J45,T45)%idx2num(iket)
         r = r + dble(this%MatCh(chbra,chket)%m(bra,ket) * &
-            & ms%jpt(chbra)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
-            & ms%jpt(chket)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
+            & tbs%jpt(chbra)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
+            & tbs%jpt(chket)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
       end do
     end do
   end function GetThBMEIso_general_sp
 
-  function GetThBMEpn_scalar_sp(this,ms,i1,i2,i3,J12,&
+  function GetThBMEpn_scalar_sp(this,i1,i2,i3,J12,&
         & i4,i5,i6,J45,J) result(r)
     use MyLibrary, only: dcg
     class(NBodyPartSp), intent(in) :: this
-    type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,J45,J
+    type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, T
     integer :: a, b, c, d, e, f
     integer :: P, Z, ch
     real(8) :: r
     r = 0.d0
-    if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
-    if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    o5 => this%ms%sps%orb(i5)
+    o6 => this%ms%sps%orb(i6)
+    if(o1%e + o2%e + o3%e > this%ms%e3max) return
+    if(o4%e + o5%e + o6%e > this%ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
     if(i4 == i5 .and. mod(J45, 2) == 1) return
-    z1 = ms%sps%orb(i1)%z
-    z2 = ms%sps%orb(i2)%z
-    z3 = ms%sps%orb(i3)%z
-    z4 = ms%sps%orb(i4)%z
-    z5 = ms%sps%orb(i5)%z
-    z6 = ms%sps%orb(i6)%z
+    z1 = o1%z
+    z2 = o2%z
+    z3 = o3%z
+    z4 = o4%z
+    z5 = o5%z
+    z6 = o6%z
 
-    a = ms%sps%pn2iso( ms%isps, i1 )
-    b = ms%sps%pn2iso( ms%isps, i2 )
-    c = ms%sps%pn2iso( ms%isps, i3 )
-    d = ms%sps%pn2iso( ms%isps, i4 )
-    e = ms%sps%pn2iso( ms%isps, i5 )
-    f = ms%sps%pn2iso( ms%isps, i6 )
+    a = this%ms%sps%pn2iso( this%ms%isps, i1 )
+    b = this%ms%sps%pn2iso( this%ms%isps, i2 )
+    c = this%ms%sps%pn2iso( this%ms%isps, i3 )
+    d = this%ms%sps%pn2iso( this%ms%isps, i4 )
+    e = this%ms%sps%pn2iso( this%ms%isps, i5 )
+    f = this%ms%sps%pn2iso( this%ms%isps, i6 )
     if(a*b*c*d*e*f == 0) return
 
-    P = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
+    P = (-1) ** (o1%l+o2%l+o3%l)
     Z = z1 + z2 + z3
     do T12 = 0, 1
       if(abs(z1+z2) > 2*T12) cycle
@@ -1314,10 +1417,10 @@ contains
         if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
-          ch = ms%thr21%jpt2ch(J,P,T)
+          ch = this%ms%thr21%jpt2ch(J,P,T)
           if(ch == 0) cycle
           r = r + &
-              & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
+              & this%GetThBME(a,b,c,J12,T12,&
               & d,e,f,J45,T45,J,T) * &
               & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
               & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
@@ -1327,38 +1430,44 @@ contains
 
   end function GetThBMEpn_scalar_sp
 
-  function GetThBMEpn_general_sp(this,ms,i1,i2,i3,J12,&
+  function GetThBMEpn_general_sp(this,i1,i2,i3,J12,&
         & i4,i5,i6,J45,Jbra,Jket) result(r)
     use MyLibrary, only: dcg
     class(NBodyPartSp), intent(in) :: this
-    type(MSpace), intent(in) :: ms
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,J45,Jbra,Jket
+    type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, Tbra, Tket
     integer :: a, b, c, d, e, f
     integer :: Pbra, Pket, Zbra, Zket, chbra, chket
     real(8) :: r
     r = 0.d0
-    if(ms%sps%orb(i1)%e + ms%sps%orb(i2)%e + ms%sps%orb(i3)%e > ms%e3max) return
-    if(ms%sps%orb(i4)%e + ms%sps%orb(i5)%e + ms%sps%orb(i6)%e > ms%e3max) return
+    o1 => this%ms%sps%orb(i1)
+    o2 => this%ms%sps%orb(i2)
+    o3 => this%ms%sps%orb(i3)
+    o4 => this%ms%sps%orb(i4)
+    o5 => this%ms%sps%orb(i5)
+    o6 => this%ms%sps%orb(i6)
+    if(o1%e + o2%e + o3%e > this%ms%e3max) return
+    if(o4%e + o5%e + o6%e > this%ms%e3max) return
     if(i1 == i2 .and. mod(J12, 2) == 1) return
     if(i4 == i5 .and. mod(J45, 2) == 1) return
-    z1 = ms%sps%orb(i1)%z
-    z2 = ms%sps%orb(i2)%z
-    z3 = ms%sps%orb(i3)%z
-    z4 = ms%sps%orb(i4)%z
-    z5 = ms%sps%orb(i5)%z
-    z6 = ms%sps%orb(i6)%z
+    z1 = o1%z
+    z2 = o2%z
+    z3 = o3%z
+    z4 = o4%z
+    z5 = o5%z
+    z6 = o6%z
 
-    a = ms%isps%nlj2idx( ms%sps%orb(i1)%n, ms%sps%orb(i1)%l, ms%sps%orb(i1)%j )
-    b = ms%isps%nlj2idx( ms%sps%orb(i2)%n, ms%sps%orb(i2)%l, ms%sps%orb(i2)%j )
-    c = ms%isps%nlj2idx( ms%sps%orb(i3)%n, ms%sps%orb(i3)%l, ms%sps%orb(i3)%j )
-    d = ms%isps%nlj2idx( ms%sps%orb(i4)%n, ms%sps%orb(i4)%l, ms%sps%orb(i4)%j )
-    e = ms%isps%nlj2idx( ms%sps%orb(i5)%n, ms%sps%orb(i5)%l, ms%sps%orb(i5)%j )
-    f = ms%isps%nlj2idx( ms%sps%orb(i6)%n, ms%sps%orb(i6)%l, ms%sps%orb(i6)%j )
+    a = this%ms%isps%nlj2idx( o1%n, o1%l, o1%j )
+    b = this%ms%isps%nlj2idx( o2%n, o2%l, o2%j )
+    c = this%ms%isps%nlj2idx( o3%n, o3%l, o3%j )
+    d = this%ms%isps%nlj2idx( o4%n, o4%l, o4%j )
+    e = this%ms%isps%nlj2idx( o5%n, o5%l, o5%j )
+    f = this%ms%isps%nlj2idx( o6%n, o6%l, o6%j )
 
-    Pbra = (-1) ** (ms%sps%orb(i1)%l+ms%sps%orb(i2)%l+ms%sps%orb(i3)%l)
-    Pket = (-1) ** (ms%sps%orb(i4)%l+ms%sps%orb(i5)%l+ms%sps%orb(i6)%l)
+    Pbra = (-1) ** (o1%l+o2%l+o3%l)
+    Pket = (-1) ** (o4%l+o5%l+o6%l)
     Zbra = z1 + z2 + z3
     Zket = z4 + z5 + z6
     do T12 = 0, 1
@@ -1369,11 +1478,11 @@ contains
             if(abs(Zbra) > Tbra) cycle
           do Tket = abs(2*T45-1), 2*T45+1, 2
             if(abs(Zket) > Tket) cycle
-            chbra = ms%thr21%jpt2ch(Jbra,Pbra,Tbra)
-            chket = ms%thr21%jpt2ch(Jket,Pket,Tket)
+            chbra = this%ms%thr21%jpt2ch(Jbra,Pbra,Tbra)
+            chket = this%ms%thr21%jpt2ch(Jket,Pket,Tket)
             if(chbra*chket == 0) cycle
             r = r + &
-                & this%GetThBME(ms%isps,ms%thr21,a,b,c,J12,T12,&
+                & this%GetThBME(a,b,c,J12,T12,&
                 & d,e,f,J45,T45,Jbra,Jket,Tbra,Tket) * &
                 & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,Tbra,Zbra) * &
                 & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,Tket,Zket)
@@ -1383,139 +1492,139 @@ contains
     end do
   end function GetThBMEpn_general_sp
 
-  subroutine TransToOrthogonal_dp(thr, thr21, ms)
-    class(NBodyPart), intent(inout) :: thr
-    type(NBodyPart), intent(in) :: thr21
-    type(MSpace), intent(in) :: ms
-    integer :: chbra, chket
-
-    do chbra = 1, ms%thr%NChan
-      do chket = 1, ms%thr%NChan
-        if(thr%Scalar .and. chbra /= chket) cycle
-        call thr%MatCh(chbra,chket)%TransToOrthogonalChannel(thr21,ms,chbra,chket)
-      end do
-    end do
-  end subroutine TransToOrthogonal_dp
-
-  subroutine TransToOrthogonal_sp(thr, thr21, ms)
-    class(NBodyPartSp), intent(inout) :: thr
-    type(NBodyPartSp), intent(in) :: thr21
-    type(MSpace), intent(in) :: ms
-    integer :: chbra, chket
-
-    do chbra = 1, ms%thr%NChan
-      do chket = 1, ms%thr%NChan
-        if(thr%Scalar .and. chbra /= chket) cycle
-        call thr%MatCh(chbra,chket)%TransToOrthogonalChannel(thr21,ms,chbra,chket)
-      end do
-    end do
-  end subroutine TransToOrthogonal_sp
-
-  ! This routine can be bottle neck
-  subroutine TransToOrthogoanlChannel_sp(Mat, thr21, ms, chbra, chket)
-    class(NBodyChannelSp), intent(inout) :: Mat
-    type(NBodyPartSp), intent(in) :: thr21
-    type(MSpace), intent(in) :: ms
-    integer, intent(in) :: chbra, chket
-    integer :: bra, ket, jbra, jket
-    integer :: a, b, c, iabc, nabc
-    integer :: d, e, f, idef, ndef
-    integer :: i_bra, aa, bb, cc, Jab
-    integer :: i_ket, dd, ee, ff, Jde
-    real(8), allocatable :: v(:,:)
-
-    jbra = ms%thr%jpz(chbra)%j
-    jket = ms%thr%jpz(chket)%j
-
-    do bra = 1, ms%thr%jpz(chbra)%nst
-      a    = ms%thr%jpz(chbra)%n2spi1(bra)
-      b    = ms%thr%jpz(chbra)%n2spi2(bra)
-      c    = ms%thr%jpz(chbra)%n2spi3(bra)
-      iabc = ms%thr%jpz(chbra)%n2labl(bra)
-      nabc = ms%thr%jpz(chbra)%spis2idx(a,b,c)
-      do ket = 1, ms%thr%jpz(chket)%nst
-        if(chbra == chket .and. bra < ket) cycle
-        d    = ms%thr%jpz(chket)%n2spi1(ket)
-        e    = ms%thr%jpz(chket)%n2spi2(ket)
-        f    = ms%thr%jpz(chket)%n2spi3(ket)
-        idef = ms%thr%jpz(chket)%n2labl(ket)
-        ndef = ms%thr%jpz(chket)%spis2idx(d,e,f)
-        allocate(v(ms%thr%jpz(chbra)%idx(nabc)%nphys, ms%thr%jpz(chket)%idx(ndef)%nphys))
-        do i_bra = 1, ms%thr%jpz(chbra)%idx(nabc)%nphys
-          aa = ms%thr%jpz(chbra)%idx(nabc)%n2spi1(i_bra)
-          bb = ms%thr%jpz(chbra)%idx(nabc)%n2spi2(i_bra)
-          cc = ms%thr%jpz(chbra)%idx(nabc)%n2spi3(i_bra)
-          Jab= ms%thr%jpz(chbra)%idx(nabc)%n2J12( i_bra)
-          do i_ket = 1, ms%thr%jpz(chket)%idx(ndef)%nphys
-            dd = ms%thr%jpz(chket)%idx(ndef)%n2spi1(i_ket)
-            ee = ms%thr%jpz(chket)%idx(ndef)%n2spi2(i_ket)
-            ff = ms%thr%jpz(chket)%idx(ndef)%n2spi3(i_ket)
-            Jde= ms%thr%jpz(chket)%idx(ndef)%n2J12( i_ket)
-            v(i_bra,i_ket) = thr21%GetThBME(ms,aa,bb,cc,Jab,dd,ee,ff,Jde,jbra,jket)
-          end do
-        end do
-        Mat%m(bra,ket) = dot_product(ms%thr%jpz(chbra)%idx(nabc)%cfp(iabc,:), &
-            & matmul(v, ms%thr%jpz(chket)%idx(ndef)%cfp(idef,:)))
-        deallocate(v)
-      end do
-    end do
-  end subroutine TransToOrthogoanlChannel_sp
-
-  ! This routine can be bottle neck
-  subroutine TransToOrthogoanlChannel_dp(Mat, thr21, ms, chbra, chket)
-    class(NBodyChannel), intent(inout) :: Mat
-    type(NBodyPart), intent(in) :: thr21
-    type(MSpace), intent(in) :: ms
-    integer, intent(in) :: chbra, chket
-    integer :: bra, ket, jbra, jket
-    integer :: a, b, c, iabc, nabc
-    integer :: d, e, f, idef, ndef
-    integer :: i_bra, aa, bb, cc, Jab
-    integer :: i_ket, dd, ee, ff, Jde
-    real(8), allocatable :: v(:,:)
-
-    jbra = ms%thr%jpz(chbra)%j
-    jket = ms%thr%jpz(chket)%j
-
-    do bra = 1, ms%thr%jpz(chbra)%nst
-      a    = ms%thr%jpz(chbra)%n2spi1(bra)
-      b    = ms%thr%jpz(chbra)%n2spi2(bra)
-      c    = ms%thr%jpz(chbra)%n2spi3(bra)
-      iabc = ms%thr%jpz(chbra)%n2labl(bra)
-      nabc = ms%thr%jpz(chbra)%spis2idx(a,b,c)
-      do ket = 1, ms%thr%jpz(chket)%nst
-        if(chbra == chket .and. bra < ket) cycle
-        d    = ms%thr%jpz(chket)%n2spi1(ket)
-        e    = ms%thr%jpz(chket)%n2spi2(ket)
-        f    = ms%thr%jpz(chket)%n2spi3(ket)
-        idef = ms%thr%jpz(chket)%n2labl(ket)
-        ndef = ms%thr%jpz(chket)%spis2idx(d,e,f)
-        allocate(v(ms%thr%jpz(chbra)%idx(nabc)%nphys, ms%thr%jpz(chket)%idx(ndef)%nphys))
-        do i_bra = 1, ms%thr%jpz(chbra)%idx(nabc)%nphys
-          aa = ms%thr%jpz(chbra)%idx(nabc)%n2spi1(i_bra)
-          bb = ms%thr%jpz(chbra)%idx(nabc)%n2spi2(i_bra)
-          cc = ms%thr%jpz(chbra)%idx(nabc)%n2spi3(i_bra)
-          Jab= ms%thr%jpz(chbra)%idx(nabc)%n2J12( i_bra)
-          do i_ket = 1, ms%thr%jpz(chket)%idx(ndef)%nphys
-            dd = ms%thr%jpz(chket)%idx(ndef)%n2spi1(i_ket)
-            ee = ms%thr%jpz(chket)%idx(ndef)%n2spi2(i_ket)
-            ff = ms%thr%jpz(chket)%idx(ndef)%n2spi3(i_ket)
-            Jde= ms%thr%jpz(chket)%idx(ndef)%n2J12( i_ket)
-            v(i_bra,i_ket) = thr21%GetThBME(ms,aa,bb,cc,Jab,dd,ee,ff,Jde,jbra,jket)
-          end do
-        end do
-        Mat%m(bra,ket) = dot_product(ms%thr%jpz(chbra)%idx(nabc)%cfp(iabc,:), &
-            & matmul(v, ms%thr%jpz(chket)%idx(ndef)%cfp(idef,:)))
-        deallocate(v)
-      end do
-    end do
-  end subroutine TransToOrthogoanlChannel_dp
+!  subroutine TransToOrthogonal_dp(thr, thr21)
+!    class(NBodyPart), intent(inout) :: thr
+!    type(NBodyPart), intent(in) :: thr21
+!    type(MSpace), intent(in) :: ms
+!    integer :: chbra, chket
+!
+!    do chbra = 1, ms%thr%NChan
+!      do chket = 1, ms%thr%NChan
+!        if(thr%Scalar .and. chbra /= chket) cycle
+!        call thr%MatCh(chbra,chket)%TransToOrthogonalChannel(thr21,ms,chbra,chket)
+!      end do
+!    end do
+!  end subroutine TransToOrthogonal_dp
+!
+!  subroutine TransToOrthogonal_sp(thr, thr21)
+!    class(NBodyPartSp), intent(inout) :: thr
+!    type(NBodyPartSp), intent(in) :: thr21
+!    type(MSpace), intent(in) :: ms
+!    integer :: chbra, chket
+!
+!    do chbra = 1, ms%thr%NChan
+!      do chket = 1, ms%thr%NChan
+!        if(thr%Scalar .and. chbra /= chket) cycle
+!        call thr%MatCh(chbra,chket)%TransToOrthogonalChannel(thr21,ms,chbra,chket)
+!      end do
+!    end do
+!  end subroutine TransToOrthogonal_sp
+!
+!  ! This routine can be bottle neck
+!  subroutine TransToOrthogoanlChannel_sp(Mat, thr21, chbra, chket)
+!    class(NBodyChannelSp), intent(inout) :: Mat
+!    type(NBodyPartSp), intent(in) :: thr21
+!    type(MSpace), intent(in) :: ms
+!    integer, intent(in) :: chbra, chket
+!    integer :: bra, ket, jbra, jket
+!    integer :: a, b, c, iabc, nabc
+!    integer :: d, e, f, idef, ndef
+!    integer :: i_bra, aa, bb, cc, Jab
+!    integer :: i_ket, dd, ee, ff, Jde
+!    real(8), allocatable :: v(:,:)
+!
+!    jbra = ms%thr%jpz(chbra)%j
+!    jket = ms%thr%jpz(chket)%j
+!
+!    do bra = 1, ms%thr%jpz(chbra)%nst
+!      a    = ms%thr%jpz(chbra)%n2spi1(bra)
+!      b    = ms%thr%jpz(chbra)%n2spi2(bra)
+!      c    = ms%thr%jpz(chbra)%n2spi3(bra)
+!      iabc = ms%thr%jpz(chbra)%n2labl(bra)
+!      nabc = ms%thr%jpz(chbra)%spis2idx(a,b,c)
+!      do ket = 1, ms%thr%jpz(chket)%nst
+!        if(chbra == chket .and. bra < ket) cycle
+!        d    = ms%thr%jpz(chket)%n2spi1(ket)
+!        e    = ms%thr%jpz(chket)%n2spi2(ket)
+!        f    = ms%thr%jpz(chket)%n2spi3(ket)
+!        idef = ms%thr%jpz(chket)%n2labl(ket)
+!        ndef = ms%thr%jpz(chket)%spis2idx(d,e,f)
+!        allocate(v(ms%thr%jpz(chbra)%idx(nabc)%nphys, ms%thr%jpz(chket)%idx(ndef)%nphys))
+!        do i_bra = 1, ms%thr%jpz(chbra)%idx(nabc)%nphys
+!          aa = ms%thr%jpz(chbra)%idx(nabc)%n2spi1(i_bra)
+!          bb = ms%thr%jpz(chbra)%idx(nabc)%n2spi2(i_bra)
+!          cc = ms%thr%jpz(chbra)%idx(nabc)%n2spi3(i_bra)
+!          Jab= ms%thr%jpz(chbra)%idx(nabc)%n2J12( i_bra)
+!          do i_ket = 1, ms%thr%jpz(chket)%idx(ndef)%nphys
+!            dd = ms%thr%jpz(chket)%idx(ndef)%n2spi1(i_ket)
+!            ee = ms%thr%jpz(chket)%idx(ndef)%n2spi2(i_ket)
+!            ff = ms%thr%jpz(chket)%idx(ndef)%n2spi3(i_ket)
+!            Jde= ms%thr%jpz(chket)%idx(ndef)%n2J12( i_ket)
+!            v(i_bra,i_ket) = thr21%GetThBME(ms,aa,bb,cc,Jab,dd,ee,ff,Jde,jbra,jket)
+!          end do
+!        end do
+!        Mat%m(bra,ket) = dot_product(ms%thr%jpz(chbra)%idx(nabc)%cfp(iabc,:), &
+!            & matmul(v, ms%thr%jpz(chket)%idx(ndef)%cfp(idef,:)))
+!        deallocate(v)
+!      end do
+!    end do
+!  end subroutine TransToOrthogoanlChannel_sp
+!
+!  ! This routine can be bottle neck
+!  subroutine TransToOrthogoanlChannel_dp(Mat, thr21, chbra, chket)
+!    class(NBodyChannel), intent(inout) :: Mat
+!    type(NBodyPart), intent(in) :: thr21
+!    type(MSpace), intent(in) :: ms
+!    integer, intent(in) :: chbra, chket
+!    integer :: bra, ket, jbra, jket
+!    integer :: a, b, c, iabc, nabc
+!    integer :: d, e, f, idef, ndef
+!    integer :: i_bra, aa, bb, cc, Jab
+!    integer :: i_ket, dd, ee, ff, Jde
+!    real(8), allocatable :: v(:,:)
+!
+!    jbra = ms%thr%jpz(chbra)%j
+!    jket = ms%thr%jpz(chket)%j
+!
+!    do bra = 1, ms%thr%jpz(chbra)%nst
+!      a    = ms%thr%jpz(chbra)%n2spi1(bra)
+!      b    = ms%thr%jpz(chbra)%n2spi2(bra)
+!      c    = ms%thr%jpz(chbra)%n2spi3(bra)
+!      iabc = ms%thr%jpz(chbra)%n2labl(bra)
+!      nabc = ms%thr%jpz(chbra)%spis2idx(a,b,c)
+!      do ket = 1, ms%thr%jpz(chket)%nst
+!        if(chbra == chket .and. bra < ket) cycle
+!        d    = ms%thr%jpz(chket)%n2spi1(ket)
+!        e    = ms%thr%jpz(chket)%n2spi2(ket)
+!        f    = ms%thr%jpz(chket)%n2spi3(ket)
+!        idef = ms%thr%jpz(chket)%n2labl(ket)
+!        ndef = ms%thr%jpz(chket)%spis2idx(d,e,f)
+!        allocate(v(ms%thr%jpz(chbra)%idx(nabc)%nphys, ms%thr%jpz(chket)%idx(ndef)%nphys))
+!        do i_bra = 1, ms%thr%jpz(chbra)%idx(nabc)%nphys
+!          aa = ms%thr%jpz(chbra)%idx(nabc)%n2spi1(i_bra)
+!          bb = ms%thr%jpz(chbra)%idx(nabc)%n2spi2(i_bra)
+!          cc = ms%thr%jpz(chbra)%idx(nabc)%n2spi3(i_bra)
+!          Jab= ms%thr%jpz(chbra)%idx(nabc)%n2J12( i_bra)
+!          do i_ket = 1, ms%thr%jpz(chket)%idx(ndef)%nphys
+!            dd = ms%thr%jpz(chket)%idx(ndef)%n2spi1(i_ket)
+!            ee = ms%thr%jpz(chket)%idx(ndef)%n2spi2(i_ket)
+!            ff = ms%thr%jpz(chket)%idx(ndef)%n2spi3(i_ket)
+!            Jde= ms%thr%jpz(chket)%idx(ndef)%n2J12( i_ket)
+!            v(i_bra,i_ket) = thr21%GetThBME(ms,aa,bb,cc,Jab,dd,ee,ff,Jde,jbra,jket)
+!          end do
+!        end do
+!        Mat%m(bra,ket) = dot_product(ms%thr%jpz(chbra)%idx(nabc)%cfp(iabc,:), &
+!            & matmul(v, ms%thr%jpz(chket)%idx(ndef)%cfp(idef,:)))
+!        deallocate(v)
+!      end do
+!    end do
+!  end subroutine TransToOrthogoanlChannel_dp
 
   subroutine SetOneBodyChannel(this, optr, sps, chbra, chket, hw, A, Z, N)
     class(NBodyChannel), intent(inout) :: this
     character(*), intent(in) :: optr
-    type(Orbits), intent(in) :: sps
-    type(OneBodyChannel), intent(in) :: chbra, chket
+    type(Orbits), intent(in), pointer :: sps
+    type(OneBodyChannel), intent(in), pointer :: chbra, chket
     real(8), intent(in) :: hw
     integer, intent(in) :: A, Z, N
     integer :: bra, ket, ia, ib
@@ -1554,8 +1663,8 @@ contains
   subroutine SetTwoBodyChannel(this, optr, sps, chbra, chket, hw, A, Z, N)
     class(NBodyChannel), intent(inout) :: this
     character(*), intent(in) :: optr
-    type(Orbits), intent(in) :: sps
-    type(TwoBodyChannel), intent(in) :: chbra, chket
+    type(Orbits), pointer, intent(in) :: sps
+    type(TwoBodyChannel), pointer, intent(in) :: chbra, chket
     real(8), intent(in) :: hw
     integer, intent(in) :: A, Z, N
     integer :: bra, ket, ia, ib, ic, id
@@ -1618,7 +1727,7 @@ contains
   end function mat_elm
 
   ! Tensor case should be tested
-  function NormalOrderingFromSp3To2(this,ms) result(r)
+  function NormalOrderingFromSp3To2(this) result(r)
     use MyLibrary, only: triag, sjs
     class(NBodyPartSp), intent(in) :: this
     type(MSpace), intent(in) :: ms
@@ -1628,7 +1737,7 @@ contains
     integer :: chbra, chket, bra, ket, bra_max, ket_max
     real(8) :: v, fact, vsum, tfact
 
-    call r%init(ms%two,this%Scalar,this%optr,this%jr,this%pr,this%zr)
+    call r%init(this%ms,this%Scalar,this%optr,this%jr,this%pr,this%zr)
 
     do chbra = 1, ms%two%NChan
       do chket = 1, chbra
@@ -1691,7 +1800,7 @@ contains
   end function NormalOrderingFromSp3To2
 
   ! Tensor case should be tested
-  function NormalOrderingFrom3To2(this,ms) result(r)
+  function NormalOrderingFrom3To2(this) result(r)
     use MyLibrary, only: triag, sjs
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
@@ -1764,7 +1873,7 @@ contains
   end function NormalOrderingFrom3To2
 
   ! Tensor case should be tested
-  function NormalOrderingFrom2To1(this,ms) result(r)
+  function NormalOrderingFrom2To1(this) result(r)
     use MyLibrary, only: sjs, triag
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
@@ -1840,7 +1949,7 @@ contains
     end do
   end function NormalOrderingFrom2To1
 
-  function NormalOrderingFrom1To0(this,ms) result(r)
+  function NormalOrderingFrom1To0(this) result(r)
     class(NBodyPart), intent(in) :: this
     type(MSpace), intent(in) :: ms
     real(8) :: r

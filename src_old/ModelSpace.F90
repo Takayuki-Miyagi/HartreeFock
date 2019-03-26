@@ -21,8 +21,6 @@ module ModelSpace
   private :: GetNOCoef
   private :: GetParticleHoleOrbits
   private :: GetAZNFromReference
-  private :: ReleaseThreeBody21
-  private :: ReleaseThreeBody
 
   type :: MSpace
     type(Orbits) :: sps
@@ -30,9 +28,7 @@ module ModelSpace
     type(OneBodySpace) :: one
     type(TwoBodySpace) :: two
     type(ThreeBodySpace) :: thr
-    type(NonOrthIsospinThreeBodySpace) :: thr21
     logical :: is_constructed=.false.
-    logical :: is_three_body_jt =.false.
     logical :: is_three_body =.false.
     real(8), allocatable :: NOCoef(:)
     real(8) :: hw, beta = 0.d0
@@ -45,7 +41,6 @@ module ModelSpace
     integer :: e2max = -1
     integer :: e3max = -1
     integer :: lmax = -1
-    integer :: e_fermi = -1
   contains
     procedure :: fin => FinMSpace
     procedure :: InitMSpace
@@ -57,10 +52,6 @@ module ModelSpace
     procedure :: GetConfFromFile
     procedure :: GetNOCoef
     procedure :: GetParticleHoleOrbits
-    procedure :: SetEFermi
-    procedure :: GetEFermi
-    procedure :: ReleaseThreeBody21
-    procedure :: ReleaseThreeBody
   end type MSpace
 
   character(2), private, parameter :: elements(119) = &
@@ -90,33 +81,25 @@ contains
     call this%sps%fin()
     call this%one%fin()
     call this%two%fin()
-    if(this%is_three_body_jt) then
-      call this%thr21%fin()
-    end if
-
-    if(this%is_three_body) then
-      call this%thr%fin()
-    end if
+    if(.not. this%is_three_body) return
+    call this%thr%fin()
   end subroutine FinMSpace
 
-  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, &
-        & lmax, beta, is_three_body_jt, is_three_body)
+  subroutine InitMSpaceFromReference(this, Nucl, hw, emax, e2max, e3max, lmax, beta, is_orth_three_body)
     class(MSpace), intent(inout) :: this
     character(*), intent(in) :: Nucl
     real(8), intent(in) :: hw
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: e3max, lmax
     real(8), intent(in), optional :: beta
-    logical, intent(in), optional :: is_three_body_jt, is_three_body
+    logical, intent(in), optional :: is_orth_three_body
     integer :: A, Z, N
 
     call GetAZNFromReference(Nucl,A,Z,N)
-    call this%InitMSpaceFromAZN(A,Z,N,hw,emax,e2max,e3max,&
-        & lmax,beta,is_three_body_jt, is_three_body)
+    call this%InitMSpaceFromAZN(A,Z,N,hw,emax,e2max,e3max,lmax,beta,is_orth_three_body)
   end subroutine InitMSpaceFromReference
 
-  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, &
-        & lmax, beta, is_three_body_jt, is_three_body)
+  subroutine InitMSpaceFromAZN(this, A, Z, N, hw, emax, e2max, e3max, lmax, beta, is_three_body)
     use Profiler, only: timer
     use ClassSys, only: sys
     class(MSpace), intent(inout), target :: this
@@ -125,7 +108,7 @@ contains
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
     real(8), intent(in), optional :: beta
-    logical, intent(in), optional :: is_three_body_jt, is_three_body
+    logical, intent(in), optional :: is_three_body
     type(sys) :: s
     integer :: i, l
     character(20) :: Nucl
@@ -152,7 +135,6 @@ contains
     if(present(lmax)) this%lmax = lmax
     if(present(beta)) this%beta = beta
     if(present(is_three_body)) this%is_three_body = is_three_body
-    if(present(is_three_body_jt)) this%is_three_body_jt = is_three_body_jt
     write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
     if(present(e3max)) then
       write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
@@ -160,10 +142,8 @@ contains
     write(*,'(a,i3)') ", lmax=",this%lmax
     write(*,'(a,f6.2,a)') " hw = ",this%hw, " MeV"
     call this%sps%init(this%emax,this%lmax)
-    call this%isps%init(this%emax,this%lmax)
     call this%GetNOCoef()
     call this%GetParticleHoleOrbits()
-    call this%SetEFermi()
 
     write(*,'(3a)') " Target Nuclide is ", trim(this%Nucl), ", Orbits:"
     write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
@@ -180,8 +160,7 @@ contains
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
 
-  subroutine InitMSpaceFromFile(this, Nucl, filename, hw, emax, e2max, e3max, &
-        & lmax, beta, is_three_body_jt, is_three_body)
+  subroutine InitMSpaceFromFile(this, Nucl, filename, hw, emax, e2max, e3max, lmax, beta, is_three_body)
     use Profiler, only: timer
     use ClassSys, only: sys
     class(MSpace), intent(inout), target :: this
@@ -190,7 +169,7 @@ contains
     integer, intent(in) :: emax, e2max
     integer, intent(in), optional :: lmax, e3max
     real(8), intent(in), optional :: beta
-    logical, intent(in), optional :: is_three_body_jt, is_three_body
+    logical, intent(in), optional :: is_three_body
     type(sys) :: s
     integer :: A, Z, N, i, l
     type(SingleParticleOrbit), pointer :: o
@@ -209,7 +188,6 @@ contains
     if(present(lmax)) this%lmax = lmax
     if(present(beta)) this%beta = beta
     if(present(is_three_body)) this%is_three_body = is_three_body
-    if(present(is_three_body_jt)) this%is_three_body_jt = is_three_body_jt
     write(*,'(a,i3,a,i3,a,i3)',advance='no') " emax=",this%emax,", e2max=",this%e2max
     if(present(e3max)) then
       write(*,'(a,i3)',advance='no') ", e3max=",this%e3max
@@ -218,11 +196,8 @@ contains
     write(*,'(a,f6.2,a)') " hw = ",this%hw, " MeV"
 
     call this%sps%init(this%emax,this%lmax)
-    call this%isps%init(this%emax,this%lmax)
     call this%GetConfFromFile(filename, A, Z, N)
     call this%GetParticleHoleOrbits()
-    call this%SetEFermi()
-
     this%A = A
     this%Z = Z
     this%N = N
@@ -248,20 +223,14 @@ contains
   subroutine InitMSpace(this)
     class(MSpace), intent(inout) :: this
     call this%one%init(this%sps)
+    call this%two%init(this%sps, this%e2max)
     write(*,'(a)') "  # of J, parity, and tz Channels:"
     write(*,'(a,i3)') "    OneBody: ", this%one%NChan
-    call this%two%init(this%sps, this%e2max)
     write(*,'(a,i3)') "    TwoBody: ", this%two%NChan
-
-    if(this%e3max > 0 .and. this%is_three_body_jt) then
-      call this%thr21%init(this%sps, this%isps, this%e2max, this%e3max)
-      write(*,'(a,i3)') "  ThreeBody (2+1): ", this%thr21%NChan
-    end if
-
-    if(this%e3max > 0 .and. this%is_three_body) then
-      call this%thr%init(this%sps, this%e2max, this%e3max)
-      write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
-    end if
+    if(this%e3max == -1) return
+    if(.not. this%is_three_body) return
+    call this%thr%init(this%sps, this%e2max, this%e3max)
+    write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
   end subroutine InitMSpace
 
   subroutine GetConfFromFile(this, filename, A, Z, N)
@@ -477,47 +446,21 @@ contains
     stop
   end subroutine GetAZNFromReference
 
-  subroutine SetEFermi(this)
-    class(MSpace), intent(inout) :: this
-    type(SingleParticleOrbit), pointer :: o
-    integer :: i
-    do i = 1, this%sps%norbs
-      o => this%sps%GetOrbit(i)
-      if(o%ph == 1) cycle
-      this%e_fermi = max(this%e_fermi, o%e)
-    end do
-  end subroutine SetEFermi
-
-  function GetEFermi(this) result(e_fermi)
-    class(MSpace), intent(inout) :: this
-    integer ::e_fermi
-    e_fermi = this%e_fermi
-  end function GetEFermi
-
-  subroutine ReleaseThreeBody21(this)
-    class(MSpace), intent(inout) :: this
-    if(.not. this%is_three_body_jt) return
-    call this%thr21%fin()
-    this%is_three_body_jt = .false.
-  end subroutine ReleaseThreeBody21
-
-  subroutine ReleaseThreeBody(this)
-    class(MSpace), intent(inout) :: this
-    if(.not. this%is_three_body) return
-    call this%thr%fin()
-    this%is_three_body = .false.
-  end subroutine ReleaseThreeBody
 end module ModelSpace
 
 ! main for test
 !program main
 !  use Profiler, only: timer
 !  use ModelSpace, only: MSpace
+!  use MyLibrary, only: &
+!      &init_dbinomial_triangle, fin_dbinomial_triangle
 !  type(MSpace) :: ms
 !
 !  call timer%init()
+!  call init_dbinomial_triangle()
 !  !call ms%init('O18', 20.d0, 4, 8, e3max=4, lmax=4)
-!  call ms%init('O16', 20.d0, 6, 6, e3max=6, is_three_body_jt=.true., is_three_body=.true.)
+!  call ms%init('O16', 20.d0, 14, 28, e3max=14)
 !  call ms%fin()
+!  call fin_dbinomial_triangle()
 !  call timer%fin()
 !end program main

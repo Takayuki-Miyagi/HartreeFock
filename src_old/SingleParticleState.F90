@@ -18,6 +18,10 @@ module SingleParticleState
   private :: GetLabelFromIndexIsospin
   private :: GetIndexFromLabel
   private :: GetIndexFromLabelIsospin
+  private :: GetOrbitFromNLJZ
+  private :: GetOrbitFromIndex
+  private :: GetOrbitIsospinFromNLJ
+  private :: GetOrbitIsospinFromIndex
 
   type :: SingleParticleOrbitIsospin
     integer :: n = -1
@@ -25,6 +29,8 @@ module SingleParticleState
     integer :: j = -1
     integer :: e = -1
     integer :: idx = -1
+    real(8) :: occ = -1.d0
+    integer :: ph = -1 ! 0:hole,1:particle,2:valence occ
   contains
     procedure :: set => SetSingleParticleOrbitIsospin
   end type SingleParticleOrbitIsospin
@@ -37,7 +43,7 @@ module SingleParticleState
     integer :: e = -1
     integer :: idx = -1
     real(8) :: occ = -1.d0
-    integer :: ph = -1 ! 0:hole,1:particle,2:partial occ
+    integer :: ph = -1 ! 0:hole,1:particle,2:valence occ
   contains
     procedure :: set => SetSingleParticleOrbit
     procedure :: SetOccupation
@@ -51,12 +57,19 @@ module SingleParticleState
     logical :: is_constructed=.false.
     integer :: emax, lmax, norbs
   contains
-    procedure :: init => InitOrbitsIsospin
-    procedure :: fin => FinOrbitsIsospin
-    procedure :: GetOrbit => GetOrbitIsospin
+    procedure :: InitOrbitsIsospin
+    procedure :: FinOrbitsIsospin
     procedure :: iso2pn
     procedure :: GetLabelFromIndexIsospin
     procedure :: GetIndexFromLabelIsospin
+    procedure :: GetOrbitIsospinFromNLJ
+    procedure :: GetOrbitIsospinFromIndex
+
+    generic :: init => InitOrbitsIsospin
+    generic :: fin => FinOrbitsIsospin
+    generic :: GetOrbit => &
+        & GetOrbitIsospinFromNLJ, &
+        & GetOrbitIsospinFromIndex
   end type OrbitsIsospin
 
   type :: Orbits
@@ -64,20 +77,25 @@ module SingleParticleState
     type(SingleParticleOrbit), allocatable :: orb(:)
     logical :: is_constructed=.false.
     integer :: emax, lmax, norbs
-    character(:), allocatable :: mode
   contains
-    procedure :: init => InitOrbits
-    procedure :: fin => FinOrbits
-    procedure :: GetOrbit
+    procedure :: InitOrbits
+    procedure :: FinOrbits
     procedure :: pn2iso
     procedure :: GetLabelFromIndex
     procedure :: GetIndexFromLabel
+    procedure :: GetOrbitFromNLJZ
+    procedure :: GetOrbitFromIndex
+
+    generic :: init => InitOrbits
+    generic :: fin => FinOrbits
+    generic :: GetOrbit => &
+        & GetOrbitFromNLJZ, &
+        & GetOrbitFromIndex
   end type Orbits
 
   character(1), private :: OrbitalAngMom(21)=['s',&
       & 'p','d','f','g','h','i','k','l','m','n',&
       & 'o','q','r','t','u','v','w','x','y','z']
-
 contains
 
   subroutine FinOrbitsIsospin(this)
@@ -88,7 +106,6 @@ contains
 #endif
     deallocate(this%orb)
     deallocate(this%nlj2idx)
-    this%is_constructed = .false.
   end subroutine FinOrbitsIsospin
 
   subroutine InitOrbitsIsospin(this, emax, lmax)
@@ -144,87 +161,31 @@ contains
 #endif
     deallocate(this%orb)
     deallocate(this%nljz2idx)
-    this%is_constructed = .false.
   end subroutine FinOrbits
 
-  subroutine InitOrbits(this, emax, lmax, mode)
+  subroutine InitOrbits(this, emax, lmax)
     class(Orbits), intent(inout) :: this
     integer, intent(in) :: emax
     integer, intent(in), optional :: lmax
-    character(*), optional, intent(in) :: mode
     integer :: e, l, n, s, j, z, cnt
 
-    this%mode = ""
-    if(present(mode)) this%mode = mode
 #ifdef SingleParticleStateDebug
     write(*,'(a)') 'In InitOrbits:'
 #endif
-    select case(this%mode)
-    case("kshell","KSHELL","Kshell")
-      call init_orbits_kshell_format(this, emax, lmax)
-      return
-    case default
-      this%emax = emax
-      this%lmax = emax
-      if(present(lmax)) this%lmax = lmax
-      allocate(this%nljz2idx(0:this%emax/2, 0:this%lmax, 1:2*this%lmax+1, -1:1))
-      this%nljz2idx(:,:,:,:) = 0
-      cnt = 0
-      do e = 0, this%emax
-        do l = 0, min(e,this%lmax)
-          if(mod(e - l, 2) == 1) cycle
-          n = (e - l) / 2
-          do s = -1, 1, 2
-            j = 2*l + s
-            if(j < 1) cycle
-            do z = -1, 1, 2
-              cnt = cnt + 1
-            end do
-          end do
-        end do
-      end do
-      this%norbs = cnt
-      allocate(this%orb(this%norbs))
-      cnt = 0
-      do e = 0, this%emax
-        do l = 0, min(e,this%lmax)
-          if(mod(e - l, 2) == 1) cycle
-          n = (e - l) / 2
-          do s = -1, 1, 2
-            j = 2*l + s
-            if(j < 1) cycle
-            do z = -1, 1, 2
-              cnt = cnt + 1
-              call this%orb(cnt)%set(n,l,j,z,cnt)
-              this%nljz2idx(n,l,j,z) = cnt
-            end do
-          end do
-        end do
-      end do
-      this%is_constructed = .true.
-    end select
-  end subroutine InitOrbits
-
-  subroutine init_orbits_kshell_format(this, emax, lmax)
-    type(Orbits), intent(inout) :: this
-    integer, intent(in) :: emax
-    integer, intent(in), optional :: lmax
-    integer :: e, l, n, s, j, z, cnt
-
     this%emax = emax
     this%lmax = emax
     if(present(lmax)) this%lmax = lmax
     allocate(this%nljz2idx(0:this%emax/2, 0:this%lmax, 1:2*this%lmax+1, -1:1))
     this%nljz2idx(:,:,:,:) = 0
     cnt = 0
-    do z = -1, 1, 2
-      do e = 0, this%emax
-        do l = 0, min(e,this%lmax)
-          if(mod(e - l, 2) == 1) cycle
-          n = (e - l) / 2
-          do s = -1, 1, 2
-            j = 2*l + s
-            if(j < 1) cycle
+    do e = 0, this%emax
+      do l = 0, min(e,this%lmax)
+        if(mod(e - l, 2) == 1) cycle
+        n = (e - l) / 2
+        do s = -1, 1, 2
+          j = 2*l + s
+          if(j < 1) cycle
+          do z = -1, 1, 2
             cnt = cnt + 1
           end do
         end do
@@ -233,14 +194,14 @@ contains
     this%norbs = cnt
     allocate(this%orb(this%norbs))
     cnt = 0
-    do z = -1, 1, 2
-      do e = 0, this%emax
-        do l = 0, min(e,this%lmax)
-          if(mod(e - l, 2) == 1) cycle
-          n = (e - l) / 2
-          do s = -1, 1, 2
-            j = 2*l + s
-            if(j < 1) cycle
+    do e = 0, this%emax
+      do l = 0, min(e,this%lmax)
+        if(mod(e - l, 2) == 1) cycle
+        n = (e - l) / 2
+        do s = -1, 1, 2
+          j = 2*l + s
+          if(j < 1) cycle
+          do z = -1, 1, 2
             cnt = cnt + 1
             call this%orb(cnt)%set(n,l,j,z,cnt)
             this%nljz2idx(n,l,j,z) = cnt
@@ -249,9 +210,7 @@ contains
       end do
     end do
     this%is_constructed = .true.
-
-  end subroutine init_orbits_kshell_format
-
+  end subroutine InitOrbits
 
   subroutine SetSingleParticleOrbitIsospin(this, n, l, j, idx)
     class(SingleParticleOrbitIsospin), intent(inout) :: this
@@ -321,24 +280,6 @@ contains
     if(this%orb(idx)%l > sps%lmax) return
     r=sps%nlj2idx(this%orb(idx)%n,this%orb(idx)%l,this%orb(idx)%j)
   end function pn2iso
-
-  function GetOrbitIsospin(this, idx) result(r)
-    class(OrbitsIsospin), target, intent(in) :: this
-    integer, intent(in) :: idx
-    type(SingleParticleOrbitIsospin), pointer :: r
-    r => null()
-    if(idx == 0) return
-    r => this%orb(idx)
-  end function GetOrbitIsospin
-
-  function GetOrbit(this, idx) result(r)
-    class(Orbits), target, intent(in) :: this
-    integer, intent(in) :: idx
-    type(SingleParticleOrbit), pointer :: r
-    r => null()
-    if(idx == 0) return
-    r => this%orb(idx)
-  end function GetOrbit
 
   function GetLabelFromIndex(this, idx) result(r)
     use ClassSys, only: sys
@@ -489,6 +430,43 @@ contains
     read(str_j,*) j
     r = this%nlj2idx(n,l,j)
   end function GetIndexFromLabelIsospin
+
+  function GetOrbitFromNLJZ(this,n,l,j,z) result(ptr)
+    class(Orbits), intent(in) :: this
+    type(SingleParticleOrbit), pointer :: ptr
+    integer, intent(in) :: n, l, j, z
+    integer :: idx
+    ptr => null()
+    idx = this%nljz2idx(n,l,j,z)
+    if(idx == 0) return
+    ptr => this%GetOrbit(idx)
+  end function GetOrbitFromNLJZ
+
+  function GetOrbitFromIndex(this,idx) result(ptr)
+    class(Orbits), target, intent(in) :: this
+    type(SingleParticleOrbit), pointer :: ptr
+    integer, intent(in) :: idx
+    ptr => this%orb(idx)
+  end function GetOrbitFromIndex
+
+  function GetOrbitIsospinFromNLJ(this,n,l,j) result(ptr)
+    class(OrbitsIsospin), intent(in) :: this
+    type(SingleParticleOrbitIsospin), pointer :: ptr
+    integer, intent(in) :: n, l, j
+    integer :: idx
+    ptr => null()
+    idx = this%nlj2idx(n,l,j)
+    if(idx == 0) return
+    ptr => this%GetOrbit(idx)
+  end function GetOrbitIsospinFromNLJ
+
+  function GetOrbitIsospinFromIndex(this,idx) result(ptr)
+    class(OrbitsIsospin), target, intent(in) :: this
+    type(SingleParticleOrbitIsospin), pointer :: ptr
+    integer, intent(in) :: idx
+    ptr => this%orb(idx)
+  end function GetOrbitIsospinFromIndex
+
 end module SingleParticleState
 
 ! main program for check
