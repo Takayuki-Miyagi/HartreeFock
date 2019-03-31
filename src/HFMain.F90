@@ -7,6 +7,7 @@ program HFMain
   use HartreeFock
   use MBPT
   use WriteOperator
+  use Atomic
   implicit none
   type(InputParameters) :: p
   type(MSpace) :: ms
@@ -39,6 +40,12 @@ program HFMain
 
   call p%init(inputfile)
   call p%PrintInputParameters()
+
+  if(command_argument_count() == 2 .and. p%is_Atomic) then
+    call atomic_case(inputfile, conffile)
+    call timer%fin()
+    stop
+  end if
 
   ti = omp_get_wtime()
   call timer%Add("Init for Rotation Group",omp_get_wtime()-ti)

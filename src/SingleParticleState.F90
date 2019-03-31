@@ -267,14 +267,16 @@ contains
 #endif
   end subroutine SetSingleParticleOrbitIsospin
 
-  subroutine SetSingleParticleOrbit(this, n, l, j, z, idx)
+  subroutine SetSingleParticleOrbit(this, n, l, j, z, idx, e)
     class(SingleParticleOrbit), intent(inout) :: this
     integer, intent(in) :: n, l, j, z, idx
+    integer, intent(in), optional :: e
     this%n = n
     this%l = l
     this%j = j
     this%z = z
     this%e = 2*n + l
+    if(present(e)) this%e = e
     this%idx = idx
 #ifdef SingleParticleStateDebug
     write(*,'(a,i3,a,i3,a,i3,a,i3,a,i3,a,i3)') &

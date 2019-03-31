@@ -38,6 +38,10 @@ module HFInput
     logical :: is_MBPTScalar
     logical :: is_MBPTEnergy
     character(256) :: Op_file_format
+
+    ! atomic mode
+    logical :: is_Atomic
+    integer :: electron_number
   contains
     procedure :: init => InitInputParameters
     procedure :: PrintInputParameters
@@ -77,6 +81,8 @@ contains
     logical :: is_MBPTScalar = .true.
     logical :: is_MBPTEnergy = .true.
     character(256) :: Op_file_format = "snt"
+    ! atomic mode
+    logical :: is_Atomic=.false.
 
     type(sys) :: s
     integer :: io
@@ -86,7 +92,7 @@ contains
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
-        & Op_file_format
+        & Op_file_format, is_Atomic
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -127,6 +133,7 @@ contains
     this%is_MBPTScalar = is_MBPTScalar
     this%Op_file_format = Op_file_format
     this%beta_cm = beta_cm
+    this%is_Atomic = is_Atomic
 
     if(lmax == -1) this%lmax = emax
     if(lmax_nn == -1) this%lmax_nn = emax_nn

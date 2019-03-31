@@ -15,6 +15,7 @@ module OneBodyOperator
   private :: FinOneBodyPart
   private :: SetOneBodyPart
   private :: GetOBME
+  private :: SetOBME
   private :: CopyOneBodyPart
   private :: SumOneBodyPart
   private :: SubtractOneBodyPart
@@ -46,6 +47,7 @@ module OneBodyOperator
     procedure :: FinOneBodyPart
     procedure :: SetOneBodyPart
     procedure :: GetOBME
+    procedure :: SetOBME
     procedure :: CopyOneBodyPart
     procedure :: SumOneBodyPart
     procedure :: SubtractOneBodyPart
@@ -282,6 +284,28 @@ contains
     ket = one%jpz(chket)%spi2n(i2)
     r = this%MatCh(chbra,chket)%m(bra,ket)
   end function GetOBME
+
+  subroutine SetOBME(this,i1,i2,me)
+    class(OneBodyPart), intent(inout) :: this
+    integer, intent(in) :: i1, i2
+    real(8), intent(in) :: me
+    type(OneBodySpace), pointer :: one
+    type(SingleParticleOrbit), pointer :: o1, o2
+    integer :: chbra, chket, bra, ket
+    real(8) :: r
+
+    r = 0.d0
+    one => this%one
+    o1 => one%sps%GetOrbit(i1)
+    o2 => one%sps%GetOrbit(i2)
+    chbra = one%jpz2ch(o1%j, (-1)**o1%l, o1%z)
+    chket = one%jpz2ch(o2%j, (-1)**o2%l, o2%z)
+    if(.not. this%MatCh(chbra,chket)%is) return
+    bra = one%jpz(chbra)%spi2n(i1)
+    ket = one%jpz(chket)%spi2n(i2)
+    this%MatCh(chbra,chket)%m(bra,ket) = me
+    this%MatCh(chket,chbra)%m(ket,bra) = me
+  end subroutine SetOBME
 
   subroutine PrintOneBodyPart(this, wunit)
     use ClassSys, only: sys
