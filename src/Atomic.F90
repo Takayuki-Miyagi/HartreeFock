@@ -98,6 +98,7 @@ contains
 
 
     call GetElectronConfFromFile(ms, conffile, N_e)
+    call ms%GetParticleHoleOrbits()
     ms%A = N_e
     ms%Z = N_e
     ms%N = 0
