@@ -206,11 +206,8 @@ contains
     type(Ops), intent(in) :: h
 
     call this%energy_third_hh(h)
-    write(*,*) "hh"
     call this%energy_third_pp(h)
-    write(*,*) "pp"
     call this%energy_third_ph(h)
-    write(*,*) "ph"
     this%e_3 = this%e_3_hh + this%e_3_pp + this%e_3_ph
   end subroutine energy_third
 

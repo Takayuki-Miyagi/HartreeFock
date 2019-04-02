@@ -13,7 +13,7 @@ contains
     type(Ops) :: h
     type(HFSolver) :: HF
     type(MBPTEnergy) :: PT
-    integer :: wunit = 6
+    integer :: wunit = 15
 
     call p%init(inputfile)
     call read_hamil_from_snt(ms, h,p%int_nn_file, conffile)
@@ -22,6 +22,7 @@ contains
     call HF%TransformToHF(h)
     if(p%is_MBPTEnergy) then
       call PT%calc(H)
+      open(wunit, file = p%summary_file, action='write',status='replace')
       call p%PrintInputParameters(wunit)
       write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
       write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
@@ -49,7 +50,7 @@ contains
     integer :: nmax, lmax, jmax
     integer :: nmin, lmin, jmin
     type(SingleParticleOrbit), pointer :: o
-    real(8) :: me
+    real(8) :: me, kin, pot
 
     h%oprtr = "hamil"
     h%jr = 0
@@ -65,6 +66,7 @@ contains
     end if
     call skip_comment(runit,'#')
     read(runit,*) porbs, norbs, pc, nc
+    call skip_comment(runit,'#')
     lines = porbs+norbs
     ms%sps%norbs = lines
     allocate(ms%sps%orb(lines))
@@ -113,8 +115,8 @@ contains
     read(runit,*) lines
     call skip_comment(runit,'#')
     do line = 1, lines
-      read(runit,*) a, b, me ! one-body part
-      call h%one%SetOBME(a,b,me)
+      read(runit,*) a, b, kin, pot ! one-body part
+      call h%one%SetOBME(a, b, kin-dble(N_e)*pot)
     end do
 
     call skip_comment(runit,'#')

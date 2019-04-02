@@ -56,6 +56,7 @@ module HartreeFock
     real(8) :: e3  ! 3n int. term
     real(8) :: ehf ! hf energy
 
+    logical :: is_roothaan=.false.
     type(OneBodyPart) :: F   ! Fock opeartor
     type(OneBodyPart) :: T   ! kinetic term
     type(OneBodyPart) :: V   ! one-body filed from 2body interaction
@@ -63,6 +64,7 @@ module HartreeFock
     type(OneBodyPart) :: rho ! density matrix
     type(OneBodyPart) :: C   ! F's diagonalization coefficient, (HO|HF)
     type(OneBodyPart) :: Occ ! diagonal Occupation matrix
+    type(OneBodyPart) :: S   ! norm kernel
     type(Monopole) :: V2, V3
   contains
     procedure :: fin => FinHFSolver
@@ -89,16 +91,18 @@ contains
     call this%T%fin()
     call this%V%fin()
     call this%W%fin()
+    call this%S%fin()
     call this%V2%FinMonopole()
     call this%V3%FinMonopole()
   end subroutine FinHFSolver
 
-  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha)
+  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,is_roothaan)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
     type(Ops), intent(in) :: hamil
     integer, intent(in), optional :: n_iter_max
     real(8), intent(in), optional :: tol, alpha
+    logical, intent(in), optional :: is_roothaan
     type(MSpace), pointer :: ms
     real(8) :: ti
     integer :: ch, ndim
@@ -117,11 +121,13 @@ contains
     if(present(n_iter_max)) this%n_iter_max = n_iter_max
     if(present(tol)) this%tol = tol
     if(present(alpha)) this%alpha = alpha
+    if(present(is_roothaan)) this%is_roothaan = is_roothaan
     this%is_three_body = hamil%ms%is_three_body_jt
     this%rank = hamil%rank
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occ',     0, 1, 0)
     call this%rho%init(ms%one, .true., 'DenMat',  0, 1, 0)
+    call this%S%init(  ms%one, .true., 'Norm',    0, 1, 0)
     call this%F%init(  ms%one, .true., 'FockOp',  0, 1, 0)
     call this%T%init(  ms%one, .true., 'kinetic', 0, 1, 0)
     call this%V%init(  ms%one, .true., 'NNint',   0, 1, 0)
