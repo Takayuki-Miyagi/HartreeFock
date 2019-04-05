@@ -96,13 +96,13 @@ contains
     call this%V3%FinMonopole()
   end subroutine FinHFSolver
 
-  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,is_roothaan)
+  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,norm_kernel)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
     type(Ops), intent(in) :: hamil
     integer, intent(in), optional :: n_iter_max
     real(8), intent(in), optional :: tol, alpha
-    logical, intent(in), optional :: is_roothaan
+    type(OneBodyPart), intent(in), optional :: norm_kernel
     type(MSpace), pointer :: ms
     real(8) :: ti
     integer :: ch, ndim
@@ -121,13 +121,15 @@ contains
     if(present(n_iter_max)) this%n_iter_max = n_iter_max
     if(present(tol)) this%tol = tol
     if(present(alpha)) this%alpha = alpha
-    if(present(is_roothaan)) this%is_roothaan = is_roothaan
+    if(present(norm_kernel)) then
+      this%is_roothaan = .true.
+      this%S = norm_kernel
+    end if
     this%is_three_body = hamil%ms%is_three_body_jt
     this%rank = hamil%rank
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occ',     0, 1, 0)
     call this%rho%init(ms%one, .true., 'DenMat',  0, 1, 0)
-    call this%S%init(  ms%one, .true., 'Norm',    0, 1, 0)
     call this%F%init(  ms%one, .true., 'FockOp',  0, 1, 0)
     call this%T%init(  ms%one, .true., 'kinetic', 0, 1, 0)
     call this%V%init(  ms%one, .true., 'NNint',   0, 1, 0)
@@ -572,7 +574,18 @@ contains
   subroutine DiagonalizeFockMatrix(this)
     class(HFSolver), intent(inout) :: this
     type(EigenSolSymD) :: sol
+    type(GenEigenSolSymD) :: sol_gen
     integer :: ch
+
+    if(this%is_roothaan) then
+      do ch = 1, this%F%one%NChan
+        call sol_gen%init(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
+        call sol_gen%DiagSym(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
+        this%C%MatCh(ch,ch)%DMat = sol%vec
+        call sol%fin()
+      end do
+      return
+    end if
 
     do ch = 1, this%F%one%NChan
       call sol%init(this%F%MatCh(ch,ch)%DMat)
