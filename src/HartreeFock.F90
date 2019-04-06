@@ -91,7 +91,7 @@ contains
     call this%T%fin()
     call this%V%fin()
     call this%W%fin()
-    call this%S%fin()
+    !call this%S%fin()
     call this%V2%FinMonopole()
     call this%V3%FinMonopole()
   end subroutine FinHFSolver

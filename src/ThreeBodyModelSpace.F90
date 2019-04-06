@@ -99,7 +99,7 @@ module ThreeBodyModelSpace
   type :: coef
     integer :: n = 0
     integer, allocatable :: idx2num(:)
-#ifdef single_precision
+#ifdef single_precision_three_body_file
     real(4), allocatable :: TrnsCoef(:)
 #else
     real(8), allocatable :: TrnsCoef(:)
@@ -1189,7 +1189,7 @@ contains
             allocate(this%jt(j12,t12)%idx2num( n))
             allocate(this%jt(j12,t12)%TrnsCoef(n))
             this%jt(j12,t12)%idx2num(:) = 0
-#ifdef single_precision
+#ifdef single_precision_three_body_file
             this%jt(j12,t12)%TrnsCoef(:) = 0.0
 #else
             this%jt(j12,t12)%TrnsCoef(:) = 0.d0
@@ -1199,7 +1199,7 @@ contains
             select case(n_recouple)
             case(1)
               n = 1
-#ifdef single_precision
+#ifdef single_precision_three_body_file
               this%jt(j12,t12)%TrnsCoef(n) = 1.0
 #else
               this%jt(j12,t12)%TrnsCoef(n) = 1.d0
@@ -1212,7 +1212,7 @@ contains
                   if(triag(2 * tab,  1, t)) cycle
                   if(triag(2 * jab, jc, j)) cycle
                   n = n + 1
-#ifdef single_precision
+#ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & real((-1.d0) ** ((jb + jc) / 2 + j12 + jab + t12 + tab) * &
                       & hat(2 * jab) * hat(2 * j12) * &
@@ -1237,7 +1237,7 @@ contains
                   if(triag(2 * tab,  1, t)) cycle
                   if(triag(2 * jab, jc, j)) cycle
                   n = n + 1
-#ifdef single_precision
+#ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = real(&
                       & - (-1.d0) ** ((jb + jc) / 2 + j12 + t12) * &
                       & hat(2 * jab) * hat(2 * j12) * &
@@ -1257,7 +1257,7 @@ contains
               end do
             case(4)
               n = n + 1
-#ifdef single_precision
+#ifdef single_precision_three_body_file
               this%jt(j12,t12)%TrnsCoef(n) = real(&
                   & (-1.d0) ** ((ja + jb) / 2 - j12 - t12))
 #else
@@ -1272,7 +1272,7 @@ contains
                   if(triag(2 * tab,  1, t)) cycle
                   if(triag(2 * jab, jc, j)) cycle
                   n = n + 1
-#ifdef single_precision
+#ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = real(&
                       & - (-1.d0) ** ((ja + jb) / 2 + jab+ tab) * &
                       & hat(2 * jab) * hat(2 * j12) * &
@@ -1297,7 +1297,7 @@ contains
                   if(triag(2 * tab,  1, t)) cycle
                   if(triag(2 * jab, jc, j)) cycle
                   n = n + 1
-#ifdef single_precision
+#ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & real(- &
                       & hat(2 * jab) * hat(2 * j12) * &

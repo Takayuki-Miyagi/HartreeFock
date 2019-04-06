@@ -30,7 +30,7 @@ module ThreeBodyInteraction
   private :: read_scalar_me3j_binary
 
   type :: ThreeBodyForceChannel
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:,:)
 #else
     real(8), allocatable :: v(:,:)
@@ -95,7 +95,7 @@ contains
     do ch = 1, thr%NChan
       n_state = thr%jpt(ch)%n_state
       allocate(this%MatCh(ch,ch)%v(n_state,n_state))
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
       this%MatCh(ch,ch)%v(:,:) = 0.0
 #else
       this%MatCh(ch,ch)%v(:,:) = 0.d0
@@ -156,7 +156,7 @@ contains
     integer :: ch
     c = a
     do ch = 1, a%thr%NChan
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
       c%MatCh(ch,ch)%v(:,:) = real(b) * a%MatCh(ch,ch)%v(:,:)
 #else
       c%MatCh(ch,ch)%v(:,:) = b * a%MatCh(ch,ch)%v(:,:)
@@ -471,7 +471,7 @@ contains
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -504,7 +504,7 @@ contains
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -542,7 +542,7 @@ contains
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -581,7 +581,7 @@ contains
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -615,7 +615,7 @@ contains
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -646,7 +646,7 @@ contains
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -767,7 +767,7 @@ contains
   subroutine store_scalar_3bme(thr,v,spsf,e2max,e3max)
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin), intent(in) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -911,7 +911,7 @@ contains
   subroutine store_scalar_3bme_sp(thr,v,spsf,e2max,e3max)
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin), intent(in) :: spsf
-#ifdef single_precision_three_body_force
+#ifdef single_precision_three_body_file
     real(4), intent(in) :: v(:)
 #else
     real(8), intent(in) :: v(:)

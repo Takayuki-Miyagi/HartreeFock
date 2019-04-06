@@ -1016,7 +1016,7 @@ contains
     type(Orbits), pointer :: sps
     type(OrbitsIsospin) :: sps_me2j
     integer :: nelm, io, runit = 22
-#ifdef single_precision
+#ifdef single_precision_two_body_file
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)

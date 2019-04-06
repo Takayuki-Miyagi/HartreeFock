@@ -38,7 +38,7 @@ ifeq ($(HOST),apt)
   FC=ifort
   LDFLAGS=-mkl -lgsl -lz
   OMP = -openmp
-  FFLAGS=-O3 -no-ipo -static -Dsingle_precision_three_body_force
+  FFLAGS=-O3 -no-ipo -static -Dsingle_precision_three_body_file
   CFLAGS=-O3
   FF2C=
   #FDFLAGS+=-check-all
@@ -61,7 +61,7 @@ ifeq ($(strip $(HOST)),oak)
   LINT = -i8
   FF2C=
   #FDFLAGS =-check all
-  FFLAGS+= -Dsingle_precision_three_body_force
+  FFLAGS+= -Dsingle_precision_three_body_file
 endif
 
 #--------------------------------------------------
