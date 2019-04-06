@@ -41,6 +41,11 @@ program HFMain
   call p%init(inputfile)
   call p%PrintInputParameters()
 
+  if(command_argument_count() == 1 .and. p%is_Atomic) then
+    write(*,"(a)") "I need a configuration file too!"
+    stop
+  end if
+
   if(command_argument_count() == 2 .and. p%is_Atomic) then
     call atomic_case(inputfile, conffile)
     call timer%fin()
