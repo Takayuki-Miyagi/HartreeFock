@@ -403,6 +403,7 @@ contains
     if(.not. this%ms%is_three_body_jt) return
     call this%thr21%fin()
     call this%ms%ReleaseThreeBody21()
+    this%ms%is_three_body_jt = .false.
   end subroutine DiscardThreeBodyFOrce
 
   subroutine DiscardThreeBodyPart(this)
@@ -410,6 +411,7 @@ contains
     if(.not. this%ms%is_three_body) return
     call this%thr%fin()
     call this%ms%ReleaseThreeBody()
+    this%ms%is_three_body = .false.
   end subroutine DiscardThreeBodyPart
 
 end module Operators
