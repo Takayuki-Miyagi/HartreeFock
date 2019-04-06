@@ -230,7 +230,7 @@ contains
     integer :: ch, idxbra, idxket, bra, ket
     integer :: P123, P456
     integer :: isorted_bra, isorted_ket
-    integer :: ibra, iket, nmax, nmin, idx_vec
+    integer :: ibra, iket, nmax, nmin
     real(8) :: r
 
     r = 0.d0
@@ -254,8 +254,6 @@ contains
     idxbra = tbs%jpt(ch)%sorting(i1,i2,i3)
     idxket = tbs%jpt(ch)%sorting(i4,i5,i6)
     if(idxbra * idxket == 0) return
-    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
-    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     isorted_bra = tbs%jpt(ch)%sort(idxbra)%idx_sorted
     isorted_ket = tbs%jpt(ch)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
@@ -264,7 +262,6 @@ contains
       bra = tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
       do iket = 1, tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%n
         ket = tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%idx2num(iket)
-        idx_vec = nmax * (nmax - 1) / 2 + nmin
         r = r + dble(this%MatCh(ch,ch)%v(bra,ket) * &
             & tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
             & tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
