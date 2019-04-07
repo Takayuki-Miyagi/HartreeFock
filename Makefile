@@ -5,6 +5,7 @@ TARGET=HartreeFock
 INSTLDIR= $(HOME)/bin
 EXEDIR=$(PWD)/exe
 DEBUG_MODE=on
+MODDIR = mod
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
   elif hostname|grep -q cedar; then echo cedar; \
@@ -79,7 +80,6 @@ OBJF77 = $(SRCF77:$(SRCDIR)/%.f=$(OBJDIR)/%.o)
 OBJF90 = $(SRCF90:$(SRCDIR)/%.f90=$(OBJDIR)/%.o)
 OBJF95 = $(SRCF95:$(SRCDIR)/%.F90=$(OBJDIR)/%.o)
 
-MODDIR = src
 MODF90 = $(SRCF90:$(SRCDIR)/%.f90=$(MODDIR)/%.mod)
 MODF95 = $(SRCF95:$(SRCDIR)/%.F90=$(MODDIR)/%.mod)
 

@@ -11,6 +11,7 @@ inputf='hf_input.txt'
 zlist=[1]
 elist=[6]
 Params['is_Atomic']=True
+Params['is_MBPTEnergy']=False
 
 def SetHamil(hw, emax_nn, e2max_nn, emax_3n, e2max_3n, e3max_3n):
     path2 = HOME + '/MtxElmnt/2BME'
@@ -44,7 +45,7 @@ def main():
                     f.write(str(key)+'= '+str(value)+' \n')
             f.write("&end \n")
             f.close()
-            cmd = exe + ' ' + inputf + " conf_input.txt"
+            cmd = exe + ' ' + inputf + " conf_atom_input.txt"
             subprocess.call(cmd,shell=True)
             f = "summary_"+file_nn
             cmd = "mv summary.out "+f

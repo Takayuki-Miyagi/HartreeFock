@@ -47,11 +47,11 @@ def main():
                     Params['e3max'] = e3
                     Params['emax_nn'] = emax_nn
                     Params['e2max_nn'] = e2max_nn
-                    Params['e2max_nn'] = e2max_nn
                     Params['emax_3n'] = emax_3n
                     Params['e2max_3n'] = e2max_3n
                     Params['e3max_3n'] = e3max_3n
-                    Params['int_nn_file'] = file_nn_int Params['int_3n_file'] = file_3n_int
+                    Params['int_nn_file'] = file_nn_int
+                    Params['int_3n_file'] = file_3n_int
                     f = open(inputf,'w')
                     f.write('&input \n')
                     for key, value in Params.items():

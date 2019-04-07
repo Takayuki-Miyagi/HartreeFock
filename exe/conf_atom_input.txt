@@ -1,0 +1,8 @@
+! example of a configuration file
+! put this file on second argument of command line variables
+! n, l, j, occupation number (<= j+1)
+! This is for Ne atom [(He) 2s^2 1p^6]
+  0  0  1  2
+  1  0  1  2
+  0  1  1  2
+  0  1  3  4
