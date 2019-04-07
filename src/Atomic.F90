@@ -19,8 +19,18 @@ contains
     call read_hamil_from_snt(ms, h,p%int_nn_file, conffile)
     call HF%init(h,alpha=p%alpha)
     call HF%solve()
-    call HF%TransformToHF(h)
+
+    if(.not. p%is_MBPTEnergy) then
+      open(wunit, file = p%summary_file, action='write',status='replace')
+      call p%PrintInputParameters(wunit)
+      write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
+          & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
+      write(wunit,'(a,4f18.8)') 'hamil: ', HF%ehf, 0.d0, 0.d0, HF%ehf
+      close(wunit)
+    end if
+
     if(p%is_MBPTEnergy) then
+      call HF%TransformToHF(h)
       call PT%calc(H)
       open(wunit, file = p%summary_file, action='write',status='replace')
       call p%PrintInputParameters(wunit)
@@ -36,6 +46,10 @@ contains
           & PT%e_0+PT%e_2+PT%e_3
       close(wunit)
     end if
+
+    call HF%fin()
+    call h%fin()
+    call ms%fin()
   end subroutine atomic_case
 
   subroutine read_hamil_from_snt(ms, h, f, conffile)
@@ -168,7 +182,7 @@ contains
         call o%SetHoleParticleValence(2)
       end if
     end do
-    write(*,"(a,i4,2a)") " # of electrons ", N_e, " from ", trim(f)
+    write(*,"(a,i4,2a)") "# number of electrons ", N_e, " from ", trim(f)
   end subroutine GetElectronConfFromFile
 
 end module Atomic

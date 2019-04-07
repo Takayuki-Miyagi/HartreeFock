@@ -235,6 +235,8 @@ contains
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(inout) :: H
     type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
+    type(Orbits), pointer :: sps
     integer :: ch, J, n, bra, ket, a, b, c, d, e, f, JJJ
     integer :: ea, eb, ec, ed
     integer :: je, le, ze, ee
@@ -244,6 +246,7 @@ contains
 
     ti = omp_get_wtime()
     ms => H%ms
+    sps => ms%sps
     H%zero = HF%ehf
     do ch = 1, ms%one%NChan
       H%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
@@ -251,8 +254,9 @@ contains
     end do
 
     do ch = 1, ms%two%NChan
-      J = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      ch_two => ms%two%jpz(ch)
+      J = ch_two%j
+      n = ch_two%n_state
       call UT%zeros(n,n)
       call V3%zeros(n,n)
       V2 = H%two%MatCh(ch,ch)%DMat
@@ -261,16 +265,16 @@ contains
       !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
       !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef,JJJ)
       do bra = 1, n
-        a = ms%two%jpz(ch)%n2spi1(bra)
-        b = ms%two%jpz(ch)%n2spi2(bra)
-        ea = ms%sps%orb(a)%e
-        eb = ms%sps%orb(b)%e
-        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-J)
+        a = ch_two%n2spi1(bra)
+        b = ch_two%n2spi2(bra)
+        ea = sps%orb(a)%e
+        eb = sps%orb(b)%e
+        ph = (-1.d0)**((sps%orb(a)%j+sps%orb(b)%j)/2-J)
         do ket = 1, n
-          c = ms%two%jpz(ch)%n2spi1(ket)
-          d = ms%two%jpz(ch)%n2spi2(ket)
-          ec = ms%sps%orb(c)%e
-          ed = ms%sps%orb(d)%e
+          c = ch_two%n2spi1(ket)
+          d = ch_two%n2spi2(ket)
+          ec = sps%orb(c)%e
+          ed = sps%orb(d)%e
 
           UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
@@ -280,17 +284,17 @@ contains
 
           if(ket > bra) cycle
           if(H%rank/=3 .or. .not. H%ms%is_three_body_jt) cycle
-          do e = 1, ms%sps%norbs
-            je = ms%sps%orb(e)%j
-            le = ms%sps%orb(e)%l
-            ze = ms%sps%orb(e)%z
-            ee = ms%sps%orb(e)%e
+          do e = 1, sps%norbs
+            je = sps%orb(e)%j
+            le = sps%orb(e)%l
+            ze = sps%orb(e)%z
+            ee = sps%orb(e)%e
             if(ea+eb+ee > ms%e3max) cycle
             do f = 1, ms%sps%norbs
-              jf = ms%sps%orb(f)%j
-              lf = ms%sps%orb(f)%l
-              zf = ms%sps%orb(f)%z
-              ef = ms%sps%orb(f)%e
+              jf = sps%orb(f)%j
+              lf = sps%orb(f)%l
+              zf = sps%orb(f)%z
+              ef = sps%orb(f)%e
               if(je /= jf) cycle
               if(le /= lf) cycle
               if(ze /= zf) cycle
@@ -317,7 +321,6 @@ contains
       call V3%fin()
     end do
     call H%DiscardThreeBodyPart()
-
     call timer%Add("HFBasisHamltonian",omp_get_wtime() - ti)
 
   end subroutine HFBasisHamiltonian

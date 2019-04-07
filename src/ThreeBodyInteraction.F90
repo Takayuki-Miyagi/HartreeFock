@@ -171,22 +171,26 @@ contains
     class(ThreeBodyForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,J45,J
+    type(Orbits), pointer :: sps
+    type(OrbitsIsospin), pointer :: isps
     type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, T
     integer :: a, b, c, d, e, f, Z
     real(8) :: r
-    real(8) :: ti
+    !real(8) :: ti ! --- test
 
-    ti = omp_get_wtime()
+    !ti = omp_get_wtime() ! --- test (conflict with omp)
+    sps => this%thr%sps
+    isps => this%thr%isps
     r = 0.d0
     if(i1 == i2 .and. mod(J12, 2) == 1) return
     if(i4 == i5 .and. mod(J45, 2) == 1) return
-    o1 => this%thr%sps%GetOrbit(i1)
-    o2 => this%thr%sps%GetOrbit(i2)
-    o3 => this%thr%sps%GetOrbit(i3)
-    o4 => this%thr%sps%GetOrbit(i4)
-    o5 => this%thr%sps%GetOrbit(i5)
-    o6 => this%thr%sps%GetOrbit(i6)
+    o1 => sps%GetOrbit(i1)
+    o2 => sps%GetOrbit(i2)
+    o3 => sps%GetOrbit(i3)
+    o4 => sps%GetOrbit(i4)
+    o5 => sps%GetOrbit(i5)
+    o6 => sps%GetOrbit(i6)
     if(o1%e + o2%e + o3%e > this%thr%e3max) return
     if(o4%e + o5%e + o6%e > this%thr%e3max) return
     z1 = o1%z; z2 = o2%z; z3 = o3%z
@@ -194,12 +198,12 @@ contains
     if(z1+z2+z3 /= z4+z5+z6) return
     Z = z1 + z2 + z3
 
-    a = this%thr%isps%nlj2idx( o1%n, o1%l, o1%j )
-    b = this%thr%isps%nlj2idx( o2%n, o2%l, o2%j )
-    c = this%thr%isps%nlj2idx( o3%n, o3%l, o3%j )
-    d = this%thr%isps%nlj2idx( o4%n, o4%l, o4%j )
-    e = this%thr%isps%nlj2idx( o5%n, o5%l, o5%j )
-    f = this%thr%isps%nlj2idx( o6%n, o6%l, o6%j )
+    a = isps%nlj2idx( o1%n, o1%l, o1%j )
+    b = isps%nlj2idx( o2%n, o2%l, o2%j )
+    c = isps%nlj2idx( o3%n, o3%l, o3%j )
+    d = isps%nlj2idx( o4%n, o4%l, o4%j )
+    e = isps%nlj2idx( o5%n, o5%l, o5%j )
+    f = isps%nlj2idx( o6%n, o6%l, o6%j )
     do T12 = 0, 1
       if(abs(z1+z2) > 2*T12) cycle
       do T45 = 0, 1
@@ -214,7 +218,7 @@ contains
         end do
       end do
     end do
-    call timer%add("GetThBME_pn", omp_get_wtime()-ti)
+    !call timer%add("GetThBME_pn", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBME_pn
 
   function GetThBME_Isospin(this,i1,i2,i3,J12,T12,&
@@ -222,25 +226,28 @@ contains
     class(ThreeBodyForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,T12,J45,T45,J,T
+    type(OrbitsIsospin), pointer :: isps
     type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
     type(NonOrthIsospinThreeBodySpace), pointer :: tbs
+    type(coef), pointer :: bra_ch, ket_ch
     integer :: ch, idxbra, idxket, bra, ket
     integer :: P123, P456
     integer :: isorted_bra, isorted_ket
-    integer :: ibra, iket, nmax, nmin
+    integer :: ibra, iket
     real(8) :: r
-    real(8) :: ti
+    !real(8) :: ti ! --- test
 
     r = 0.d0
-    ti = omp_get_wtime()
+    !ti = omp_get_wtime() ! --- test (conflict with omp)
     if(i1 == i2 .and. mod(J12+T12,2) == 0) return
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
-    o1 => this%thr%isps%GetOrbit(i1)
-    o2 => this%thr%isps%GetOrbit(i2)
-    o3 => this%thr%isps%GetOrbit(i3)
-    o4 => this%thr%isps%GetOrbit(i4)
-    o5 => this%thr%isps%GetOrbit(i5)
-    o6 => this%thr%isps%GetOrbit(i6)
+    isps => this%thr%isps
+    o1 => isps%GetOrbit(i1)
+    o2 => isps%GetOrbit(i2)
+    o3 => isps%GetOrbit(i3)
+    o4 => isps%GetOrbit(i4)
+    o5 => isps%GetOrbit(i5)
+    o6 => isps%GetOrbit(i6)
     tbs => this%thr
     P123 = (-1) ** (o1%l+o2%l+o3%l)
     P456 = (-1) ** (o4%l+o5%l+o6%l)
@@ -257,16 +264,18 @@ contains
     isorted_ket = tbs%jpt(ch)%sort(idxket)%idx_sorted
     if(isorted_bra * isorted_ket == 0) return
 
-    do ibra = 1, tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%n
-      bra = tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%idx2num(ibra)
-      do iket = 1, tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%n
-        ket = tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%idx2num(iket)
+    bra_ch => tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)
+    ket_ch => tbs%jpt(ch)%sort(idxket)%JT(J45,T45)
+
+    do ibra = 1, bra_ch%n
+      bra = bra_ch%idx2num(ibra)
+      do iket = 1, ket_ch%n
+        ket = ket_ch%idx2num(iket)
         r = r + dble(this%MatCh(ch,ch)%v(bra,ket) * &
-            & tbs%jpt(ch)%sort(idxbra)%JT(J12,T12)%TrnsCoef(ibra) * &
-            & tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
+            & bra_ch%TrnsCoef(ibra) * ket_ch%TrnsCoef(iket))
       end do
     end do
-    call timer%add("GetThBME_isospin", omp_get_wtime()-ti)
+    !call timer%add("GetThBME_isospin", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBME_Isospin
 
   subroutine PrintThreeBodyForce(this, wunit)
