@@ -236,10 +236,10 @@ contains
 
     call this%one%set(ms%hw, ms%A, ms%Z, ms%N)
     write(*,'(2a)') "2B file: ", trim(file_nn)
-    call rd2%ReadScalar2BFile(this%two)
+    call rd2%ReadTwoBodyFile(this%two)
     if(this%rank == 3 .and. this%ms%is_three_body_jt) then
       write(*,'(2a)') "3B file: ", trim(file_3n)
-      call rd3%ReadScalar3BFile(this%thr21)
+      call rd3%ReadIsospinThreeBodyFile(this%thr21)
     end if
 
     if(this%rank == 3 .and. this%ms%is_three_body_jt .and. this%ms%is_three_body) then

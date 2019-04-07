@@ -12,36 +12,38 @@ Host= $(shell if hostname|grep -q apt1; then echo apt; \
 HOST=$(strip $(Host))
 $(info Host:$(HOST))
 
+FDEP=
+FC=
+LFLAGS=
+FFLAGS=
+DFLAGS=
 #--------------------------------------------------
 # Default Parameters
 #--------------------------------------------------
 ifeq ($(HOST),other)
   FDEP=makedepf90
-  CC=gcc
   FC=gfortran
-  LDFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl -lz
-  OMP = -fopenmp
-  FFLAGS=-O3 -Dsingle_precision_three_body_force
-  CFLAGS=-O3
-  FF2C= -ff2c
-  FDFLAGS=
+  LFLAGS= -I/usr/local/include -L/usr/local/lib -llapack -lblas -lgsl -lz
+  FFLAGS = -O3 -Dsingle_precision_three_body_file -fopenmp
+  #FFLAGS += -ff2c
+  DFLAGS=
   ifeq ($(DEBUG_MODE),on)
-    FDFLAGS+=-DModelSpaceDebug
+    DFLAGS+=-DModelSpaceDebug
     #FDFLAGS+=-DTwoBodyOperatorDebug
-    FDFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
+    DFLAGS+=-fbounds-check -Wall -fbacktrace -O -Wuninitialized
   endif
 endif
 
 ifeq ($(HOST),apt)
   #FDEP=
-  CC=gcc
   FC=ifort
-  LDFLAGS=-mkl -lgsl -lz
-  OMP = -openmp
-  FFLAGS=-O3 -no-ipo -static -Dsingle_precision_three_body_file
-  CFLAGS=-O3
-  FF2C=
-  #FDFLAGS+=-check-all
+  LFLAGS=-mkl -lgsl -lz
+  FFLAGS=-O3 -no-ipo -static -Dsingle_precision_three_body_file -openmp
+  ifeq ($(DEBUG_MODE),on)
+    #DFLAGS+=-DModelSpaceDebug
+    #FDFLAGS+=-DTwoBodyOperatorDebug
+    DFLAGS+=-check all
+  endif
 endif
 
 #-----------------------------
@@ -51,17 +53,14 @@ endif
 #-----------------------------
 ifeq ($(strip $(HOST)),oak)
   FDEP=
-  CC=icc
   FC=ifort
   MKL=-L$(MKLROOT)/lib/ -L$(MKLROOT)/lib/intel64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -Wl,-rpath,$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/../compiler/lib/
-  LDFLAGS=$(MKL) -lgsl -lz
-  OMP = -qopenmp
-  FFLAGS=-O3 -heap-arrays
-  CFLAGS=-O3
-  LINT = -i8
-  FF2C=
-  #FDFLAGS =-check all
-  FFLAGS+= -Dsingle_precision_three_body_file
+  LFLAGS=$(MKL) -lgsl -lz
+  FFLAGS=-O3 -heap-arrays -qopenmp
+  FFLAGS += -Dsingle_precision_three_body_file
+  ifeq ($(DEBUG_MODE),on)
+    DFLAGS+=-check all
+  endif
 endif
 
 #--------------------------------------------------
@@ -119,7 +118,7 @@ endif
 #--------------------------------------------------
 all: dirs $(TARGET)
 $(TARGET): $(OBJS)
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $(TARGET).exe $^ $(LDFLAGS)
+	$(FC) $(FFLAGS) $(DFLAGS) -o $(TARGET).exe $^ $(LFLAGS)
 	if test -d $(EXEDIR); then \
 		: ; \
 	else \
@@ -131,16 +130,12 @@ $(TARGET): $(OBJS)
 	@echo "Edit '$(PWD)/exe/run_hf_mbpt.py' and excecute."
 	@echo "#####################################################################################"
 
-$(OBJDIR)/%.o:$(SRCDIR)/%.c
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(OBJDIR)/%.o:$(SRCDIR)/%.f
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR)/%.f90
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) $(MODOUT) -o $@ -c $<
+	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR)/%.F90
-	$(FC) $(FFLAGS) $(OMP) $(FDFLAGS) $(MODOUT) -o $@ -c $<
+	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 $(OBJDIR)/%.o:$(LINSRCDIR)/%.f90
-	$(FC) $(FF2C) $(FFLAGS) $(OMP) $(FDFLAGS) $(MODOUT) -o $@ -c $<
+	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 #
 dirs:
 	if test -d $(OBJDIR); then \

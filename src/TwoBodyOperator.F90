@@ -67,7 +67,6 @@ module TwoBodyOperator
     procedure :: FinTwoBodyPart
     procedure :: SetTwoBodyPart
     procedure :: SetTwoBodyPartFromOneBody
-    procedure :: ReadTwoBodyFile
     procedure :: SetTwBME_scalar
     procedure :: SetTwBME_tensor
     procedure :: GetTwBME_scalar
@@ -101,6 +100,7 @@ module TwoBodyOperator
     procedure :: Set2BodyReadFile       ! setter
     procedure :: Set2BodyFileBoundaries ! setter
     generic :: set => Set2BodyReadFile, Set2BodyFileBoundaries
+    procedure :: ReadTwoBodyFile
     ! methods for two-body matrix element
     procedure :: ReadScalar2BFile
     procedure :: ReadTensor2BFile
@@ -808,22 +808,22 @@ contains
 
   end subroutine Set2BodyFileBoundaries
 
-  subroutine ReadTwoBodyFile(this, rd)
+  subroutine ReadTwoBodyFile(this, V)
     use Profiler, only: timer
-    class(TwoBodyPart), intent(inout) :: this
-    type(Read2BodyFiles), intent(in) :: rd
+    class(Read2BodyFiles), intent(in) :: this
+    class(TwoBodyPart), intent(inout) :: v
     real(8) :: ti
 
     ti = omp_get_wtime()
 
-    select case(rd%file_nn)
+    select case(this%file_nn)
     case('None', 'NONE', 'none')
       write(*,*) "Error in ReadTwoBodyFile"
 
     case default
 
-      if(this%Scalar) call rd%ReadScalar2BFile(this)
-      if(.not. this%Scalar) call rd%ReadTensor2BFile(this)
+      if(V%Scalar) call this%ReadScalar2BFile(V)
+      if(.not. V%Scalar) call this%ReadTensor2BFile(V)
     end select
 
     call timer%Add("Read from file", omp_get_wtime()-ti)

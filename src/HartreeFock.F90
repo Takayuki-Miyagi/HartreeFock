@@ -1,4 +1,5 @@
 module HartreeFock
+  use omp_lib
   use LinAlgLib
   use Operators
   implicit none

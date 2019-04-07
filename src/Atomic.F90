@@ -50,8 +50,9 @@ contains
     integer :: nmax, lmax, jmax
     integer :: nmin, lmin, jmin
     type(SingleParticleOrbit), pointer :: o
-    real(8) :: me, kin, pot
+    real(8) :: me, kin, pot, ti
 
+    ti = omp_get_wtime()
     h%oprtr = "hamil"
     h%jr = 0
     h%pr = 1
@@ -130,6 +131,7 @@ contains
       call h%two%SetTwBME(a,b,c,d,J,me)
     end do
     close(runit)
+    call timer%Add("Model space & Hamiltonian", omp_get_wtime()-ti)
   end subroutine read_hamil_from_snt
 
   subroutine GetElectronConfFromFile(ms, f, N_e)
@@ -166,6 +168,7 @@ contains
         call o%SetHoleParticleValence(2)
       end if
     end do
+    write(*,"(a,i4,2a)") " # of electrons ", N_e, " from ", trim(f)
   end subroutine GetElectronConfFromFile
 
 end module Atomic

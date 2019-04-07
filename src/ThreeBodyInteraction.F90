@@ -1,5 +1,6 @@
 module ThreeBodyInteraction
   use omp_lib
+  use Profiler, only: timer
   use SingleParticleState
   use ThreeBodyModelSpace
   implicit none
@@ -46,7 +47,6 @@ module ThreeBodyInteraction
     procedure :: FinThreeBodyForce
     procedure :: GetThBME_isospin
     procedure :: GetThBME_pn
-    procedure :: ReadIsospinThreeBodyFile
     procedure :: CopyThreeBodyForce
     procedure :: SumThreeBodyForce
     procedure :: SubtractThreeBodyForce
@@ -71,6 +71,7 @@ module ThreeBodyInteraction
     procedure :: Set3BodyReadFile        ! setter
     procedure :: Set3BodyFileBoundaries  ! setter
     generic :: set => Set3BodyReadFile, Set3BodyFileBoundaries
+    procedure :: ReadIsospinThreeBodyFile
     ! methods for three-body marix element
     procedure :: ReadScalar3BFile
     procedure :: ReadTensor3BFile
@@ -172,10 +173,14 @@ contains
     integer, intent(in) :: J12,J45,J
     type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, T
-    integer :: a, b, c, d, e, f
-    integer :: P, Z, ch
+    integer :: a, b, c, d, e, f, Z
     real(8) :: r
+    real(8) :: ti
+
+    ti = omp_get_wtime()
     r = 0.d0
+    if(i1 == i2 .and. mod(J12, 2) == 1) return
+    if(i4 == i5 .and. mod(J45, 2) == 1) return
     o1 => this%thr%sps%GetOrbit(i1)
     o2 => this%thr%sps%GetOrbit(i2)
     o3 => this%thr%sps%GetOrbit(i3)
@@ -184,14 +189,10 @@ contains
     o6 => this%thr%sps%GetOrbit(i6)
     if(o1%e + o2%e + o3%e > this%thr%e3max) return
     if(o4%e + o5%e + o6%e > this%thr%e3max) return
-    if(i1 == i2 .and. mod(J12, 2) == 1) return
-    if(i4 == i5 .and. mod(J45, 2) == 1) return
-    z1 = o1%z
-    z2 = o2%z
-    z3 = o3%z
-    z4 = o4%z
-    z5 = o5%z
-    z6 = o6%z
+    z1 = o1%z; z2 = o2%z; z3 = o3%z
+    z4 = o4%z; z5 = o5%z; z6 = o6%z
+    if(z1+z2+z3 /= z4+z5+z6) return
+    Z = z1 + z2 + z3
 
     a = this%thr%isps%nlj2idx( o1%n, o1%l, o1%j )
     b = this%thr%isps%nlj2idx( o2%n, o2%l, o2%j )
@@ -199,17 +200,12 @@ contains
     d = this%thr%isps%nlj2idx( o4%n, o4%l, o4%j )
     e = this%thr%isps%nlj2idx( o5%n, o5%l, o5%j )
     f = this%thr%isps%nlj2idx( o6%n, o6%l, o6%j )
-
-    P = (-1) ** (o1%l+o2%l+o3%l)
-    Z = z1 + z2 + z3
     do T12 = 0, 1
       if(abs(z1+z2) > 2*T12) cycle
       do T45 = 0, 1
         if(abs(z4+z5) > 2*T45) cycle
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
-          ch = this%thr%jpt2ch(J,P,T)
-          if(ch == 0) cycle
           r = r + &
               & this%GetThBME(a,b,c,J12,T12,&
               & d,e,f,J45,T45,J,T) * &
@@ -218,6 +214,7 @@ contains
         end do
       end do
     end do
+    call timer%add("GetThBME_pn", omp_get_wtime()-ti)
   end function GetThBME_pn
 
   function GetThBME_Isospin(this,i1,i2,i3,J12,T12,&
@@ -232,8 +229,10 @@ contains
     integer :: isorted_bra, isorted_ket
     integer :: ibra, iket, nmax, nmin
     real(8) :: r
+    real(8) :: ti
 
     r = 0.d0
+    ti = omp_get_wtime()
     if(i1 == i2 .and. mod(J12+T12,2) == 0) return
     if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     o1 => this%thr%isps%GetOrbit(i1)
@@ -267,6 +266,7 @@ contains
             & tbs%jpt(ch)%sort(idxket)%JT(J45,T45)%TrnsCoef(iket))
       end do
     end do
+    call timer%add("GetThBME_isospin", omp_get_wtime()-ti)
   end function GetThBME_Isospin
 
   subroutine PrintThreeBodyForce(this, wunit)
@@ -403,22 +403,21 @@ contains
 
   end subroutine Set3BodyFileBoundaries
 
-  subroutine ReadIsospinThreeBodyFile(this, rd)
-    use Profiler, only: timer
-    class(ThreeBodyForce), intent(inout) :: this
-    type(Read3BodyFiles), intent(in) :: rd
+  subroutine ReadIsospinThreeBodyFile(this, V)
+    class(Read3BodyFiles), intent(in) :: this
+    type(ThreeBodyForce), intent(inout) :: V
     real(8) :: ti
 
     ti = omp_get_wtime()
 
-    select case(rd%file_3n)
+    select case(this%file_3n)
     case('None', 'NONE', 'none')
       write(*,*) "No three-body matrix element."
       return
     case default
 
-      if(this%Scalar) call rd%ReadScalar3BFile(this)
-      if(.not. this%Scalar) call rd%ReadTensor3BFile(this)
+      if(V%Scalar) call this%ReadScalar3BFile(V)
+      if(.not. V%Scalar) call this%ReadTensor3BFile(V)
     end select
 
     call timer%Add('Read from file', omp_get_wtime()-ti)

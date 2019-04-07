@@ -153,6 +153,13 @@ contains
 
     if(present(iunit)) iut = iunit
 
+    if(this%is_atomic) then
+      write(iut,'(a)') "######  Input parameters  ####  "
+      write(iut,'(a)') "#  Hamiltonian file:"
+      write(iut,'(2a)') "#  ", trim(this%int_nn_file)
+      return
+    end if
+
     write(iut,'(a)') "######  Input parameters  ####  "
     write(iut,'(2a)') "#  Target nuclide is ", trim(this%Nucl)
     write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  Model space: emax =", &

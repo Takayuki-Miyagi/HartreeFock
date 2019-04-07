@@ -17,7 +17,6 @@ program HFMain
   type(MBPTScalar) :: PTs
   type(WriteFiles) :: w
   character(256) :: inputfile='none', conffile='none'
-  real(8) :: ti
   integer :: n, istatus, wunit=23
 
   call timer%init()
@@ -51,9 +50,6 @@ program HFMain
     call timer%fin()
     stop
   end if
-
-  ti = omp_get_wtime()
-  call timer%Add("Init for Rotation Group",omp_get_wtime()-ti)
 
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
