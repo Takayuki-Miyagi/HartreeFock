@@ -52,12 +52,12 @@ contains
     class(InputParameters), intent(inout) :: this
     character(*), intent(in) :: inputfile
     integer :: emax=6
-    integer :: e2max=12
-    integer :: e3max=6
+    integer :: e2max=-1
+    integer :: e3max=-1
     integer :: lmax=-1
     real(8) :: hw=20.d0
     real(8) :: beta_cm = 0.d0 ! lowson's cm parameter, H => H + beta_cm * (hw/A) * Hcm
-    real(8) :: alpha=1.d0
+    real(8) :: alpha=0.7d0
     character(20) :: Nucl='O16'
     character(256) :: int_nn_file
     character(256) :: int_3n_file
@@ -104,7 +104,9 @@ contains
 
     this%emax = emax
     this%e2max = e2max
+    if(e2max == -1) this%e2max = 2*emax
     this%e3max = e3max
+    if(e3max == -1) this%e3max = 3*emax
     this%hw = hw
     this%alpha = alpha
     this%Nucl = Nucl

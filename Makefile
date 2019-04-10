@@ -4,7 +4,7 @@
 TARGET=HartreeFock
 INSTLDIR= $(HOME)/bin
 EXEDIR=$(PWD)/exe
-DEBUG_MODE=on
+DEBUG_MODE=off
 MODDIR = mod
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
