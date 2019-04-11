@@ -415,7 +415,7 @@ contains
       !$omp end parallel
       Opr%two%MatCh(ch,ch)%DMat = &
           & UT%T() * Opr%two%MatCh(ch,ch)%DMat * UT
-      o2from3%MatCh(ch,ch)%DMat = &
+      if(Opr%rank/=3 .or. .not. Opr%ms%is_three_body_jt) o2from3%MatCh(ch,ch)%DMat = &
           & UT%T() * o2from3%MatCh(ch,ch)%DMat * UT
       call UT%fin()
       call V2%fin()
