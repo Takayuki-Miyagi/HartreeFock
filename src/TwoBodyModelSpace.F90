@@ -28,8 +28,12 @@ module TwoBodyModelSpace
     integer, allocatable :: n2spi2(:)
     integer, allocatable :: spis2n(:,:)
     integer, allocatable :: iphase(:,:)
-    integer, allocatable :: holes(:)
-    integer, allocatable :: particles(:)
+    integer, allocatable :: hps(:)
+    integer, allocatable :: hhs(:)
+    integer, allocatable :: hvs(:)
+    integer, allocatable :: vvs(:)
+    integer, allocatable :: vps(:)
+    integer, allocatable :: pps(:)
   contains
     procedure :: InitTwoBodyChannel
     procedure :: FinTwoBodyChannel
@@ -243,6 +247,50 @@ contains
       if(7 <= loop .and. loop <= 8) this%n_vp_state = this%n_vp_state + cnt_sub
       if(loop == 9) this%n_pp_state = cnt_sub
     end do
+
+    allocate(this%hps(this%n_hp_state))
+    allocate(this%hhs(this%n_hh_state))
+    allocate(this%hvs(this%n_hv_state))
+    allocate(this%vvs(this%n_vv_state))
+    allocate(this%vps(this%n_vp_state))
+    allocate(this%pps(this%n_pp_state))
+
+    cnt = 0
+    do loop = 1, 9
+      cnt_sub = 0
+      do i1 = 1, sps%norbs
+        o1 => sps%GetOrbit(i1)
+        do i2 = 1, i1
+          o2 => sps%GetOrbit(i2)
+
+          if(loop == 1 .and. .not. (o1%ph == 0 .and. o2%ph == 1)) cycle ! hp states
+          if(loop == 2 .and. .not. (o1%ph == 1 .and. o2%ph == 0)) cycle ! ph states
+          if(loop == 3 .and. .not. (o1%ph == 0 .and. o2%ph == 0)) cycle ! hh states
+          if(loop == 4 .and. .not. (o1%ph == 0 .and. o2%ph == 2)) cycle ! hv states
+          if(loop == 5 .and. .not. (o1%ph == 2 .and. o2%ph == 0)) cycle ! vh states
+          if(loop == 6 .and. .not. (o1%ph == 2 .and. o2%ph == 2)) cycle ! vv states
+          if(loop == 7 .and. .not. (o1%ph == 2 .and. o2%ph == 1)) cycle ! vp states
+          if(loop == 8 .and. .not. (o1%ph == 1 .and. o2%ph == 2)) cycle ! pv states
+          if(loop == 9 .and. .not. (o1%ph == 1 .and. o2%ph == 1)) cycle ! pp states
+
+          if(o1%e + o2%e > e2max) cycle
+          if(triag(o1%j, o2%j, 2*j)) cycle
+          if((-1) ** (o1%l+o2%l) /= p) cycle
+          if(o1%z + o2%z /= 2*z) cycle
+          if(i1 == i2 .and. mod(j,2) == 1) cycle
+
+          cnt = cnt + 1
+          cnt_sub = cnt_sub + 1
+          if(1 <= loop .and. loop <= 2) this%hps(cnt_sub) = cnt
+          if(loop == 3) this%hhs(cnt_sub) = cnt
+          if(4 <= loop .and. loop <= 5) this%hvs(cnt_sub) = cnt
+          if(6 == loop) this%vvs(cnt_sub) = cnt
+          if(7 <= loop .and. loop <= 8) this%vps(cnt_sub) = cnt
+          if(loop == 9) this%pps(cnt_sub) = cnt
+        end do
+      end do
+    end do
+
 #ifdef ModelSpaceDebug
     write(*,'(a,i3,a,i3,a,i3,a,i5)') "Two-body channel: J=", j, ", P=", p, ", Tz=", z, ", # of states=", this%n_state
 #endif

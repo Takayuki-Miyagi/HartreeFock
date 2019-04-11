@@ -211,9 +211,16 @@ contains
     integer, intent(in) :: a(4), b(4), c(4), d(4), J
     real(8) :: r
     integer :: ja, jb, jc, jd
+    integer :: ea, eb, ec, ed
     real(8) :: fact
 
     r = 0.d0
+    ea = 2*a(1) + a(2)
+    eb = 2*b(1) + b(2)
+    ec = 2*c(1) + c(2)
+    ed = 2*d(1) + d(2)
+    if(abs(ea+eb-ec-ed) > 2 .or. mod(abs(ea+eb-ec-ed),2)==1) return
+
     ja = a(3)
     jb = b(3)
     jc = c(3)
@@ -238,10 +245,18 @@ contains
     use MyLibrary, only: sjs
     integer, intent(in) :: a(4), b(4), c(4), d(4), J
     real(8) :: r
+    integer :: ea, eb, ec, ed
     integer :: ja, jb, jc, jd
     real(8) :: fact
 
     r = 0.d0
+
+    ea = 2*a(1) + a(2)
+    eb = 2*b(1) + b(2)
+    ec = 2*c(1) + c(2)
+    ed = 2*d(1) + d(2)
+    if(abs(ea+eb-ec-ed) > 2 .or. mod(abs(ea+eb-ec-ed),2)==1) return
+
     ja = a(3)
     jb = b(3)
     jc = c(3)

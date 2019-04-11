@@ -124,30 +124,31 @@ contains
     use Profiler, only: timer
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
+    type(MSPace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
     real(8) :: vsum, v, ti
 
     ti = omp_get_wtime()
-
+    ms => h%ms
     vsum = 0.d0
-    do ch = 1, h%ms%two%NChan
-      J2 = h%ms%two%jpz(ch)%j
-      n = h%ms%two%jpz(ch)%n_state
+    do ch = 1, ms%two%NChan
+      ch_two => ms%two%jpz(ch)
+      J2 = ch_two%j
+      n = ch_two%n_state
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
 
       v = 0.d0
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
-      do ab = 1, n
-        a = h%ms%two%jpz(ch)%n2spi1(ab)
-        b = h%ms%two%jpz(ch)%n2spi2(ab)
-        if( h%ms%sps%orb(a)%ph /= 1 ) cycle
-        if( h%ms%sps%orb(b)%ph /= 1 ) cycle
-        do ij = 1, n
-          i = h%ms%two%jpz(ch)%n2spi1(ij)
-          j = h%ms%two%jpz(ch)%n2spi2(ij)
-          if( h%ms%sps%orb(i)%ph /= 0 ) cycle
-          if( h%ms%sps%orb(j)%ph /= 0 ) cycle
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do ij = 1, ch_two%n_hh_state
+          i = ch_two%n2spi1(ch_two%hhs(ij))
+          j = ch_two%n2spi2(ch_two%hhs(ij))
 
           v = v + h%two%GetTwBME(i,j,a,b,J2)**2 / &
               & denom2b(h%one,i,j,a,b)
@@ -229,6 +230,7 @@ contains
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
     real(8) :: v, vsum, ti
@@ -240,37 +242,28 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      ch_two => ms%two%jpz(ch)
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+
       v = 0.d0
       !$omp parallel
-      !$omp do private(a,b,cd,c,d,ij,i,j) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do cd = 1, n
-          c = ms%two%jpz(ch)%n2spi1(cd)
-          d = ms%two%jpz(ch)%n2spi2(cd)
-          if( ms%sps%orb(c)%ph /= 1 ) cycle
-          if( ms%sps%orb(d)%ph /= 1 ) cycle
-          do ij = 1, n
-            i = ms%two%jpz(ch)%n2spi1(ij)
-            j = ms%two%jpz(ch)%n2spi2(ij)
-            if( ms%sps%orb(i)%ph /= 0 ) cycle
-            if( ms%sps%orb(j)%ph /= 0 ) cycle
+      !$omp do private(ab,a,b,cd,c,d,ij,i,j) reduction(+:v)
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do cd = 1, ch_two%n_pp_state
+          c = ch_two%n2spi1(ch_two%pps(cd))
+          d = ch_two%n2spi2(ch_two%pps(cd))
+          do ij = 1, ch_two%n_hh_state
+            i = ch_two%n2spi1(ch_two%hhs(ij))
+            j = ch_two%n2spi2(ch_two%hhs(ij))
 
             v = v + h%two%GetTwBME(i,j,a,b,J2) * &
                 & h%two%GetTwBME(a,b,c,d,J2) * &
                 & h%two%GetTwBME(c,d,i,j,J2) / &
                 & ( denom2b(h%one,i,j,a,b) * &
                 &   denom2b(h%one,i,j,c,d) )
-            !if(abs(v) > 1.d2) then
-            !  write(*,'(5f18.8)') h%two%GetTwBME(ms%sps,ms%two,i,j,a,b,J2), &
-            !    & h%two%GetTwBME(ms%sps,ms%two,a,b,c,d,J2) , &
-            !    & h%two%GetTwBME(ms%sps,ms%two,c,d,i,j,J2) , &
-            !    & denom(ms%sps,ms%one,h%one,i,j,a,b) , &
-            !    & denom(ms%sps,ms%one,h%one,i,j,c,d)
-            !end if
           end do
         end do
       end do
@@ -300,6 +293,7 @@ contains
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
     real(8) :: v, vsum, ti
@@ -312,24 +306,23 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      ch_two => ms%two%jpz(ch)
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+
       v = 0.d0
       !$omp parallel
-      !$omp do private(a,b,ij,i,j,kl,k,l) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do ij = 1, n
-          i = ms%two%jpz(ch)%n2spi1(ij)
-          j = ms%two%jpz(ch)%n2spi2(ij)
-          if( ms%sps%orb(i)%ph /= 0 ) cycle
-          if( ms%sps%orb(j)%ph /= 0 ) cycle
-          do kl = 1, n
-            k = ms%two%jpz(ch)%n2spi1(kl)
-            l = ms%two%jpz(ch)%n2spi2(kl)
-            if( ms%sps%orb(k)%ph /= 0 ) cycle
-            if( ms%sps%orb(l)%ph /= 0 ) cycle
+      !$omp do private(ab,a,b,ij,i,j,kl,k,l) reduction(+:v)
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do ij = 1, ch_two%n_hh_state
+          i = ch_two%n2spi1(ch_two%hhs(ij))
+          j = ch_two%n2spi2(ch_two%hhs(ij))
+          do kl = 1, ch_two%n_hh_state
+            k = ch_two%n2spi1(ch_two%hhs(kl))
+            l = ch_two%n2spi2(ch_two%hhs(kl))
+
             v = v + h%two%GetTwBME(a,b,i,j,J2) * &
                 & h%two%GetTwBME(i,j,k,l,J2) * &
                 & h%two%GetTwBME(k,l,a,b,J2) / &
@@ -340,8 +333,7 @@ contains
       end do
       !$omp end do
       !$omp end parallel
-
-      vsum = vsum + dble(2*J2+1) * v
+vsum = vsum + dble(2*J2+1) * v
     end do
 
     this%e_3_hh = vsum
@@ -632,6 +624,7 @@ contains
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
     real(8) :: vsum, v, ti
@@ -641,22 +634,19 @@ contains
 
     vsum = 0.d0
     do ch = 1, ms%two%NChan
-      J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
+      ch_two => ms%two%jpz(ch)
+      J2 = ch_two%j
+      n = ch_two%n_state
 
       v = 0.d0
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do ij = 1, n
-          i = ms%two%jpz(ch)%n2spi1(ij)
-          j = ms%two%jpz(ch)%n2spi2(ij)
-          if( ms%sps%orb(i)%ph /= 0 ) cycle
-          if( ms%sps%orb(j)%ph /= 0 ) cycle
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do ij = 1, ch_two%n_hh_state
+          i = ch_two%n2spi1(ch_two%hhs(ij))
+          j = ch_two%n2spi2(ch_two%hhs(ij))
 
           v = v + h%two%GetTwBME(i,j,a,b,J2) * &
               &   s%two%GetTwBME(a,b,i,j,J2) / &
@@ -718,6 +708,8 @@ contains
     ti = omp_get_wtime()
     ms => h%ms
     vsum = 0.d0
+    !$omp parallel
+    !$omp do private(ia,ib,a,b,ii,ij,i,j,ic,c,ja,jb,ji,jj,norm,v,J2) reduction(+:vsum)
     do ia = 1, size(ms%particles)
       do ib = 1, size(ms%particles)
         a = ms%particles(ia)
@@ -764,6 +756,8 @@ contains
         end do
       end do
     end do
+    !$omp end do
+    !$omp end parallel
     this%s_2_s1p = vsum * 0.5d0
     call timer%Add("Second order MBPT s1 p ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s1p
@@ -794,6 +788,8 @@ contains
     ms => h%ms
 
     vsum = 0.d0
+    !$omp parallel
+    !$omp do private(ia,ib,a,b,ii,ij,i,j,ik,k,ja,jb,ji,jj,norm,v,J2) reduction(+:vsum)
     do ia = 1, size(ms%particles)
       do ib = 1, size(ms%particles)
         a = ms%particles(ia)
@@ -840,6 +836,8 @@ contains
         end do
       end do
     end do
+    !$omp end do
+    !$omp end parallel
     this%s_2_s1h = vsum * 0.5d0
     call timer%Add("Second order MBPT s1 h ladder",omp_get_wtime()-ti)
   end subroutine scalar_second_s1h
@@ -870,6 +868,8 @@ contains
     ti = omp_get_wtime()
     ms => h%ms
     vsum = 0.d0
+    !$omp parallel
+    !$omp do private(ia,ib,a,b,ii,ij,i,j,ik,k,ja,jb,ji,jj,norm,v,J2,ic,c) reduction(+:vsum)
     do ia = 1, size(ms%particles)
       do ib = 1, size(ms%particles)
         a = ms%particles(ia)
@@ -946,6 +946,8 @@ contains
         end do
       end do
     end do
+    !$omp end do
+    !$omp end parallel
     this%s_2_s1ph = vsum
     call timer%Add("Second order MBPT s1 ph bubble",omp_get_wtime()-ti)
   end subroutine scalar_second_s1ph
@@ -967,6 +969,7 @@ contains
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
     real(8) :: v, vsum, ti
@@ -978,24 +981,22 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      ch_two => ms%two%jpz(ch)
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+
       v = 0.d0
       !$omp parallel
       !$omp do private(a,b,cd,c,d,ij,i,j) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do cd = 1, n
-          c = ms%two%jpz(ch)%n2spi1(cd)
-          d = ms%two%jpz(ch)%n2spi2(cd)
-          if( ms%sps%orb(c)%ph /= 1 ) cycle
-          if( ms%sps%orb(d)%ph /= 1 ) cycle
-          do ij = 1, n
-            i = ms%two%jpz(ch)%n2spi1(ij)
-            j = ms%two%jpz(ch)%n2spi2(ij)
-            if( ms%sps%orb(i)%ph /= 0 ) cycle
-            if( ms%sps%orb(j)%ph /= 0 ) cycle
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do cd = 1, ch_two%n_pp_state
+          c = ch_two%n2spi1(ch_two%pps(cd))
+          d = ch_two%n2spi2(ch_two%pps(cd))
+          do ij = 1, ch_two%n_hh_state
+            i = ch_two%n2spi1(ch_two%hhs(ij))
+            j = ch_two%n2spi2(ch_two%hhs(ij))
 
             v = v + h%two%GetTwBME(i,j,a,b,J2) * &
                 & s%two%GetTwBME(a,b,c,d,J2) * &
@@ -1030,6 +1031,7 @@ contains
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
     real(8) :: v, vsum, ti
@@ -1042,24 +1044,23 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      ch_two => ms%two%jpz(ch)
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+
       v = 0.d0
       !$omp parallel
       !$omp do private(a,b,ij,i,j,kl,k,l) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do ij = 1, n
-          i = ms%two%jpz(ch)%n2spi1(ij)
-          j = ms%two%jpz(ch)%n2spi2(ij)
-          if( ms%sps%orb(i)%ph /= 0 ) cycle
-          if( ms%sps%orb(j)%ph /= 0 ) cycle
-          do kl = 1, n
-            k = ms%two%jpz(ch)%n2spi1(kl)
-            l = ms%two%jpz(ch)%n2spi2(kl)
-            if( ms%sps%orb(k)%ph /= 0 ) cycle
-            if( ms%sps%orb(l)%ph /= 0 ) cycle
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do ij = 1, ch_two%n_hh_state
+          i = ch_two%n2spi1(ch_two%hhs(ij))
+          j = ch_two%n2spi2(ch_two%hhs(ij))
+          do kl = 1, ch_two%n_hh_state
+            k = ch_two%n2spi1(ch_two%hhs(kl))
+            l = ch_two%n2spi2(ch_two%hhs(kl))
+
             v = v + h%two%GetTwBME(a,b,i,j,J2) * &
                 & s%two%GetTwBME(i,j,k,l,J2) * &
                 & h%two%GetTwBME(k,l,a,b,J2) / &
@@ -1197,6 +1198,7 @@ contains
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
     real(8) :: v, vsum, ti
@@ -1208,24 +1210,22 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      ch_two => ms%two%jpz(ch)
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+
       v = 0.d0
       !$omp parallel
       !$omp do private(a,b,cd,c,d,ij,i,j) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do cd = 1, n
-          c = ms%two%jpz(ch)%n2spi1(cd)
-          d = ms%two%jpz(ch)%n2spi2(cd)
-          if( ms%sps%orb(c)%ph /= 1 ) cycle
-          if( ms%sps%orb(d)%ph /= 1 ) cycle
-          do ij = 1, n
-            i = ms%two%jpz(ch)%n2spi1(ij)
-            j = ms%two%jpz(ch)%n2spi2(ij)
-            if( ms%sps%orb(i)%ph /= 0 ) cycle
-            if( ms%sps%orb(j)%ph /= 0 ) cycle
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do cd = 1, ch_two%n_pp_state
+          c = ch_two%n2spi1(ch_two%pps(cd))
+          d = ch_two%n2spi2(ch_two%pps(cd))
+          do ij = 1, ch_two%n_hh_state
+            i = ch_two%n2spi1(ch_two%hhs(ij))
+            j = ch_two%n2spi2(ch_two%hhs(ij))
 
             v = v + s%two%GetTwBME(i,j,a,b,J2) * &
                 & h%two%GetTwBME(a,b,c,d,J2) * &
@@ -1260,6 +1260,7 @@ contains
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
     real(8) :: v, vsum, ti
@@ -1272,24 +1273,23 @@ contains
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      ch_two => ms%two%jpz(ch)
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+
       v = 0.d0
       !$omp parallel
       !$omp do private(a,b,ij,i,j,kl,k,l) reduction(+:v)
-      do ab = 1, n
-        a = ms%two%jpz(ch)%n2spi1(ab)
-        b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
-        do ij = 1, n
-          i = ms%two%jpz(ch)%n2spi1(ij)
-          j = ms%two%jpz(ch)%n2spi2(ij)
-          if( ms%sps%orb(i)%ph /= 0 ) cycle
-          if( ms%sps%orb(j)%ph /= 0 ) cycle
-          do kl = 1, n
-            k = ms%two%jpz(ch)%n2spi1(kl)
-            l = ms%two%jpz(ch)%n2spi2(kl)
-            if( ms%sps%orb(k)%ph /= 0 ) cycle
-            if( ms%sps%orb(l)%ph /= 0 ) cycle
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pps(ab))
+        b = ch_two%n2spi2(ch_two%pps(ab))
+        do ij = 1, ch_two%n_hh_state
+          i = ch_two%n2spi1(ch_two%hhs(ij))
+          j = ch_two%n2spi2(ch_two%hhs(ij))
+          do kl = 1, ch_two%n_hh_state
+            k = ch_two%n2spi1(ch_two%hhs(kl))
+            l = ch_two%n2spi2(ch_two%hhs(kl))
+
             v = v + h%two%GetTwBME(a,b,i,j,J2) * &
                 & s%two%GetTwBME(i,j,k,l,J2) * &
                 & h%two%GetTwBME(k,l,a,b,J2) / &

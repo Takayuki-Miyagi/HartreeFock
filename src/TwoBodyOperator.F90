@@ -718,7 +718,9 @@ contains
 
         j1 = one%jpz(chbra)%j
         j2 = one%jpz(chket)%j
-
+        !$omp parallel
+        !$omp do private(bra, i1, o1, l1, z1, e1, ket_max, ket, i2, o2, l2, z2, e2, vsum, &
+        !$omp &          ih, oh, jh, eh, fact, v, J_bra, J_ket, tfact)
         do bra = 1, bra_max
           i1 = one%jpz(chbra)%n2spi(bra)
           o1 => this%two%sps%GetOrbit(i1)
@@ -770,6 +772,8 @@ contains
                 & vsum / dble(j1+1)
           end do
         end do
+        !$omp end do
+        !$omp end parallel
 
       end do
     end do
