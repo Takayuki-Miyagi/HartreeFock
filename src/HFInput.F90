@@ -22,15 +22,15 @@ module HFInput
     integer :: e2max_nn
     integer :: lmax_nn
     ! three-body file
-    character(256) :: int_3n_file
+    character(:), allocatable :: int_3n_file
     character(256), allocatable :: files_3n(:)
     integer :: emax_3n
     integer :: e2max_3n
     integer :: e3max_3n
     integer :: lmax_3n
     ! output files
-    character(256) :: out_dir
-    character(256) :: summary_file
+    character(:), allocatable :: out_dir
+    character(:), allocatable :: summary_file
 
     !
     logical :: is_Op_out

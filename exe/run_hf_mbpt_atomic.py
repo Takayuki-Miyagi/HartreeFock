@@ -45,7 +45,7 @@ def main():
                     f.write(str(key)+'= '+str(value)+' \n')
             f.write("&end \n")
             f.close()
-            cmd = exe + ' ' + inputf + " conf_atom_input.txt"
+            cmd = exe + ' ' + inputf + " conf_atom_input.txt > log.out"
             subprocess.call(cmd,shell=True)
             f = "summary_"+file_nn
             cmd = "mv summary.out "+f

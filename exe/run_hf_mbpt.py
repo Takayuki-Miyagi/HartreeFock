@@ -61,7 +61,7 @@ def main():
                             f.write(str(key)+'= '+str(value)+' \n')
                     f.write("&end \n")
                     f.close()
-                    cmd = exe + ' ' + inputf
+                    cmd = exe + ' ' + inputf + " > log.out"
                     subprocess.call(cmd,shell=True)
 
 if(__name__ == '__main__'):

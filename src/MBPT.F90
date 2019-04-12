@@ -491,7 +491,7 @@ vsum = vsum + dble(2*J2+1) * v
     type(MSpace), pointer :: ms
     integer :: a, b, i, j, norbs, ch, J2, n, ab, ij
     type(SingleParticleOrbit), pointer :: oa, oi
-    real(8) :: max_denom1b, max_denom2b, max_val, max_v, lowest_particle, highest_hole
+    real(8) :: max_denom1b, max_denom2b, max_val, lowest_particle, highest_hole
 
     ms => h%ms
     norbs = ms%sps%norbs
@@ -523,11 +523,11 @@ vsum = vsum + dble(2*J2+1) * v
     end do
 
     max_denom2b = 0.d0
-    max_v = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
       n = ms%two%jpz(ch)%n_state
 
+      max_val = 0.d0
       !$omp parallel
       !$omp do private(ab, a, b, ij, i, j) reduction(max:max_val) schedule(dynamic)
       do ab = 1, n
@@ -547,14 +547,12 @@ vsum = vsum + dble(2*J2+1) * v
       end do
       !$omp end do
       !$omp end parallel
-      max_v = max(max_v, maxval(abs(h%two%MatCh(ch,ch)%m)))
       max_denom2b = max(max_denom2b, max_val)
     end do
 
     write(*,'(a,f12.6)') " max(h / |e_h1 - e_p1|)               = ", max_denom1b
     write(*,'(a,f12.6)') " max(v / |e_h1 + e_h2 - e_p1 - e_p2|) = ", max_denom2b
     write(*,'(a,f12.6)') " min( e_p ) - max( e_h ) = ", this%energy_gap
-    !write(*,'(a,f12.6)') " max(|v|) = ", max_v
     if(max(max_denom2b,max_denom1b) > 1.d0 .or. this%energy_gap < 0.d0) then
       write(*,'(a)') "Warning: MBPT might be dengerous!"
     end if
