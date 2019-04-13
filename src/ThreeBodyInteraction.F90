@@ -41,6 +41,7 @@ module ThreeBodyInteraction
   type :: ThreeBodyForce
     type(ThreeBodyForceChannel), allocatable :: MatCh(:,:)
     type(NonOrthIsospinThreeBodySpace), pointer :: thr
+    real(8), allocatable :: Cgs(:,:,:,:,:,:)
     logical :: Scalar
   contains
     procedure :: InitThreeBodyForce
@@ -85,9 +86,11 @@ module ThreeBodyInteraction
 
 contains
   subroutine InitThreeBodyForce(this, thr)
+    use MyLibrary, only: triag, dcg
     class(ThreeBodyForce), intent(inout) :: this
     type(NonOrthIsospinThreeBodySpace), target, intent(in) :: thr
     integer :: ch, n_state
+    integer :: t1, t2, t3, z1, z2, z3
     ! so far only scalar
     this%Scalar = .true.
     this%thr => thr
@@ -102,6 +105,25 @@ contains
       this%MatCh(ch,ch)%v(:,:) = 0.d0
 #endif
     end do
+
+    allocate(this%CGs(0:3,-3:3, 0:3, -3:3, 0:3, -3:3))
+    this%CGs(:,:,:,:,:,:) = 0.d0
+
+    do t1 = 0,3
+      do t2 = 0,3
+        do t3 = 0,3
+          do z1 = -t1, t1
+            do z2 = -t2, t2
+              do z3 = -t3, t3
+                if(z1+z2 /= z3) cycle
+                if(triag(t1,t2,t3)) cycle
+                this%CGs(t1,z1,t2,z2,t3,z3) = dcg(t1,z1,t2,z2,t3,z3)
+              end do
+            end do
+          end do
+        end do
+      end do
+    end do
   end subroutine InitThreeBodyForce
 
   subroutine FinThreeBodyForce(this)
@@ -111,6 +133,7 @@ contains
       deallocate(this%MatCh(ch,ch)%v)
     end do
     deallocate(this%MatCh)
+    deallocate(this%CGs)
     this%thr => null()
   end subroutine FinThreeBodyForce
 
@@ -213,8 +236,8 @@ contains
           r = r + &
               & this%GetThBME(a,b,c,J12,T12,&
               & d,e,f,J45,T45,J,T) * &
-              & dcg(1,z1,1,z2,2*T12,z1+z2) * dcg(2*T12,z1+z2,1,z3,T,Z) * &
-              & dcg(1,z4,1,z5,2*T45,z4+z5) * dcg(2*T45,z4+z5,1,z6,T,Z)
+              & this%CGs(1,z1,1,z2,2*T12,z1+z2) * this%CGs(2*T12,z1+z2,1,z3,T,Z) * &
+              & this%CGs(1,z4,1,z5,2*T45,z4+z5) * this%CGs(2*T45,z4+z5,1,z6,T,Z)
         end do
       end do
     end do
