@@ -188,8 +188,7 @@ contains
     end do
   end function ScaleThreeBodyForce
 
-  function GetThBME_pn(this,i1,i2,i3,J12,&
-        & i4,i5,i6,J45,J) result(r)
+  function GetThBME_pn(this,i1,i2,i3,J12,i4,i5,i6,J45,J) result(r)
     use MyLibrary, only: dcg
     class(ThreeBodyForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
@@ -234,8 +233,7 @@ contains
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
           r = r + &
-              & this%GetThBME(a,b,c,J12,T12,&
-              & d,e,f,J45,T45,J,T) * &
+              & this%GetThBME(a,b,c,J12,T12,d,e,f,J45,T45,J,T) * &
               & this%CGs(1,z1,1,z2,2*T12,z1+z2) * this%CGs(2*T12,z1+z2,1,z3,T,Z) * &
               & this%CGs(1,z4,1,z5,2*T45,z4+z5) * this%CGs(2*T45,z4+z5,1,z6,T,Z)
         end do
@@ -244,8 +242,7 @@ contains
     !call timer%add("GetThBME_pn", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBME_pn
 
-  function GetThBME_Isospin(this,i1,i2,i3,J12,T12,&
-        & i4,i5,i6,J45,T45,J,T) result(r)
+  function GetThBME_Isospin(this,i1,i2,i3,J12,T12,i4,i5,i6,J45,T45,J,T) result(r)
     class(ThreeBodyForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,T12,J45,T45,J,T
@@ -294,10 +291,11 @@ contains
       bra = bra_ch%idx2num(ibra)
       do iket = 1, ket_ch%n
         ket = ket_ch%idx2num(iket)
-        r = r + dble(this%MatCh(ch,ch)%v(bra,ket) * &
-            & bra_ch%TrnsCoef(ibra) * ket_ch%TrnsCoef(iket))
+        r = r + this%MatCh(ch,ch)%v(bra,ket) * &
+            & bra_ch%TrnsCoef(ibra) * ket_ch%TrnsCoef(iket)
       end do
     end do
+    r = dble(r)
     !call timer%add("GetThBME_isospin", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBME_Isospin
 
@@ -935,148 +933,6 @@ contains
       end do
     end do
   end subroutine store_scalar_3bme
-
-  subroutine store_scalar_3bme_sp(thr,v,spsf,e2max,e3max)
-    type(ThreeBodyForce), intent(inout) :: thr
-    type(OrbitsIsospin), intent(in) :: spsf
-#ifdef single_precision_three_body_file
-    real(4), intent(in) :: v(:)
-#else
-    real(8), intent(in) :: v(:)
-#endif
-    integer, intent(in) :: e2max, e3max
-    type(NonOrthIsospinThreeBodySpace), pointer :: ms
-    type(OrbitsIsospin), pointer :: sps
-    integer(8) :: cnt
-    integer :: i1, l1, j1, e1
-    integer :: i2, l2, j2, e2
-    integer :: i3, l3, j3, e3
-    integer :: i4, l4, j4, e4
-    integer :: i5, l5, j5, e5, i5max
-    integer :: i6, l6, j6, e6, i6max
-    integer :: J12, T12, J45, T45, J, T, P123, P456
-    integer :: ch, idxb, idxk, bra, ket
-
-    ms => thr%thr
-    sps => ms%isps
-    cnt = 0
-    do i1 = 1, spsf%norbs
-      l1 = spsf%orb(i1)%l
-      j1 = spsf%orb(i1)%j
-      e1 = spsf%orb(i1)%e
-      do i2 = 1, i1
-        l2 = spsf%orb(i2)%l
-        j2 = spsf%orb(i2)%j
-        e2 = spsf%orb(i2)%e
-        if(e1 + e2 > e2max) cycle
-        do i3 = 1, i2
-          l3 = spsf%orb(i3)%l
-          j3 = spsf%orb(i3)%j
-          e3 = spsf%orb(i3)%e
-          if(e1 + e3 > e2max) cycle
-          if(e2 + e3 > e2max) cycle
-          if(e1 + e2 + e3 > e3max) cycle
-
-          P123 = (-1) ** (l1+l2+l3)
-
-          do i4 = 1, i1
-            l4 = spsf%orb(i4)%l
-            j4 = spsf%orb(i4)%j
-            e4 = spsf%orb(i4)%e
-
-            i5max = i4
-            if(i1 == i4) i5max = i2
-
-            do i5 = 1, i5max
-              l5 = spsf%orb(i5)%l
-              j5 = spsf%orb(i5)%j
-              e5 = spsf%orb(i5)%e
-              if(e4 + e5 > e2max) cycle
-
-              i6max = i5
-              if(i1 == i4 .and. i2 == i5) i6max = i3
-
-              do i6 = 1, i6max
-                l6 = spsf%orb(i6)%l
-                j6 = spsf%orb(i6)%j
-                e6 = spsf%orb(i6)%e
-                if(e4 + e6 > e2max) cycle
-                if(e5 + e6 > e2max) cycle
-                if(e4 + e5 + e6 > e3max) cycle
-
-                P456 = (-1) ** (l4+l5+l6)
-
-                if(P123 /= P456) cycle
-                do J12 = abs(j1-j2)/2, (j1+j2)/2
-                  do J45 = abs(j4-j5)/2, (j4+j5)/2
-                    do J = max(abs(2*J12-j3),abs(2*J45-j6)),&
-                          &min(   (2*J12+j3),   (2*J45+j6)), 2
-
-                      do T12 = 0, 1
-                        do T45 = 0, 1
-                          do T = max(abs(2*T12-1),abs(2*T45-1)),&
-                                &min(   (2*T12+1),   (2*T45+1)), 2
-                            cnt = cnt + 1
-
-                            if(e1 > ms%emax) cycle
-                            if(e2 > ms%emax) cycle
-                            if(e3 > ms%emax) cycle
-
-                            if(e4 > ms%emax) cycle
-                            if(e5 > ms%emax) cycle
-                            if(e6 > ms%emax) cycle
-
-                            if(e1 + e2 > ms%e2max) cycle
-                            if(e2 + e3 > ms%e2max) cycle
-                            if(e3 + e1 > ms%e2max) cycle
-
-                            if(e4 + e5 > ms%e2max) cycle
-                            if(e5 + e6 > ms%e2max) cycle
-                            if(e6 + e4 > ms%e2max) cycle
-
-                            if(e1 + e2 + e3 > ms%e3max) cycle
-                            if(e4 + e5 + e6 > ms%e3max) cycle
-
-                            if(i1==i2 .and. mod(J12+T12,2)==0) then
-                              if(abs(v(cnt)) > 1.d-6) then
-                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
-                              end if
-                              cycle
-                            end if
-
-                            if(i4==i5 .and. mod(J45+T45,2)==0) then
-                              if(abs(v(cnt)) > 1.d-6) then
-                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
-                              end if
-                              cycle
-                            end if
-                            ch = ms%jpt2ch(J,P123,T)
-                            idxb = ms%jpt(ch)%spis2idx(i1,i2,i3)
-                            idxk = ms%jpt(ch)%spis2idx(i4,i5,i6)
-                            if(idxb*idxk == 0) cycle
-                            bra = ms%jpt(ch)%idxqn(idxb)%JT2n(J12,T12)
-                            ket = ms%jpt(ch)%idxqn(idxk)%JT2n(J45,T45)
-                            if(bra*ket == 0) cycle
-                            thr%MatCh(ch,ch)%v(bra,ket) = v(cnt)
-                            thr%MatCh(ch,ch)%v(ket,bra) = v(cnt)
-                          end do
-
-                        end do
-                      end do
-                    end do
-                  end do
-                end do
-
-
-              end do
-            end do
-          end do
-
-
-        end do
-      end do
-    end do
-  end subroutine store_scalar_3bme_sp
 
   !
   !

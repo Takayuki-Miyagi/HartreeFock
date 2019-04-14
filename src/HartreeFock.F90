@@ -1051,34 +1051,35 @@ contains
   function GetIndex2(i1,i2,i3,i4) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4
     integer(8) :: r
-    r = i1 + lshift(i2,10) + lshift(i3,20) + lshift(i4,30)
+    !r = i1 + lshift(i2,10) + lshift(i3,20) + lshift(i4,30)
+    r = i1 + shiftl(i2,10) + shiftl(i3,20) + shiftl(i4,30)
   end function GetIndex2
 
   subroutine GetSpLabels2(idx,i1,i2,i3,i4)
     integer(8), intent(in)  :: idx
     integer(8), intent(out) :: i1, i2, i3, i4
-    i1 = mod(idx,1024)
-    i2 = mod(rshift(idx,10),1024)
-    i3 = mod(rshift(idx,20),1024)
-    i4 = mod(rshift(idx,30),1024)
+    i1 = mod(idx, int(1024,kind=8))
+    i2 = mod(shiftr(idx,10), int(1024,kind=8))
+    i3 = mod(shiftr(idx,20), int(1024,kind=8))
+    i4 = mod(shiftr(idx,30), int(1024,kind=8))
   end subroutine GetSpLabels2
 
   function GetIndex3(i1,i2,i3,i4,i5,i6) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4, i5, i6
     integer(8) :: r
-    r = i1 + lshift(i2,10) + lshift(i3,20) + lshift(i4,30) + &
-        &    lshift(i5,40) + lshift(i6,50)
+    r = i1 + shiftl(i2,10) + shiftl(i3,20) + shiftl(i4,30) + &
+        &    shiftl(i5,40) + shiftl(i6,50)
   end function GetIndex3
 
   subroutine GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)
     integer(8), intent(in)  :: idx
     integer(8), intent(out) :: i1, i2, i3, i4, i5, i6
-    i1 = mod(idx,1024)
-    i2 = mod(rshift(idx,10),1024)
-    i3 = mod(rshift(idx,20),1024)
-    i4 = mod(rshift(idx,30),1024)
-    i5 = mod(rshift(idx,40),1024)
-    i6 = mod(rshift(idx,50),1024)
+    i1 = mod(idx, int(1024,kind=8))
+    i2 = mod(shiftr(idx,10), int(1024,kind=8))
+    i3 = mod(shiftr(idx,20), int(1024,kind=8))
+    i4 = mod(shiftr(idx,30), int(1024,kind=8))
+    i5 = mod(shiftr(idx,40), int(1024,kind=8))
+    i6 = mod(shiftr(idx,50), int(1024,kind=8))
   end subroutine GetSpLabels3
 end module HartreeFock
 

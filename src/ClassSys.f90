@@ -92,9 +92,8 @@ contains
     character(*), intent(in) :: dir
     character(Lenc) :: comm
     integer :: is, ie, idxdir
-    integer :: lnblnk
 
-    idxdir = lnblnk(dir)
+    idxdir = len_trim(dir)
     is = 1; ie = is + len('if [ ! -d ')
     write(comm(is:ie), '(a)') 'if [ ! -d '
     is = ie + 1; ie = is + idxdir
@@ -111,7 +110,7 @@ contains
     is = ie + 1; ie = is + 4
     write(comm(is:ie), '(a)') '); fi'
     !write(*,'(a)') comm(1:ie)
-    call system(comm(1:ie))
+    call execute_command_line(comm(1:ie))
   end subroutine mkdir
 
   function i2str(this, i)

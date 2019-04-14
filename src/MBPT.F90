@@ -2,6 +2,7 @@ module MBPT
   use omp_lib
   use ModelSpace
   use Operators
+  use StoreCouplings
   implicit none
 
   public :: MBPTEnergy, MBPTScalar
@@ -79,11 +80,13 @@ module MBPT
     procedure :: scalar_second_v2hh
     procedure :: scalar_second_v2ph
   end type MBPTScalar
+  type(SixJsStore), private :: sixjs
 contains
 
   subroutine CalcEnergyCorr(this,hamil)
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: hamil
+    integer :: jmax
 
     write(*,*)
     write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
@@ -95,6 +98,8 @@ contains
       return
     end if
 
+    jmax = 2*hamil%ms%sps%lmax+1
+    call sixjs%init(1,jmax,.true., 1,jmax,.true., 1,jmax,.true.)
     call this%MBPTCriteria(hamil)
 
     this%e_0 = hamil%zero
@@ -105,6 +110,7 @@ contains
     write(*,'(a,4f16.8)') "Third order corrections pp, hh, ph, and total: ", &
         & this%e_3_pp, this%e_3_hh, this%e_3_ph, this%e_3
     write(*,'(a,f16.8)') "Third order MBPT energy: ", this%e_0 + this%e_2 + this%e_3
+    call sixjs%fin()
 
   end subroutine CalcEnergyCorr
 
@@ -476,8 +482,11 @@ vsum = vsum + dble(2*J2+1) * v
     do J2 = max( abs(ji-jj),abs(ja-jb) )/2, min( (ji+jj),(ja+jb) )/2
       if(i==j .and. mod(J2,2)==1) cycle
       if(a==b .and. mod(J2,2)==1) cycle
+      !r = r + dble(2*J2+1) * &
+      !    & sjs(ji, jj, 2*J2, ja, jb, 2*L) * &
+      !    & v%GetTwBME(i,j,a,b,J2)
       r = r + dble(2*J2+1) * &
-          & sjs(ji, jj, 2*J2, ja, jb, 2*L) * &
+          & sixjs%get(ji,jj,2*J2,ja,jb,2*L) * &
           & v%GetTwBME(i,j,a,b,J2)
     end do
   end function cross_couple
@@ -565,6 +574,7 @@ vsum = vsum + dble(2*J2+1) * v
     type(Ops), intent(in) :: hamil, opr
     logical, intent(in) :: is_MBPT_full
     type(MSpace), pointer :: ms
+    integer :: jmax
     write(*,*)
     write(*,'(a)') " Many-body perturbation calculation up to 2nd order (scalar)"
     write(*,*)
@@ -580,6 +590,9 @@ vsum = vsum + dble(2*J2+1) * v
       write(*,"(a)") " Operator has to be normal ordered"
       return
     end if
+
+    jmax = 2*hamil%ms%sps%lmax+1
+    call sixjs%init(1,jmax,.true., 1,jmax,.true., 1,jmax,.true.)
 
     ms => hamil%ms
     this%s_0 = opr%zero
@@ -603,6 +616,7 @@ vsum = vsum + dble(2*J2+1) * v
     end if
     write(*,'(a,f16.8)') "Total        = ", this%s_2
 
+    call sixjs%fin()
   end subroutine CalcScalarCorr
 
   subroutine scalar_first(this,h,s)

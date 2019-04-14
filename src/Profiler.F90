@@ -39,7 +39,7 @@ contains
     character(512) :: os_str
     integer :: io
 
-    call system( 'uname > ' // trim(this%tempfile) )
+    call execute_command_line( 'uname > ' // trim(this%tempfile) )
     open(999,file=this%tempfile,iostat=io)
     if(io /= 0) then
       write(*,*) "Error opening file in InitProf"
@@ -51,7 +51,7 @@ contains
       stop
     end if
     close(999)
-    call system( 'rm ' // trim(this%tempfile) )
+    call execute_command_line( 'rm ' // trim(this%tempfile) )
 
     select case(os_str)
     case("Linux", "linux")
@@ -146,7 +146,7 @@ contains
     write(c_num,'(i0)') getpid()
     fn_proc = '/proc/' // trim(c_num) // '/status'
     cmd = 'cat ' // trim(fn_proc) // ' | grep VmRSS > ' // trim(this%tempfile)
-    call system( trim(cmd) )
+    call execute_command_line( trim(cmd) )
     open(999,file=this%tempfile,iostat=io)
     if(io /= 0) then
       write(*,*) "File opening error in CurrentMemory"
@@ -173,7 +173,7 @@ contains
     end if
     close(999)
     cmd = 'rm ' // trim(this%tempfile)
-    call system( trim(cmd) )
+    call execute_command_line( trim(cmd) )
 
 
     if(.not. present(msg) ) return
