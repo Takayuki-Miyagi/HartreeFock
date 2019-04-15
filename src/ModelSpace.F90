@@ -1,8 +1,7 @@
 ! Define one-, two-, and three-body model space.
 ! The three-body space used in Hartree-Fock calculation is not orthonormalized
 ! Note that the orthonormalized three-body space is also defined
-! with the coefficient of fractional parentage, which will not be used
-! in Hartree-Fock calculation.
+! with the coefficient of fractional parentage, which will not be used in Hartree-Fock calculation.
 ! However, this definition may be useful for beyond Hartree-Fock calculation methods.
 !
 module ModelSpace

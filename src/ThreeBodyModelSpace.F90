@@ -42,7 +42,7 @@ module ThreeBodyModelSpace
     integer, allocatable :: n2spi2(:) ! permutations
     integer, allocatable :: n2spi3(:) ! permutations
     integer, allocatable :: n2J12(:)  ! Jab
-    real(8), allocatable :: cfp(:,:)  ! (orth|non-orth)
+    real(8), allocatable :: cfp(:,:)  ! (non-orth|orth)
   contains
     procedure :: init => InitAdditionalQN
     procedure :: fin => FinAdditionalQN
@@ -54,9 +54,9 @@ module ThreeBodyModelSpace
     integer :: p = 0
     integer :: z = 100
     integer :: n_state = 0
-    integer :: n_hhp_state = 0 ! hole-hole-particle     (not relevant)
-    integer :: n_hpv_state = 0 ! hole-particle-valence  (not relevant)
-    integer :: n_hpp_state = 0 ! hole-particle-particle (not relevant)
+    integer :: n_hhp_state = 0 ! hole-hole-particle     (not relevant for decoupling)
+    integer :: n_hpv_state = 0 ! hole-particle-valence  (not relevant for decoupling)
+    integer :: n_hpp_state = 0 ! hole-particle-particle (not relevant for decoupling)
     integer :: n_hhh_state = 0 ! hole-hole-hole
     integer :: n_hhv_state = 0 ! hole-hole-valence
     integer :: n_hvv_state = 0 ! hole-valence-valence

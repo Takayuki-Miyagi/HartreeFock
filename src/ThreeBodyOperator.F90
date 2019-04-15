@@ -448,12 +448,12 @@ contains
     do bra = 1, ch_bra%n_idx
       qbra => ch_bra%idx(bra)
       call cfp_bra%ini(qbra%north,qbra%nphys)
-      cfp_bra%m = qbra%cfp
+      cfp_bra%m = transpose(qbra%cfp)
       do ket = 1, ch_ket%n_idx
         qket => ch_ket%idx(ket)
 
         call cfp_ket%ini(qket%nphys,qket%north)
-        cfp_ket%m = transpose(qket%cfp)
+        cfp_ket%m = qket%cfp
 
         call vin%zeros(qbra%nphys,qket%nphys)
 
@@ -515,12 +515,12 @@ contains
     do bra = 1, ch_bra%n_idx
       qbra => ch_bra%idx(bra)
       call cfp_bra%ini(qbra%north,qbra%nphys)
-      cfp_bra%m = qbra%cfp
+      cfp_bra%m = transpose(qbra%cfp)
       do ket = 1, ch_ket%n_idx
         qket => ch_ket%idx(ket)
 
         call cfp_ket%ini(qket%nphys,qket%north)
-        cfp_ket%m = transpose(qket%cfp)
+        cfp_ket%m = qket%cfp
 
         call vin%zeros(qbra%nphys,qket%nphys)
 
@@ -586,12 +586,12 @@ contains
     do bra = 1, ch_bra%n_idx
       qbra => ch_bra%idx(bra)
       call cfp_bra%ini(qbra%north,qbra%nphys)
-      cfp_bra%m = qbra%cfp
+      cfp_bra%m = transpose(qbra%cfp)
       do ket = 1, ch_ket%n_idx
         qket => ch_ket%idx(ket)
 
         call cfp_ket%ini(qket%nphys,qket%north)
-        cfp_ket%m = transpose(qket%cfp)
+        cfp_ket%m = qket%cfp
 
         call vin%zeros(qbra%nphys,qket%nphys)
 
