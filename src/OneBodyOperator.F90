@@ -332,6 +332,7 @@ contains
     real(8) :: zero
     integer :: ch, n, i, j
     zero = 0.d0
+    if(.not. this%Scalar) return
     sps => this%one%sps
     do ch = 1, this%one%NChan
       j = this%one%jpz(ch)%j

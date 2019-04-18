@@ -643,14 +643,23 @@ contains
   end subroutine SetTwoBodyPartFromOneBody
 
   subroutine SetTwoBodyPartChannelFromOneBody(two, one)
+    class(TwoBodyPartChannel), intent(inout) :: two
+    type(OneBodyPart), intent(in) :: one
+    if(one%Scalar) call SetTwoBodyPartChannelFromOneBodyScalar(two, one)
+    if(.not. one%Scalar) call SetTwoBodyPartChannelFromOneBodyTensor(two, one)
+  end subroutine SetTwoBodyPartChannelFromOneBody
+
+  subroutine SetTwoBodyPartChannelFromOneBodyScalar(two, one)
     use MyLibrary, only: sjs
+    use Profiler, only: timer
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
     class(TwoBodyChannel), pointer :: ch_bra, ch_ket
     integer :: bra, ket, a, b, c, d, jbra, jket
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-    real(8) :: norm, me
+    real(8) :: norm, me, ti
 
+    ti = omp_get_wtime()
     ch_bra => two%ch_bra
     ch_ket => two%ch_ket
 
@@ -672,112 +681,222 @@ contains
         if(a == b) norm = norm / dsqrt(2.d0)
         if(c == d) norm = norm / dsqrt(2.d0)
         me = 0.d0
-        if(one%Scalar) then
-          if(a == c) me = me + one%GetOBME(b,d)
-          if(a == d) me = me - one%GetOBME(b,c) * (-1.d0)**((oa%j+ob%j)/2-jbra)
-          if(b == c) me = me - one%GetOBME(a,d) * (-1.d0)**((oa%j+ob%j)/2-jbra)
-          if(b == d) me = me + one%GetOBME(a,c)
-        else
-          ! tensor case not tested
-          if(a == c) me = me + one%GetOBME(b,d) * &
-              & (-1.d0)**((oc%j+od%j)/2-jbra) * sjs(2*jbra,2*jket,2*one%jr,od%j,ob%j,oa%j)
-          if(a == d) me = me - one%GetOBME(b,c) * &
-              & (-1.d0)**(         jket-jbra) * sjs(2*jbra,2*jket,2*one%jr,od%j,ob%j,oa%j)
-          if(b == c) me = me - one%GetOBME(a,d) * &
-              & (-1.d0)**(oa%j+ob%j+oc%j+od%j)/2 * sjs(2*jbra,2*jket,2*one%jr,od%j,oa%j,ob%j)
-          if(b == d) me = me + one%GetOBME(a,c) * &
-              & (-1.d0)**((oa%j+ob%j)/2+jket) * sjs(2*jbra,2*jket,2*one%jr,oc%j,oa%j,ob%j)
-        end if
-        me = me * norm * dsqrt(dble(2*jbra+1) * dble(2*jket+1)) * (-1.d0)**(one%jr)
+        if(a == c) me = me + one%GetOBME(b,d)
+        if(a == d) me = me - one%GetOBME(b,c) * (-1.d0)**((oa%j+ob%j)/2-jbra)
+        if(b == c) me = me - one%GetOBME(a,d) * (-1.d0)**((oa%j+ob%j)/2-jbra)
+        if(b == d) me = me + one%GetOBME(a,c)
+        me = me * norm
+        two%m(bra,ket) = me
       end do
     end do
     !$omp end do
     !$omp end parallel
-  end subroutine SetTwoBodyPartChannelFromOneBody
+    call timer%Add("SetTwoBodyPartChannelFromOneBodyScalar", omp_get_wtime()-ti)
+  end subroutine SetTwoBodyPartChannelFromOneBodyScalar
+
+  subroutine SetTwoBodyPartChannelFromOneBodyTensor(two, one)
+    use MyLibrary, only: sjs
+    use Profiler, only: timer
+    class(TwoBodyPartChannel), intent(inout) :: two
+    type(OneBodyPart), intent(in) :: one
+    class(TwoBodyChannel), pointer :: ch_bra, ch_ket
+    integer :: bra, ket, a, b, c, d, jbra, jket
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+    real(8) :: norm, me, ti
+
+    ti = omp_get_wtime()
+    ch_bra => two%ch_bra
+    ch_ket => two%ch_ket
+
+    !$omp parallel
+    !$omp do private(bra, jbra, a, b, oa, ob, ket, jket, c, d, oc, od, norm, me)
+    do bra = 1, ch_bra%n_state
+      jbra = ch_bra%j
+      a = ch_bra%n2spi1(bra)
+      b = ch_bra%n2spi2(bra)
+      oa => one%one%sps%GetOrbit(a)
+      ob => one%one%sps%GetOrbit(b)
+      do ket = 1, ch_ket%n_state
+        jket = ch_ket%j
+        c = ch_bra%n2spi1(ket)
+        d = ch_bra%n2spi2(ket)
+        oc => one%one%sps%GetOrbit(c)
+        od => one%one%sps%GetOrbit(d)
+        norm = 1.d0
+        if(a == b) norm = norm / dsqrt(2.d0)
+        if(c == d) norm = norm / dsqrt(2.d0)
+        me = 0.d0
+        ! tensor case not tested
+        if(a == c) me = me + one%GetOBME(b,d) * &
+            & (-1.d0)**((oc%j+od%j)/2-jbra) * sjs(2*jbra,2*jket,2*one%jr,od%j,ob%j,oa%j)
+        if(a == d) me = me - one%GetOBME(b,c) * &
+            & (-1.d0)**(         jket-jbra) * sjs(2*jbra,2*jket,2*one%jr,od%j,ob%j,oa%j)
+        if(b == c) me = me - one%GetOBME(a,d) * &
+            & (-1.d0)**(oa%j+ob%j+oc%j+od%j)/2 * sjs(2*jbra,2*jket,2*one%jr,od%j,oa%j,ob%j)
+        if(b == d) me = me + one%GetOBME(a,c) * &
+            & (-1.d0)**((oa%j+ob%j)/2+jket) * sjs(2*jbra,2*jket,2*one%jr,oc%j,oa%j,ob%j)
+        me = me * norm * dsqrt(dble(2*jbra+1) * dble(2*jket+1)) * (-1.d0)**(one%jr)
+        two%m(bra,ket) = me
+      end do
+    end do
+    !$omp end do
+    !$omp end parallel
+    call timer%Add("SetTwoBodyPartChannelFromOneBodyTensor", omp_get_wtime()-ti)
+  end subroutine SetTwoBodyPartChannelFromOneBodyTensor
 
   function NormalOrderingFrom2To1(this, one) result(r)
     use MyLibrary, only: sjs, triag
     class(TwoBodyPart), intent(in) :: this
     type(OneBodySpace), intent(in) :: one
     type(OneBodyPart) :: r
+
+    if(this%Scalar) r = ScalarNormalOrderingFrom2To1(this, one)
+    if(.not. this%Scalar) r = TensorNormalOrderingFrom2To1(this, one)
+  end function NormalOrderingFrom2To1
+
+  function ScalarNormalOrderingFrom2To1(this, one) result(r)
+    use MyLibrary, only: sjs, triag
+    use Profiler, only: timer
+    type(TwoBodyPart), intent(in) :: this
+    type(OneBodySpace), intent(in) :: one
+    type(OneBodyPart) :: r
+    integer :: bra, ket, ih, J, ch, ibra, iket
     type(SingleParticleOrbit), pointer :: o1, o2, oh
-    integer :: i1, i2, ih, j1, j2, l1, l2, z1, z2, e1, e2
-    integer :: jh, eh, J_bra, J_ket
-    integer :: chbra, chket, bra, ket, bra_max, ket_max
-    real(8) :: vsum, v, fact, tfact
+    real(8) :: vsum, fact, v, ti
 
     call r%init(one,this%Scalar,this%oprtr,this%jr,this%pr,this%zr)
 
-    do chbra = 1, one%NChan
-      do chket = 1, chbra
-        if( .not. r%MatCh(chbra,chket)%is) cycle
+    ti = omp_get_wtime()
+    !$omp parallel
+    !$omp do private(bra, o1, ket, o2, vsum, ih, oh, fact, v, &
+    !$omp &          J, ch, ibra, iket)
+    do bra = 1, one%sps%norbs
+      o1 => one%sps%GetOrbit(bra)
+      do ket = 1, bra
+        o2 => one%sps%GetOrbit(ket)
 
-
-        bra_max = one%jpz(chbra)%n_state
-        ket_max = one%jpz(chket)%n_state
-
-        j1 = one%jpz(chbra)%j
-        j2 = one%jpz(chket)%j
-        !$omp parallel
-        !$omp do private(bra, i1, o1, l1, z1, e1, ket_max, ket, i2, o2, l2, z2, e2, vsum, &
-        !$omp &          ih, oh, jh, eh, fact, v, J_bra, J_ket, tfact)
-        do bra = 1, bra_max
-          i1 = one%jpz(chbra)%n2spi(bra)
-          o1 => this%two%sps%GetOrbit(i1)
-          l1 = o1%l
-          z1 = o1%z
-          e1 = o1%e
-          if(chbra == chket) ket_max = bra
-          do ket = 1, ket_max
-            i2 = one%jpz(chket)%n2spi(ket)
-            o2 => this%two%sps%GetOrbit(i2)
-            l2 = o2%l
-            z2 = o2%z
-            e2 = o2%e
-
-            vsum = 0.d0
-            do ih = 1, this%two%sps%norbs
-              oh => this%two%sps%GetOrbit(ih)
-              if(oh%occ < 1.d-6) cycle
-              jh = oh%j
-              eh = oh%e
-              if(e1 + eh > this%two%e2max) cycle
-              if(e2 + eh > this%two%e2max) cycle
-              fact = 1.d0
-              if(i1==ih) fact = fact * dsqrt(2.d0)
-              if(i2==ih) fact = fact * dsqrt(2.d0)
-
-              v = 0.d0
-              do J_bra = abs(j1-jh)/2, (j1+jh)/2
-                if(i1 == ih .and. mod(J_bra,2)==1) cycle
-                do J_ket = abs(j2-jh)/2, (j2+jh)/2
-                  if(i2 == ih .and. mod(J_bra,2)==1) cycle
-
-                  if(triag(J_bra,J_ket,this%jr)) cycle
-                  tfact = sqrt(dble( (2*J_bra+1) * (2*J_ket+1) ) )
-                  if(.not. this%Scalar) then
-                    tfact = sqrt(dble( (2*J_bra+1) * (2*J_ket+1) ) ) * &
-                        (-1.d0) ** ((j1+jh)/2+J_ket+this%jr) * &
-                        & sjs(j1,2*J_bra,jh,2*J_ket,j2,2*this%jr)
-                  end if
-                  v = v + tfact * &
-                      & this%GetTwBME(i1,ih,i2,ih,J_bra,J_ket) * &
-                      & oh%occ
-                end do
-              end do
-              vsum = vsum + v * fact
-            end do
-            r%MatCh(chbra,chket)%m(bra,ket) = vsum
-            if(this%Scalar) r%MatCh(chbra,chket)%m(bra,ket) = &
-                & vsum / dble(j1+1)
+        if(o1%z /= o2%z) cycle
+        if(o1%l /= o2%l) cycle
+        if(o1%j /= o2%j) cycle
+        vsum = 0.d0
+        do ih = 1, one%sps%norbs
+          oh => one%sps%GetOrbit(ih)
+          if(oh%occ < 1.d-8) cycle
+          if(o1%e + oh%e > this%two%e2max) cycle
+          if(o1%e + oh%e > this%two%e2max) cycle
+          fact = 1.d0
+          if(bra==ih) fact = fact * dsqrt(2.d0)
+          if(ket==ih) fact = fact * dsqrt(2.d0)
+          v = 0.d0
+          do J = abs(o1%j-oh%j)/2, (o1%j+oh%j)/2
+            if(bra == ih .and. mod(J,2)==1) cycle
+            if(ket == ih .and. mod(J,2)==1) cycle
+            v = v + dble(2*J+1) * &
+                & this%GetTwBME(bra,ih,ket,ih,J) * &
+                & oh%occ
           end do
+          vsum = vsum + v * fact
         end do
-        !$omp end do
-        !$omp end parallel
-
+        ch = one%jpz2ch(o1%j, (-1)**o1%l, o1%z)
+        ibra = one%jpz(ch)%spi2n(bra)
+        iket = one%jpz(ch)%spi2n(ket)
+        r%MatCh(ch,ch)%m(ibra,iket) = vsum / dble(o1%j+1)
+        r%MatCh(ch,ch)%m(iket,ibra) = vsum / dble(o1%j+1)
       end do
     end do
-  end function NormalOrderingFrom2To1
+    !$omp end do
+    !$omp end parallel
+    call timer%Add("ScalarOrderingFrom2To1", omp_get_wtime()-ti)
+  end function ScalarNormalOrderingFrom2To1
+
+  function TensorNormalOrderingFrom2To1(this, one) result(r)
+    use MyLibrary, only: sjs, triag
+    use Profiler, only: timer
+    type(TwoBodyPart), intent(in) :: this
+    type(OneBodySpace), intent(in) :: one
+    type(OneBodyPart) :: r
+    !type(SingleParticleOrbit), pointer :: o1, o2, oh
+    !integer :: i1, i2, ih, j1, j2, l1, l2, z1, z2, e1, e2
+    !integer :: jh, eh, J_bra, J_ket
+    !integer :: chbra, chket, bra, ket, bra_max, ket_max
+    !real(8) :: vsum, v, fact, tfact
+    !real(8) :: ti
+
+    call r%init(one,this%Scalar,this%oprtr,this%jr,this%pr,this%zr)
+    return
+    !ti = omp_get_wtime()
+    !do chbra = 1, one%NChan
+    !  do chket = 1, chbra
+    !    if( .not. r%MatCh(chbra,chket)%is) cycle
+
+
+    !    bra_max = one%jpz(chbra)%n_state
+    !    ket_max = one%jpz(chket)%n_state
+
+    !    j1 = one%jpz(chbra)%j
+    !    j2 = one%jpz(chket)%j
+    !    !$omp parallel
+    !    !$omp do private(bra, i1, o1, l1, z1, e1, ket_max, ket, i2, o2, l2, z2, e2, vsum, &
+    !    !$omp &          ih, oh, jh, eh, fact, v, J_bra, J_ket, tfact)
+    !    do bra = 1, bra_max
+    !      i1 = one%jpz(chbra)%n2spi(bra)
+    !      o1 => this%two%sps%GetOrbit(i1)
+    !      l1 = o1%l
+    !      z1 = o1%z
+    !      e1 = o1%e
+    !      if(chbra == chket) ket_max = bra
+    !      do ket = 1, ket_max
+    !        i2 = one%jpz(chket)%n2spi(ket)
+    !        o2 => this%two%sps%GetOrbit(i2)
+    !        l2 = o2%l
+    !        z2 = o2%z
+    !        e2 = o2%e
+
+    !        vsum = 0.d0
+    !        do ih = 1, this%two%sps%norbs
+    !          oh => this%two%sps%GetOrbit(ih)
+    !          if(oh%occ < 1.d-8) cycle
+    !          jh = oh%j
+    !          eh = oh%e
+    !          if(e1 + eh > this%two%e2max) cycle
+    !          if(e2 + eh > this%two%e2max) cycle
+    !          fact = 1.d0
+    !          if(i1==ih) fact = fact * dsqrt(2.d0)
+    !          if(i2==ih) fact = fact * dsqrt(2.d0)
+
+    !          v = 0.d0
+    !          do J_bra = abs(j1-jh)/2, (j1+jh)/2
+    !            if(i1 == ih .and. mod(J_bra,2)==1) cycle
+    !            do J_ket = abs(j2-jh)/2, (j2+jh)/2
+    !              if(i2 == ih .and. mod(J_ket,2)==1) cycle
+
+    !              if(triag(J_bra,J_ket,this%jr)) cycle
+    !              tfact = sqrt(dble( (2*J_bra+1) * (2*J_ket+1) ) )
+    !              if(.not. this%Scalar) then
+    !                tfact = sqrt(dble( (2*J_bra+1) * (2*J_ket+1) ) ) * &
+    !                    (-1.d0) ** ((j1+jh)/2+J_ket+this%jr) * &
+    !                    & sjs(j1,2*J_bra,jh,2*J_ket,j2,2*this%jr)
+    !              end if
+    !              v = v + tfact * &
+    !                  & this%GetTwBME(i1,ih,i2,ih,J_bra,J_ket) * &
+    !                  & oh%occ
+    !            end do
+    !          end do
+    !          vsum = vsum + v * fact
+    !        end do
+    !        r%MatCh(chbra,chket)%m(bra,ket) = vsum
+    !        if(this%Scalar) then
+    !          r%MatCh(chbra,chket)%m(bra,ket) = vsum / dble(j1+1)
+    !          r%MatCh(chbra,chket)%m(ket,bra) = vsum / dble(j1+1)
+    !        end if
+    !      end do
+    !    end do
+    !    !$omp end do
+    !    !$omp end parallel
+    !  end do
+    !end do
+    !call timer%Add("TensorNormalOrderingFrom2To1", omp_get_wtime()-ti)
+  end function TensorNormalOrderingFrom2To1
 
 
   !

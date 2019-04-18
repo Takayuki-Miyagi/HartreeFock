@@ -152,7 +152,7 @@ contains
     type(Orbits), intent(in), target :: sps
     type(SingleParticleOrbit), pointer :: o
     integer, intent(in) :: j, p, z, n
-    integer :: cnt, i, loop
+    integer :: cnt, i, loop, cnt_sub
     integer :: partition(3) = [0,2,1]
     this%j = j
     this%p = p
@@ -163,6 +163,7 @@ contains
     this%spi2n(:) = 0
     cnt = 0
     do loop = 1, size(partition)
+      cnt_sub = 0
       do i = 1, sps%norbs
         o => sps%GetOrbit(i)
         if(o%ph /= partition(loop)) cycle
@@ -170,12 +171,13 @@ contains
         if((-1)**o%l /= p) cycle
         if(o%z /= z) cycle
         cnt = cnt + 1
+        cnt_sub = cnt_sub + 1
         this%n2spi(cnt) = i
         this%spi2n(i) = cnt
       end do
-      if(partition(loop) == 0) this%n_h_state = cnt
-      if(partition(loop) == 1) this%n_p_state = cnt
-      if(partition(loop) == 2) this%n_v_state = cnt
+      if(partition(loop) == 0) this%n_h_state = cnt_sub
+      if(partition(loop) == 1) this%n_p_state = cnt_sub
+      if(partition(loop) == 2) this%n_v_state = cnt_sub
     end do
 #ifdef ModelSpaceDebug
     write(*,'(a,i3,a,i3,a,i3,a,i5)') "One-body channel: J=", j, ", P=", p, ", Tz=", z, ", # of states=", this%n_state

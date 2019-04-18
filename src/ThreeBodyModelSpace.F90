@@ -425,7 +425,7 @@ contains
             call this%idx(idx)%init(sps,i1,i2,i3,j,ni,nj)
             do i = 1, ni
               cnt = cnt + 1
-              cnt = cnt_sub + 1
+              cnt_sub = cnt_sub + 1
               this%n2spi1(cnt) = i1
               this%n2spi2(cnt) = i2
               this%n2spi3(cnt) = i3

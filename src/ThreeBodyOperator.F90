@@ -239,6 +239,7 @@ contains
     ch = this%thr%jpz2ch(J,Pbra,Zbra)
     idx_bra = this%thr%jpz(ch)%spis2idx(a, b, c)
     idx_ket = this%thr%jpz(ch)%spis2idx(d, e, f)
+    if(idx_bra * idx_ket == 0) return
     aqn_bra => this%thr%jpz(ch)%idx(idx_bra)
     aqn_ket => this%thr%jpz(ch)%idx(idx_ket)
     n_bra = aqn_bra%find(a,b,c,Jab)
@@ -246,8 +247,8 @@ contains
     call vbra%ini(aqn_bra%north)
     call vket%ini(aqn_ket%north)
     call m%ini(aqn_bra%north, aqn_ket%north)
-    vbra%v = aqn_bra%cfp(:,n_bra)
-    vket%v = aqn_ket%cfp(:,n_ket)
+    vbra%v = aqn_bra%cfp(n_bra,:)
+    vket%v = aqn_ket%cfp(n_ket,:)
     do ibra = 1, aqn_bra%north
       do iket = 1, aqn_ket%north
         m%m(ibra,iket) = this%GetThBME_i_scalar(a,b,c,ibra,d,e,f,iket,J)
