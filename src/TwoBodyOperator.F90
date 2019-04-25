@@ -119,6 +119,7 @@ contains
     class(TwoBodyPart), intent(inout) :: this
     integer :: chbra, chket
 
+    if(.not. allocated(this%MatCh)) return
     do chbra = 1, this%Two%NChan
       do chket = 1, this%Two%NChan
         call this%MatCh(chbra,chket)%release()
@@ -139,6 +140,8 @@ contains
     integer :: chbra, chket
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
+
+    if(allocated(this%MatCh)) call this%fin()
     this%two => two
     this%oprtr = oprtr
     this%Scalar = Scalar

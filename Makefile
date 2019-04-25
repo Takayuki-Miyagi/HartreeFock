@@ -112,7 +112,7 @@ endif
 
 SRCDIR = src
 SRCDIR_LinAlg = LinAlgf90/src
-SRCDIR_HF = HFMain
+SRCDIR_HF = main
 DEPDIR = .
 OBJDIR = obj
 

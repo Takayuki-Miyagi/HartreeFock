@@ -88,6 +88,7 @@ contains
     class(ThreeBodyPart), intent(inout) :: this
     integer :: chbra, chket
 
+    if(.not. allocated(this%MatCh)) return
     do chbra = 1, this%thr%NChan
       do chket = 1, this%thr%NChan
         call this%MatCh(chbra,chket)%release()
@@ -108,6 +109,8 @@ contains
     integer :: chbra, chket
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
+
+    if(allocated(this%MatCh)) call this%fin()
     this%thr => thr
     this%oprtr = oprtr
     this%Scalar = Scalar
@@ -237,6 +240,7 @@ contains
     if(Pbra * Pket /= 1) return
     if(Zket /= Zbra) return
     ch = this%thr%jpz2ch(J,Pbra,Zbra)
+    if(ch == 0) return
     idx_bra = this%thr%jpz(ch)%spis2idx(a, b, c)
     idx_ket = this%thr%jpz(ch)%spis2idx(d, e, f)
     if(idx_bra * idx_ket == 0) return
@@ -459,18 +463,19 @@ contains
         call vin%zeros(qbra%nphys,qket%nphys)
 
         do bra_sub = 1, qbra%nphys
-          a = qbra%n2spi1(bra_sub)
-          b = qbra%n2spi2(bra_sub)
-          c = qbra%n2spi3(bra_sub)
+          a  =qbra%n2spi1(bra_sub)
+          b  =qbra%n2spi2(bra_sub)
+          c  =qbra%n2spi3(bra_sub)
           Jab= qbra%n2J12(bra_sub)
           do ket_sub = 1, qket%nphys
-            d = qket%n2spi1(ket_sub)
-            e = qket%n2spi2(ket_sub)
-            f = qket%n2spi3(ket_sub)
+            d  =qket%n2spi1(ket_sub)
+            e  =qket%n2spi2(ket_sub)
+            f  =qket%n2spi3(ket_sub)
             Jde= qket%n2J12(ket_sub)
-            if(c /= f) cycle
             if(b /= e) cycle
-            vin%m(bra_sub,ket_sub) =  op1%GetOBME(a,c)
+            if(c /= f) cycle
+            if(Jab /= Jde) cycle
+            vin%m(bra_sub,ket_sub) =  op1%GetOBME(a,d)
 
           end do
         end do
@@ -511,7 +516,7 @@ contains
 
     !$omp parallel
     !$omp do private(bra, qbra, cfp_bra, ket, qket, cfp_ket, &
-    !$omp &  vin, bra_sub, a, b, c, Jab, ket_sub, d, e, f, Jde, &
+    !$omp &  vin, bra_sub, a, b, c, Jab, ket_sub, d, e, f, Jde, norm, &
     !$omp &  vout, bra_start, bra_end, ket_start, ket_end)
     do bra = 1, ch_bra%n_idx
       qbra => ch_bra%idx(bra)
@@ -706,10 +711,12 @@ contains
                         & (-1.d0) ** ( J12 + (jh+Jket)/2 + this%jr) * &
                         & sjs(2*J12,Jbra,jh,Jket,2*J34,2*this%jr)
                   end if
-                  v = v + tfact * oh%occ * &
+                  v = v + tfact * &
                       & this%GetThBMEJ(i1,i2,ih,J12,i3,i4,ih,J34,Jket)
+
                 end do
               end do
+              vsum = vsum + v * oh%occ
             end do
             r%MatCh(chbra,chket)%m(bra,ket) = vsum * fact / sqrt( dble( (2*J12+1) * (2*J34+1) ) )
             r%MatCh(chket,chbra)%m(ket,bra) = r%MatCh(chbra,chket)%m(bra,ket) * &

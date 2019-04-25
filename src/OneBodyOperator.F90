@@ -71,6 +71,7 @@ contains
     class(OneBodyPart), intent(inout) :: this
     integer :: chbra, chket
 
+    if(.not. allocated(this%MatCh)) return
     do chbra = 1, this%one%NChan
       do chket = 1, this%one%NChan
         call this%MatCh(chbra,chket)%release()
@@ -91,13 +92,15 @@ contains
     integer :: chbra, chket
     integer :: jbra, pbra, zbra, nbra
     integer :: jket, pket, zket, nket
+
+    if(allocated(this%MatCh)) call this%fin()
+
     this%one => one
     this%oprtr = oprtr
     this%Scalar = Scalar
     this%jr = jr
     this%pr = pr
     this%zr = zr
-
     allocate(this%MatCh(one%NChan, one%NChan))
     do chbra = 1, one%NChan
       jbra = one%jpz(chbra)%j
