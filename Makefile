@@ -111,7 +111,7 @@ endif
 #--------------------------------------------------
 
 SRCDIR = src
-SRCDIR_LinAlg = LinAlgf90/src
+SRCDIR_LinAlg = submodule/LinAlgf90/src
 SRCDIR_HF = main
 DEPDIR = .
 OBJDIR = obj
