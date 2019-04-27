@@ -15,6 +15,8 @@ module HFInput
     real(8) :: alpha
     character(256), allocatable :: Ops(:)
     character(:), allocatable :: Nucl
+    character(:), allocatable :: Core
+    character(:), allocatable :: valence_list
     ! two-body file
     character(256) :: int_nn_file
     character(256), allocatable :: files_nn(:)
@@ -59,6 +61,8 @@ contains
     real(8) :: beta_cm = 0.d0 ! lowson's cm parameter, H => H + beta_cm * (hw/A) * Hcm
     real(8) :: alpha=0.7d0
     character(20) :: Nucl='O16'
+    character(20) :: Core=""
+    character(512) :: valence_list = ""
     character(256) :: int_nn_file
     character(256) :: int_3n_file
 
@@ -92,7 +96,7 @@ contains
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
-        & Op_file_format, is_Atomic
+        & Op_file_format, is_Atomic, Core, valence_list
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -110,6 +114,8 @@ contains
     this%hw = hw
     this%alpha = alpha
     this%Nucl = Nucl
+    this%Core = Core
+    this%valence_list = valence_list
     this%int_nn_file = int_nn_file
     this%int_3n_file = int_3n_file
 

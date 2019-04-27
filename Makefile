@@ -9,6 +9,7 @@ TARGET=HartreeFock
 INSTLDIR=$(HOME)/bin
 EXEDIR=$(PWD)/exe
 MODDIR = mod
+MODDIR = src
 MPI=off
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \

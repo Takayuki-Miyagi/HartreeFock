@@ -53,13 +53,15 @@ program HFMain
 
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
-    if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
-    if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
+        & hw=p%hw, emax=p%emax, e2max=p%e2max, lmax=p%lmax, beta=p%beta_cm)
+    if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, lmax=p%lmax, beta=p%beta_cm)
   case default
-    if(conffile == 'none') call ms%init(p%Nucl, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm,&
-        & is_three_body_jt=.true.)
-    if(conffile /= 'none') call ms%init(p%Nucl, conffile, p%hw, p%emax, p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm, &
-        & is_three_body_jt=.true.)
+    if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
+        & hw=p%hw, emax=p%emax, e2max=p%e2max, e3max=p%e3max, lmax=p%lmax, &
+        & beta=p%beta_cm, is_three_body_jt=.true.)
+    if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, &
+        & e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm, is_three_body_jt=.true.)
   end select
   call w%init(p%emax, p%e2max)
 
