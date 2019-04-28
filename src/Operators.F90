@@ -20,6 +20,7 @@ module Operators
   private :: SubtractOps
   private :: ScaleOps
   private :: NormalOrdering
+  private :: ReNormalOrdering
   private :: NO2BApprox
   !private :: UnNormalOrdering
   private :: DiscardThreeBodyForce
@@ -51,6 +52,7 @@ module Operators
     procedure :: ScaleOps
 
     procedure :: NormalOrdering
+    procedure :: ReNormalOrdering
     procedure :: NO2BApprox
     procedure :: UnNormalOrdering2B
     procedure :: DiscardThreeBodyForce
@@ -411,6 +413,34 @@ contains
     call this%thr%fin()
     call this%ms%ReleaseThreeBody()
   end subroutine DiscardThreeBodyPart
+
+  subroutine ReNormalOrdering2B(op)
+    class(Ops), intent(inout) :: op
+    type(MSpace), pointer :: ms
+    real(8), allocatable :: NOcoef_orig(:)
+    type(SingleParticleOrbit), pointer :: o
+    integer :: idx
+
+    ms => op%ms
+    allocate(NOcoef_orig(ms%sps%norbs))
+    NOcoef_orig = ms%NOcoef
+    call op%UnNormalOrdering2B()
+    do idx = 1, ms%sps%norbs
+      o => ms%sps%GetOrbit(idx)
+      if(o%ph == 2) then
+        o%occ = 0.d0
+      end if
+    end do
+    call op%NormalOrdering()
+
+    ms%NOcoef = NOcoef_orig
+    do idx = 1, ms%sps%norbs
+      o => ms%sps%GetOrbit(idx)
+      call o%SetOccupation(ms%NOcoef(idx))
+    end do
+    deallocate(NOcoef_orig)
+
+  end subroutine ReNormalOrdering2B
 
 end module Operators
 
