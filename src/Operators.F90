@@ -20,7 +20,7 @@ module Operators
   private :: SubtractOps
   private :: ScaleOps
   private :: NormalOrdering
-  private :: ReNormalOrdering
+  private :: ReNormalOrdering2B
   private :: NO2BApprox
   !private :: UnNormalOrdering
   private :: DiscardThreeBodyForce
@@ -52,7 +52,7 @@ module Operators
     procedure :: ScaleOps
 
     procedure :: NormalOrdering
-    procedure :: ReNormalOrdering
+    procedure :: ReNormalOrdering2B
     procedure :: NO2BApprox
     procedure :: UnNormalOrdering2B
     procedure :: DiscardThreeBodyForce
