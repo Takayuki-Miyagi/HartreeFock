@@ -631,29 +631,42 @@ contains
     this%MatCh(ch,ch)%m(ket,bra) = this%MatCh(ch,ch)%m(bra,ket)
   end subroutine AddToTwBME_scalar
 
-  subroutine SetTwoBodyPartFromOneBody(two, one)
+  subroutine SetTwoBodyPartFromOneBody(two, one, mode)
     class(TwoBodyPart), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
     class(TwoBodySpace), pointer :: ms
+    character(*), intent(in), optional :: mode
     integer :: chbra, chket
     ms => two%two
     do chbra = 1, ms%NChan
       do chket = 1, ms%NChan
         if(.not. two%MatCh(chbra,chket)%is) cycle
-        call two%MatCh(chbra,chket)%set(one)
+        call two%MatCh(chbra,chket)%set(one, mode)
       end do
     end do
   end subroutine SetTwoBodyPartFromOneBody
 
-  subroutine SetTwoBodyPartChannelFromOneBody(two, one)
+  subroutine SetTwoBodyPartChannelFromOneBody(two, one, mode)
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
-    if(one%Scalar) call SetTwoBodyPartChannelFromOneBodyScalar(two, one)
-    if(.not. one%Scalar) call SetTwoBodyPartChannelFromOneBodyTensor(two, one)
+    character(*), intent(in), optional :: mode
+    character(:), allocatable :: op
+
+    op = "+"
+    if(present(mode)) op = mode
+    if(op == "+") then
+      if(one%Scalar) call SetTwoBodyPartChannelFromOneBodyScalar(two, one)
+      if(.not. one%Scalar) call SetTwoBodyPartChannelFromOneBodyTensor(two, one)
+      return
+    end if
+
+    if(op == "*") then
+      call SetTwoBodyChannelFromOneBodyTrans(two, one)
+      return
+    end if
   end subroutine SetTwoBodyPartChannelFromOneBody
 
   subroutine SetTwoBodyPartChannelFromOneBodyScalar(two, one)
-    use MyLibrary, only: sjs
     use Profiler, only: timer
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
@@ -696,6 +709,49 @@ contains
     !$omp end parallel
     call timer%Add("SetTwoBodyPartChannelFromOneBodyScalar", omp_get_wtime()-ti)
   end subroutine SetTwoBodyPartChannelFromOneBodyScalar
+
+  subroutine SetTwoBodyChannelFromOneBodyTrans(two, one)
+    use Profiler, only: timer
+    class(TwoBodyPartChannel), intent(inout) :: two
+    type(OneBodyPart), intent(in) :: one
+    class(TwoBodyChannel), pointer :: ch_bra, ch_ket
+    integer :: bra, ket, a, b, c, d, jbra, jket
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+    real(8) :: norm, me, ti
+
+    ti = omp_get_wtime()
+    ch_bra => two%ch_bra
+    ch_ket => two%ch_ket
+
+    !$omp parallel
+    !$omp do private(bra, jbra, a, b, oa, ob, ket, jket, c, d, oc, od, norm, me)
+    do bra = 1, ch_bra%n_state
+      jbra = ch_bra%j
+      a = ch_bra%n2spi1(bra)
+      b = ch_bra%n2spi2(bra)
+      oa => one%one%sps%GetOrbit(a)
+      ob => one%one%sps%GetOrbit(b)
+      do ket = 1, ch_ket%n_state
+        jket = ch_ket%j
+        c = ch_bra%n2spi1(ket)
+        d = ch_bra%n2spi2(ket)
+        oc => one%one%sps%GetOrbit(c)
+        od => one%one%sps%GetOrbit(d)
+        norm = 1.d0
+        if(a == b) norm = norm / dsqrt(2.d0)
+        if(c == d) norm = norm / dsqrt(2.d0)
+        me = 0.d0
+        me = one%GetOBME(a,c) * one%GetOBME(b,d)
+        me = me - one%GetOBME(a,d) * one%GetOBME(b,c) * &
+            & (-1.d0)**((oa%j+ob%j)/2 - jket)
+        me = me * norm
+        two%m(bra,ket) = me
+      end do
+    end do
+    !$omp end do
+    !$omp end parallel
+    call timer%Add("SetTwoBodyChannelFromOneBodyTrans", omp_get_wtime()-ti)
+  end subroutine SetTwoBodyChannelFromOneBodyTrans
 
   subroutine SetTwoBodyPartChannelFromOneBodyTensor(two, one)
     use MyLibrary, only: sjs
