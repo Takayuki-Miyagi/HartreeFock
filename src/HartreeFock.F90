@@ -693,7 +693,7 @@ contains
     this%diff = 0.d0
     this%F = this%T + this%V + this%W * 0.5d0
     do ch1 = 1, one%NChan
-      this%diff = max(maxval(this%F%MatCh(ch1,ch1)%m - Fold%MatCh(ch1,ch1)%m), this%diff)
+      this%diff = max(maxval(abs(this%F%MatCh(ch1,ch1)%m - Fold%MatCh(ch1,ch1)%m)), this%diff)
     end do
     call Fold%fin()
 
