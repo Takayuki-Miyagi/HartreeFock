@@ -336,6 +336,7 @@ contains
     character(:), allocatable :: msg
     integer :: jbra, pbra, zbra, jket, pket, zket
 
+    msg = ""
     do chbra = 1, this%two%NChan
       jbra = this%two%jpz(chbra)%j
       pbra = this%two%jpz(chbra)%p
@@ -887,11 +888,11 @@ contains
     !integer :: jh, eh, J_bra, J_ket
     !integer :: chbra, chket, bra, ket, bra_max, ket_max
     !real(8) :: vsum, v, fact, tfact
-    !real(8) :: ti
+    real(8) :: ti
 
     call r%init(one,this%Scalar,this%oprtr,this%jr,this%pr,this%zr)
     return
-    !ti = omp_get_wtime()
+    ti = omp_get_wtime()
     !do chbra = 1, one%NChan
     !  do chket = 1, chbra
     !    if( .not. r%MatCh(chbra,chket)%is) cycle
@@ -962,7 +963,7 @@ contains
     !    !$omp end parallel
     !  end do
     !end do
-    !call timer%Add("TensorNormalOrderingFrom2To1", omp_get_wtime()-ti)
+    call timer%Add("TensorNormalOrderingFrom2To1", omp_get_wtime()-ti)
   end function TensorNormalOrderingFrom2To1
 
 

@@ -176,6 +176,7 @@ contains
     ch = this%thr%jpz2ch(J,Pbra,Zbra)
     idx_bra = this%thr%jpz(ch)%spis2idx(a,b,c)
     idx_ket = this%thr%jpz(ch)%spis2idx(d,e,f)
+    if(idx_bra * idx_ket == 0) return
     nbra = this%thr%jpz(ch)%idx(idx_bra)%idx2n(ibra)
     nket = this%thr%jpz(ch)%idx(idx_ket)%idx2n(iket)
     r = this%MatCh(ch,ch)%m(nbra,nket)
@@ -207,6 +208,7 @@ contains
     chket = this%thr%jpz2ch(Jket,Pket,Zket)
     idx_bra = this%thr%jpz(chbra)%spis2idx(a,b,c)
     idx_ket = this%thr%jpz(chket)%spis2idx(d,e,f)
+    if(idx_bra*idx_ket == 0) return
     nbra = this%thr%jpz(chbra)%idx(idx_bra)%idx2n(ibra)
     nket = this%thr%jpz(chket)%idx(idx_ket)%idx2n(iket)
     r = this%MatCh(chbra,chket)%m(nbra,nket)
@@ -259,7 +261,6 @@ contains
       end do
     end do
     r = vbra * (m * vket)
-    r = r * 6.d0
     call vbra%fin()
     call vket%fin()
     call m%fin()
@@ -298,6 +299,7 @@ contains
     chket = this%thr%jpz2ch(Jket,Pket,Zket)
     idx_bra = this%thr%jpz(chbra)%spis2idx(a, b, c)
     idx_ket = this%thr%jpz(chket)%spis2idx(d, e, f)
+    if(idx_bra*idx_ket == 0) return
     aqn_bra => this%thr%jpz(chbra)%idx(idx_bra)
     aqn_ket => this%thr%jpz(chket)%idx(idx_ket)
     n_bra = aqn_bra%find(a,b,c,Jab)
@@ -313,7 +315,6 @@ contains
       end do
     end do
     r = vbra * (m * vket)
-    r = r * 6.d0
     call vbra%fin()
     call vket%fin()
     call m%fin()
@@ -645,6 +646,7 @@ contains
     character(:), allocatable :: msg
     integer :: jbra, pbra, zbra, jket, pket, zket
 
+    msg = ""
     do chbra = 1, this%thr%NChan
       jbra = this%thr%jpz(chbra)%j
       pbra = this%thr%jpz(chbra)%p

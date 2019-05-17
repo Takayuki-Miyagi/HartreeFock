@@ -319,6 +319,7 @@ contains
     character(:), allocatable :: msg
     integer :: jbra, pbra, zbra, jket, pket, zket
 
+    msg = ""
     do chbra = 1, this%one%NChan
       jbra = this%one%jpz(chbra)%j
       pbra = this%one%jpz(chbra)%p
