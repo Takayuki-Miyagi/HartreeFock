@@ -334,12 +334,21 @@ contains
     integer :: chbra, chket
     type(sys) :: s
     character(:), allocatable :: msg
+    integer :: jbra, pbra, zbra, jket, pket, zket
 
     do chbra = 1, this%two%NChan
+      jbra = this%two%jpz(chbra)%j
+      pbra = this%two%jpz(chbra)%p
+      zbra = this%two%jpz(chbra)%z
       do chket = 1, this%two%NChan
+        jket = this%two%jpz(chket)%j
+        pket = this%two%jpz(chket)%p
+        zket = this%two%jpz(chket)%z
         if(.not. this%MatCh(chbra,chket)%is) cycle
-        msg = trim(this%oprtr) // " " // trim(s%str(chbra)) &
-            &  // " " // trim(s%str(chket))
+        msg = trim(this%oprtr) // " (" // trim(s%str(jbra)) // &
+            & "," // trim(s%str(pbra)) // "," // trim(s%str(zbra)) // &
+            & ")  (" // trim(s%str(jket)) // "," // &
+            & trim(s%str(pket)) // "," // trim(s%str(zket)) // ")"
         call this%MatCh(chbra,chket)%prt(msg=msg,iunit=wunit)
       end do
     end do
@@ -715,24 +724,23 @@ contains
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
     class(TwoBodyChannel), pointer :: ch_bra, ch_ket
-    integer :: bra, ket, a, b, c, d, jbra, jket
+    integer :: bra, ket, a, b, c, d, j
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
     real(8) :: norm, me, ti
 
     ti = omp_get_wtime()
     ch_bra => two%ch_bra
     ch_ket => two%ch_ket
+    j = ch_ket%j
 
     !$omp parallel
-    !$omp do private(bra, jbra, a, b, oa, ob, ket, jket, c, d, oc, od, norm, me)
+    !$omp do private(bra, a, b, oa, ob, ket, c, d, oc, od, norm, me)
     do bra = 1, ch_bra%n_state
-      jbra = ch_bra%j
       a = ch_bra%n2spi1(bra)
       b = ch_bra%n2spi2(bra)
       oa => one%one%sps%GetOrbit(a)
       ob => one%one%sps%GetOrbit(b)
       do ket = 1, ch_ket%n_state
-        jket = ch_ket%j
         c = ch_bra%n2spi1(ket)
         d = ch_bra%n2spi2(ket)
         oc => one%one%sps%GetOrbit(c)
@@ -743,7 +751,7 @@ contains
         me = 0.d0
         me = one%GetOBME(a,c) * one%GetOBME(b,d)
         me = me - one%GetOBME(a,d) * one%GetOBME(b,c) * &
-            & (-1.d0)**((oa%j+ob%j)/2 - jket)
+            & (-1.d0)**((oa%j+ob%j)/2 - j)
         me = me * norm
         two%m(bra,ket) = me
       end do
