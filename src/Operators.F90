@@ -71,6 +71,7 @@ module Operators
 contains
   subroutine FinOps(this)
     class(Ops), intent(inout) :: this
+    if(.not. associated(this%ms)) return
     this%zero = 0.d0
     call this%one%fin()
     call this%two%fin()
