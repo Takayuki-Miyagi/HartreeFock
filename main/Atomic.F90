@@ -3,7 +3,7 @@ module Atomic
   use ModelSpace
   use Operators
   use HartreeFock
-  use MBPT
+  use HFMBPT
   implicit none
 contains
   subroutine atomic_case(inputfile, conffile)
@@ -30,7 +30,7 @@ contains
     end if
 
     if(p%is_MBPTEnergy) then
-      call HF%TransformToHF(h)
+      h = HF%BasisTransform(h)
       call PT%calc(H)
       open(wunit, file = p%summary_file, action='write',status='replace')
       call p%PrintInputParameters(wunit)

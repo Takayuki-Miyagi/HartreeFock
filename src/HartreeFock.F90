@@ -15,12 +15,12 @@ module HartreeFock
   private :: UpdateDensityMatrix
   private :: UpdateFockMatrix
   private :: CalcEnergy
-  private :: TransformToHF
-  private :: HFBasisNO2BHamiltonian
-  private :: HFBasisNO2BScalar
-  !private :: HFBasisNO2BTensor ! To do
-  private :: HFBasisScalar
-  !private :: HFBasisTensor ! To do
+  private :: BasisTransform
+  private :: BasisTransNO2BHamiltonian
+  private :: BasisTransNO2BScalar
+  private :: BasisTransNO2BTensor
+  private :: BasisTransScalar
+  private :: BasisTransTensor
 
 
   private :: InitMonopole2
@@ -79,12 +79,12 @@ module HartreeFock
     procedure :: UpdateDensityMatrix
     procedure :: UpdateFockMatrix
     procedure :: CalcEnergy
-    procedure :: TransformToHF
-    procedure :: HFBasisNO2BHamiltonian
-    procedure :: HFBasisNO2BScalar
-    !procedure :: HFBasisNO2BTensor
-    procedure :: HFBasisScalar
-    !procedure :: HFBasisTensor
+    procedure :: BasisTransform
+    procedure :: BasisTransNO2BHamiltonian
+    procedure :: BasisTransNO2BScalar
+    procedure :: BasisTransNO2BTensor
+    procedure :: BasisTransScalar
+    procedure :: BasisTransTensor
   end type HFSolver
 
 contains
@@ -203,13 +203,14 @@ contains
     call timer%Add("Hartree-Fock iteration",omp_get_wtime() - ti)
   end subroutine SolveHFSolver
 
-  subroutine TransformToHF(HF,Optr,is_NO2B)
+  function BasisTransform(HF,Optr,is_NO2B) result(op)
     !  Input: Operator is HO basis operator (not normal ordered)
     ! Output: Operator is HF basis operator {not normal ordered                    , is_NO2B is false
     !                                       {normal ordered with NO2B approximation, is_NO2B is true
     !
-    class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Optr
+    class(HFSolver), intent(inout) :: HF
+    type(Ops), intent(in) :: Optr
+    type(Ops) :: op
     logical, intent(in), optional :: is_NO2B
     logical :: NO2B=.True.
 
@@ -220,43 +221,47 @@ contains
       stop
     end if
 
+    call HF%UpdateDensityMatrix()
     if(NO2B) then
       if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
-        call HF%HFBasisNO2BHamiltonian(Optr)
-        Optr%is_normal_ordered = .true.
+        op = HF%BasisTransNO2BHamiltonian(Optr)
+        op%is_normal_ordered = .true.
         return
       end if
 
       if(Optr%Scalar) then
-        call HF%HFBasisNO2BScalar(Optr)
-        Optr%is_normal_ordered = .true.
+        op = HF%BasisTransNO2BScalar(Optr)
+        op%is_normal_ordered = .true.
         return
       end if
 
       if(.not. Optr%Scalar) then
-        write(*,*) "Not implemented yet."
+        write(*,*) "Not tested yet."
         return
-        !call HF%HFBasisNO2BTensor(ms,Optr)
+        op = HF%BasisTransNO2BTensor(Optr)
+        op%is_normal_ordered = .true.
+        return
       end if
     end if
 
     if(Optr%Scalar) then
-      call HF%HFBasisScalar(Optr)
+      op = HF%BasisTransScalar(Optr)
       return
     end if
 
     if(.not. Optr%Scalar) then
-      write(*,*) "Not implemented yet."
+      write(*,*) "Not tested yet."
       return
-      !call HF%HFBasisTensor(ms,Optr)
+      op = HF%BasisTransTensor(Optr)
     end if
 
-  end subroutine TransformToHF
+  end function BasisTransform
 
-  subroutine HFBasisNO2BHamiltonian(HF,H)
+  function BasisTransNO2BHamiltonian(HF,H) result(op)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: H
+    type(Ops), intent(in) :: H
+    type(Ops) :: op
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     type(Orbits), pointer :: sps
@@ -270,9 +275,10 @@ contains
     ti = omp_get_wtime()
     ms => H%ms
     sps => ms%sps
-    H%zero = HF%ehf
+    call op%init(0, 1, 0, "hamil", ms, 2)
+    op%zero = HF%ehf
     do ch = 1, ms%one%NChan
-      H%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+      op%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
           &  HF%F%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
     end do
 
@@ -338,20 +344,20 @@ contains
       end do
       !$omp end do
       !$omp end parallel
-      H%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
+      op%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
       call UT%fin()
       call V2%fin()
       call V3%fin()
     end do
-    call H%DiscardThreeBodyPart()
-    call timer%Add("HFBasisNO2BHamltonian",omp_get_wtime() - ti)
+    call timer%Add("BasisTransNO2BHamltonian",omp_get_wtime() - ti)
 
-  end subroutine HFBasisNO2BHamiltonian
+  end function BasisTransNO2BHamiltonian
 
-  subroutine HFBasisNO2BScalar(HF,Opr)
+  function BasisTransNO2BScalar(HF,Opr) result(op)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Opr
+    type(Ops), intent(in) :: Opr
+    type(Ops) :: op
     type(MSpace), pointer :: ms
     type(TwoBodyPart) :: o2from3
     type(OneBodyPart) :: o1from3, o1from2
@@ -364,8 +370,9 @@ contains
 
     ms => Opr%ms
     ti = omp_get_wtime()
+    call op%init(0, 1, 0, opr%oprtr, ms, 2)
     do ch = 1, ms%one%NChan
-      Opr%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+      Op%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
           &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
     end do
 
@@ -436,14 +443,13 @@ contains
       end do
       !$omp end do
       !$omp end parallel
-      Opr%two%MatCh(ch,ch)%DMat = &
+      Op%two%MatCh(ch,ch)%DMat = &
           & UT%T() * Opr%two%MatCh(ch,ch)%DMat * UT
       if(Opr%rank/=3 .or. .not. Opr%ms%is_three_body_jt) o2from3%MatCh(ch,ch)%DMat = &
           & UT%T() * o2from3%MatCh(ch,ch)%DMat * UT
       call UT%fin()
       call V2%fin()
     end do
-    call Opr%DiscardThreeBodyPart()
 
     o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
     o1from2 = Opr%two%NormalOrderingFrom2To1(ms%one)
@@ -452,18 +458,19 @@ contains
     o0from2 = o1from2%NormalOrderingFrom1To0()
     o0from1 = Opr%one%NormalOrderingFrom1To0()
 
-    Opr%zero = Opr%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
-    Opr%one = Opr%one + o1from2 + o1from3 * 0.5d0
-    Opr%two = Opr%two + o2from3
+    Op%zero = Opr%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+    Op%one = Opr%one + o1from2 + o1from3 * 0.5d0
+    Op%two = Opr%two + o2from3
 
-    call timer%Add("HFBasisNO2BScalar",omp_get_wtime() - ti)
+    call timer%Add("BasisTransNO2BScalar",omp_get_wtime() - ti)
 
-  end subroutine HFBasisNO2BScalar
+  end function BasisTransNO2BScalar
 
-  subroutine HFBasisNO2BTensor(HF,Opr)
+  function BasisTransNO2BTensor(HF,Opr) result(op)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Opr
+    type(Ops), intent(in) :: Opr
+    type(Ops) :: op
     type(MSpace), pointer :: ms
     type(TwoBodyPart) :: o2from3
     type(OneBodyPart) :: o1from2, o1from3
@@ -477,10 +484,11 @@ contains
 
     ms => Opr%ms
     ti = omp_get_wtime()
-    Opr%zero = 0.d0
+    call op%init(opr%jr, opr%pr, opr%zr, opr%oprtr, ms, 2)
+    Op%zero = 0.d0
     do chbra = 1, ms%one%NChan
       do chket = 1, ms%one%NChan
-        Opr%one%MatCh(chbra,chket)%DMat = HF%C%MatCh(chbra,chbra)%DMat%T() * &
+        Op%one%MatCh(chbra,chket)%DMat = HF%C%MatCh(chbra,chbra)%DMat%T() * &
             &  Opr%one%MatCh(chbra,chket)%DMat * HF%C%MatCh(chket,chket)%DMat
       end do
     end do
@@ -534,7 +542,7 @@ contains
         end do
         !$omp end do
         !$omp end parallel
-        Opr%two%MatCh(chbra,chket)%DMat = &
+        Op%two%MatCh(chbra,chket)%DMat = &
             & UTbra%T() * Opr%two%MatCh(chbra,chket)%DMat * UTket
         o2from3%MatCh(chbra,chket)%DMat = &
             & UTbra%T() * o2from3%MatCh(chbra,chket)%DMat * UTket
@@ -543,7 +551,6 @@ contains
         call V2%fin()
       end do
     end do
-    call Opr%DiscardThreeBodyPart()
 
     o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
     o1from2 = Opr%two%NormalOrderingFrom2To1(ms%one)
@@ -552,17 +559,18 @@ contains
     o0from2 = o1from2%NormalOrderingFrom1To0()
     o0from1 = Opr%one%NormalOrderingFrom1To0()
 
-    Opr%zero = o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
-    Opr%one = Opr%one + o1from2 + o1from3 * 0.5d0
-    Opr%two = Opr%two + o2from3
+    Op%zero = o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+    Op%one = Opr%one + o1from2 + o1from3 * 0.5d0
+    Op%two = Opr%two + o2from3
 
-    call timer%Add("HFBasisNO2BTensor",omp_get_wtime() - ti)
-  end subroutine HFBasisNO2BTensor
+    call timer%Add("BasisTransNO2BTensor",omp_get_wtime() - ti)
+  end function BasisTransNO2BTensor
 
-  subroutine HFBasisScalar(HF,Op)
+  function BasisTransScalar(HF,Op) result(Opnew)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Op
+    type(Ops), intent(in) :: Op
+    type(Ops) :: Opnew
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     type(ThreeBodyChannel), pointer :: ch_thr
@@ -578,8 +586,9 @@ contains
     ti = omp_get_wtime()
     ms => Op%ms
     sps => ms%sps
+    call opnew%init(0, 1, 0, op%oprtr, ms, 3)
     do ch = 1, ms%one%NChan
-      Op%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+      Opnew%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
           &  Op%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
     end do
 
@@ -609,7 +618,7 @@ contains
       end do
       !$omp end do
       !$omp end parallel
-      Op%two%MatCh(ch,ch)%DMat = UT%T() * V2 * UT
+      Opnew%two%MatCh(ch,ch)%DMat = UT%T() * V2 * UT
       call UT%fin()
       call V2%fin()
     end do
@@ -638,16 +647,17 @@ contains
       end do
       !$omp end do
       !$omp end parallel
-      Op%thr%MatCh(ch,ch)%DMat = o3%DMat
+      Opnew%thr%MatCh(ch,ch)%DMat = o3%DMat
     end do
 
-    call timer%Add("HFBasisScalar",omp_get_wtime() - ti)
-  end subroutine HFBasisScalar
+    call timer%Add("BasisTransScalar",omp_get_wtime() - ti)
+  end function BasisTransScalar
 
-  subroutine HFBasisTensor(HF,Op)
+  function BasisTransTensor(HF,Op) result(Opnew)
     use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
-    type(Ops), intent(inout) :: Op
+    type(Ops), intent(in) :: Op
+    type(Ops) :: opnew
     type(MSpace), pointer :: ms
     type(ThreeBodyPartChannel) :: o3
     type(ThreeBodyChannel), pointer :: bra3, ket3
@@ -661,10 +671,11 @@ contains
 
     ti = omp_get_wtime()
     ms => Op%ms
-    Op%zero = 0.d0
+    call opnew%init(op%jr, op%pr, op%zr, op%oprtr, ms, 3)
+    Opnew%zero = 0.d0
     do chbra = 1, ms%one%NChan
       do chket = 1, ms%one%NChan
-        Op%one%MatCh(chbra,chket)%DMat = HF%C%MatCh(chbra,chbra)%DMat%T() * &
+        Opnew%one%MatCh(chbra,chket)%DMat = HF%C%MatCh(chbra,chbra)%DMat%T() * &
             &  Op%one%MatCh(chbra,chket)%DMat * HF%C%MatCh(chket,chket)%DMat
       end do
     end do
@@ -717,7 +728,7 @@ contains
         end do
         !$omp end do
         !$omp end parallel
-        Op%two%MatCh(chbra,chket)%DMat = &
+        Opnew%two%MatCh(chbra,chket)%DMat = &
             & UTbra%T() * Op%two%MatCh(chbra,chket)%DMat * UTket
         call UTbra%fin()
         call UTket%fin()
@@ -754,11 +765,12 @@ contains
         end do
         !$omp end do
         !$omp end parallel
+        opnew%thr%MatCh(chbra,chket) = o3
       end do
     end do
-    call timer%Add("HFBasisTensor",omp_get_wtime() - ti)
+    call timer%Add("BasisTransTensor",omp_get_wtime() - ti)
 
-  end subroutine HFBasisTensor
+  end function BasisTransTensor
 
   function HF_ThBME_scalar(CC,thr,a,b,c,ibra,d,e,f,iket,J) result(me)
     type(OneBodyPart), intent(in) :: CC

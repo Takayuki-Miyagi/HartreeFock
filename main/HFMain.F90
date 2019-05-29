@@ -5,16 +5,17 @@ program HFMain
   use ModelSpace
   use Operators
   use HartreeFock
-  use MBPT
+  use HFMBPT
   use WriteOperator
   use Atomic
   implicit none
   type(InputParameters) :: p
   type(MSpace) :: ms
-  type(Ops) :: h, opr
+  type(Ops) :: h, opr, htr
   type(HFSolver) :: HF
   type(MBPTEnergy) :: PT
   type(MBPTScalar) :: PTs
+  type(MBPTDMat) :: PTd
   type(WriteFiles) :: w
   character(256) :: inputfile='none', conffile='none'
   integer :: n, istatus, wunit=23
@@ -79,12 +80,9 @@ program HFMain
   call HF%init(h,alpha=p%alpha)
   call HF%solve()
 
-  ! print single-particle energies
-  !call HF%PrintSPEs(ms)
-  call HF%TransformToHF(h)
-
+  htr = HF%BasisTransform(h)
   if(p%is_MBPTEnergy) then
-    call PT%calc(H)
+    call PT%calc(htr)
     open(wunit, file = p%summary_file, action='write',status='replace')
     call p%PrintInputParameters(wunit)
     write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
@@ -99,6 +97,13 @@ program HFMain
         & PT%e_0+PT%e_2+PT%e_3
     close(wunit)
   end if
+
+  if(p%is_NAT) then
+    call PTd%init(HF, htr)
+    HF%C = PTd%C_HO2NAT
+    htr = HF%BasisTransform(h)
+  end if
+
   if(p%is_Op_out) then
     call w%SetFileName(p%out_dir, p%Op_file_format, h)
     call w%writef(p,h)
@@ -118,9 +123,9 @@ program HFMain
     write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
     call opr%init(p%Ops(n),ms,2)
     call opr%set()
-    call HF%TransformToHF(opr)
+    opr = HF%BasisTransform(opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(h,opr,p%is_MBPTScalar_full)
+      call PTs%calc(htr,opr,p%is_MBPTScalar_full)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
       write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
@@ -140,9 +145,9 @@ program HFMain
     call opr%init(p%Ops(n),ms, 2)
     call opr%set(p%files_nn(n), 'none', &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
-    call HF%TransformToHF(opr)
+    opr = HF%BasisTransform(opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(h,opr,p%is_MBPTScalar_full)
+      call PTs%calc(htr,opr,p%is_MBPTScalar_full)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
@@ -165,9 +170,9 @@ program HFMain
     call opr%set(p%files_nn(n), p%files_3n(n), &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-    call HF%TransformToHF(opr)
+    opr = HF%BasisTransform(opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(h,opr,p%is_MBPTScalar_full)
+      call PTs%calc(htr,opr,p%is_MBPTScalar_full)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
@@ -183,6 +188,7 @@ program HFMain
     call opr%fin()
   end do
 
+  call htr%fin()
   call h%fin()
   call HF%fin()
   call ms%fin()

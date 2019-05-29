@@ -39,6 +39,7 @@ module HFInput
     logical :: is_MBPTscalar_full
     logical :: is_MBPTScalar
     logical :: is_MBPTEnergy
+    logical :: is_NAT
     character(256) :: Op_file_format
 
     ! atomic mode
@@ -84,6 +85,7 @@ contains
     logical :: is_MBPTscalar_full = .false.
     logical :: is_MBPTScalar = .true.
     logical :: is_MBPTEnergy = .true.
+    logical :: is_NAT = .false.
     character(256) :: Op_file_format = "snt"
     ! atomic mode
     logical :: is_Atomic=.false.
@@ -96,7 +98,7 @@ contains
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
-        & Op_file_format, is_Atomic, Core, valence_list
+        & Op_file_format, is_Atomic, Core, valence_list, is_NAT
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -139,6 +141,7 @@ contains
     this%is_MBPTscalar_full = is_MBPTscalar_full
     this%is_MBPTEnergy = is_MBPTEnergy
     this%is_MBPTScalar = is_MBPTScalar
+    this%is_NAT = is_NAT
     this%Op_file_format = Op_file_format
     this%beta_cm = beta_cm
     this%is_Atomic = is_Atomic

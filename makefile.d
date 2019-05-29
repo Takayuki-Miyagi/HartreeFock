@@ -3,10 +3,10 @@ obj/ClassSys.o : src/ClassSys.f90
 obj/ThreeBodyInteraction.o : src/ThreeBodyInteraction.F90 obj/TwoBodyOperator.o obj/LinAlgLib.o obj/ClassSys.o obj/MyLibrary.o obj/ThreeBodyModelSpace.o obj/SingleParticleState.o obj/Profiler.o 
 obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/ThreeBodyInteraction.o obj/ThreeBodyOperator.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ModelSpace.o 
 obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o 
-obj/MBPT.o : src/MBPT.F90 obj/MyLibrary.o obj/Profiler.o obj/StoreCouplings.o obj/Operators.o obj/ModelSpace.o 
+obj/HFMBPT.o : src/HFMBPT.F90 obj/MyLibrary.o obj/Profiler.o obj/HartreeFock.o obj/StoreCouplings.o obj/Operators.o obj/ModelSpace.o 
 obj/ThreeBodyModelSpace.o : src/ThreeBodyModelSpace.F90 obj/MyLibrary.o obj/LinAlgLib.o obj/SingleParticleState.o 
 obj/MPIFunction.o : src/MPIFunction.F90 
-obj/ModelSpace.o : src/ModelSpace.F90 obj/MyLibrary.o obj/ClassSys.o obj/Profiler.o obj/ThreeBodyModelSpace.o obj/TwoBodyModelSpace.o obj/OneBodyModelSpace.o obj/SingleParticleState.o 
+obj/ModelSpace.o : src/ModelSpace.F90 obj/MyLibrary.o obj/Profiler.o obj/ClassSys.o obj/ThreeBodyModelSpace.o obj/TwoBodyModelSpace.o obj/OneBodyModelSpace.o obj/SingleParticleState.o 
 obj/StoreCouplings.o : src/StoreCouplings.F90 obj/MyLibrary.o obj/Profiler.o 
 obj/OneBodyOperator.o : src/OneBodyOperator.F90 obj/ClassSys.o obj/DefineOperators.o obj/MyLibrary.o obj/OneBodyModelSpace.o obj/LinAlgLib.o 
 obj/SingleParticleState.o : src/SingleParticleState.F90 obj/ClassSys.o 
@@ -29,6 +29,6 @@ obj/MatrixComplex.o : submodule/LinAlgf90/src/MatrixComplex.f90 obj/VectorComple
 obj/SingleDoubleComplex.o : submodule/LinAlgf90/src/SingleDoubleComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o obj/MatrixDouble.o obj/VectorDouble.o obj/MatrixSingle.o obj/VectorSingle.o 
 obj/MatVecComplex.o : submodule/LinAlgf90/src/MatVecComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o obj/LinAlgParameters.o 
 obj/WriteOperator.o : main/WriteOperator.F90 obj/Profiler.o obj/ClassSys.o obj/Operators.o obj/HFInput.o 
-obj/Atomic.o : main/Atomic.F90 obj/MyLibrary.o obj/MBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o 
+obj/Atomic.o : main/Atomic.F90 obj/MyLibrary.o obj/HFMBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o 
 obj/HFInput.o : main/HFInput.F90 obj/ClassSys.o 
-obj/HFMain.o : main/HFMain.F90 obj/Atomic.o obj/WriteOperator.o obj/MBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/Profiler.o 
+obj/HFMain.o : main/HFMain.F90 obj/Atomic.o obj/WriteOperator.o obj/HFMBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/Profiler.o 
