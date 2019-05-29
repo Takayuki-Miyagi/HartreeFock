@@ -226,6 +226,8 @@ contains
     call HF%UpdateDensityMatrix()
     if(NO2B) then
       if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
+        call HF%UpdateFockMatrix()
+        call HF%CalcEnergy()
         op = HF%BasisTransNO2BHamiltonian(Optr)
         op%is_normal_ordered = .true.
         return
@@ -772,7 +774,6 @@ contains
     integer, intent(in) :: a, b, c, d, e, f
     integer, intent(in) :: ibra, iket, J
     integer :: i1, i2, i3, i4, i5, i6
-    integer :: P, Z
     type(Orbits), pointer :: sps
     real(8) :: me, tr
     sps => CC%one%sps
