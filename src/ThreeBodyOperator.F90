@@ -176,6 +176,7 @@ contains
     ch = this%thr%jpz2ch(J,Pbra,Zbra)
     idx_bra = this%thr%jpz(ch)%spis2idx(a,b,c)
     idx_ket = this%thr%jpz(ch)%spis2idx(d,e,f)
+    if(idx_bra * idx_ket == 0) return
     nbra = this%thr%jpz(ch)%idx(idx_bra)%idx2n(ibra)
     nket = this%thr%jpz(ch)%idx(idx_ket)%idx2n(iket)
     r = this%MatCh(ch,ch)%m(nbra,nket)
@@ -207,6 +208,7 @@ contains
     chket = this%thr%jpz2ch(Jket,Pket,Zket)
     idx_bra = this%thr%jpz(chbra)%spis2idx(a,b,c)
     idx_ket = this%thr%jpz(chket)%spis2idx(d,e,f)
+    if(idx_bra*idx_ket == 0) return
     nbra = this%thr%jpz(chbra)%idx(idx_bra)%idx2n(ibra)
     nket = this%thr%jpz(chket)%idx(idx_ket)%idx2n(iket)
     r = this%MatCh(chbra,chket)%m(nbra,nket)
@@ -259,7 +261,6 @@ contains
       end do
     end do
     r = vbra * (m * vket)
-    r = r * 6.d0
     call vbra%fin()
     call vket%fin()
     call m%fin()
@@ -298,6 +299,7 @@ contains
     chket = this%thr%jpz2ch(Jket,Pket,Zket)
     idx_bra = this%thr%jpz(chbra)%spis2idx(a, b, c)
     idx_ket = this%thr%jpz(chket)%spis2idx(d, e, f)
+    if(idx_bra*idx_ket == 0) return
     aqn_bra => this%thr%jpz(chbra)%idx(idx_bra)
     aqn_ket => this%thr%jpz(chket)%idx(idx_ket)
     n_bra = aqn_bra%find(a,b,c,Jab)
@@ -313,7 +315,6 @@ contains
       end do
     end do
     r = vbra * (m * vket)
-    r = r * 6.d0
     call vbra%fin()
     call vket%fin()
     call m%fin()
@@ -643,12 +644,22 @@ contains
     integer :: chbra, chket
     type(sys) :: s
     character(:), allocatable :: msg
+    integer :: jbra, pbra, zbra, jket, pket, zket
 
+    msg = ""
     do chbra = 1, this%thr%NChan
+      jbra = this%thr%jpz(chbra)%j
+      pbra = this%thr%jpz(chbra)%p
+      zbra = this%thr%jpz(chbra)%z
       do chket = 1, this%thr%NChan
+        jket = this%thr%jpz(chket)%j
+        pket = this%thr%jpz(chket)%p
+        zket = this%thr%jpz(chket)%z
         if(.not. this%MatCh(chbra,chket)%is) cycle
-        msg = trim(this%oprtr) // " " // trim(s%str(chbra)) &
-            &  // " " // trim(s%str(chket))
+        msg = trim(this%oprtr) // " (" // trim(s%str(jbra)) // &
+            & "," // trim(s%str(pbra)) // "," // trim(s%str(zbra)) // &
+            & ")  (" // trim(s%str(jket)) // "," // &
+            & trim(s%str(pket)) // "," // trim(s%str(zket)) // ")"
         call this%MatCh(chbra,chket)%prt(msg=msg,iunit=wunit)
       end do
     end do

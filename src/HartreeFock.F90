@@ -39,6 +39,7 @@ module HartreeFock
   contains
     procedure :: InitMonopole2
     procedure :: InitMonopole3
+    procedure :: InitMonopole3_i
     procedure :: FinMonopole
   end type Monopole
 
@@ -130,7 +131,7 @@ contains
       this%is_roothaan = .true.
       this%S = norm_kernel
     end if
-    this%is_three_body = hamil%ms%is_three_body_jt
+    this%is_three_body = hamil%ms%is_three_body_jt .or. hamil%ms%is_three_body
     this%rank = hamil%rank
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occ',     0, 1, 0)
@@ -151,7 +152,8 @@ contains
     if(this%rank == 3 .and. this%is_three_body) then
       ti = omp_get_wtime()
       call timer%cmemory()
-      call this%V3%InitMonopole3(hamil%thr21)
+      if(hamil%ms%is_three_body_jt) call this%V3%InitMonopole3(hamil%thr21)
+      if(hamil%ms%is_three_body) call this%V3%InitMonopole3_i(hamil%thr)
       call timer%countup_memory('Monople 3Body int.')
       call timer%Add("Construct Monopole 3Body int.", omp_get_wtime() - ti)
     end if
@@ -475,12 +477,9 @@ contains
     type(TwoBodyPart) :: o2from3
     type(OneBodyPart) :: o1from2, o1from3
     integer :: chbra, chket, Jbra, Jket, nbra, nket
-    integer :: bra, ket, a, b, c, d, e, f, JJJ
-    integer :: ea, eb, ec, ed
-    integer :: je, le, ze, ee
-    integer :: jf, lf, zf, ef
+    integer :: bra, ket, a, b, c, d
     real(8) :: ph, ti, o0from1, o0from2, o0from3
-    type(DMat) :: UTbra, UTket, V2, V3
+    type(DMat) :: UTbra, UTket, V2
 
     ms => Opr%ms
     ti = omp_get_wtime()
@@ -504,10 +503,10 @@ contains
       do bra = 1, nbra
         a = ms%two%jpz(chbra)%n2spi1(bra)
         b = ms%two%jpz(chbra)%n2spi2(bra)
-        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-Jket)
+        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-Jbra)
         do ket = 1, nbra
-          c = ms%two%jpz(chket)%n2spi1(ket)
-          d = ms%two%jpz(chket)%n2spi2(ket)
+          c = ms%two%jpz(chbra)%n2spi1(ket)
+          d = ms%two%jpz(chbra)%n2spi2(ket)
 
           UTbra%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
           if(a/=b) UTbra%m(bra,ket) = UTbra%m(bra,ket) - ph * &
@@ -577,11 +576,8 @@ contains
     type(Orbits), pointer :: sps
     type(ThreeBodyPartChannel) :: o3
     integer :: ch, J, n, bra, ket, a, b, c, d, e, f, ibra, iket
-    integer :: ea, eb, ec, ed
-    integer :: je, le, ze, ee
-    integer :: jf, lf, zf, ef
     real(8) :: ph, ti
-    type(DMat) :: UT, V2, V3
+    type(DMat) :: UT, V2
 
     ti = omp_get_wtime()
     ms => Op%ms
@@ -624,6 +620,7 @@ contains
     end do
 
     if(Op%rank < 3) return
+    return
     do ch = 1, ms%thr%NChan
       ch_thr => ms%thr%jpz(ch)
       J = ch_thr%j
@@ -662,12 +659,9 @@ contains
     type(ThreeBodyPartChannel) :: o3
     type(ThreeBodyChannel), pointer :: bra3, ket3
     integer :: chbra, chket, Jbra, Jket, nbra, nket
-    integer :: bra, ket, a, b, c, d, e, f, JJJ, ibra, iket
-    integer :: ea, eb, ec, ed
-    integer :: je, le, ze, ee
-    integer :: jf, lf, zf, ef
-    real(8) :: ph, ti, o0from1, o0from2, o0from3
-    type(DMat) :: UTbra, UTket, V2, V3
+    integer :: bra, ket, a, b, c, d, e, f, ibra, iket
+    real(8) :: ph, ti
+    type(DMat) :: UTbra, UTket
 
     ti = omp_get_wtime()
     ms => Op%ms
@@ -692,8 +686,8 @@ contains
         b = ms%two%jpz(chbra)%n2spi2(bra)
         ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-Jket)
         do ket = 1, nbra
-          c = ms%two%jpz(chket)%n2spi1(ket)
-          d = ms%two%jpz(chket)%n2spi2(ket)
+          c = ms%two%jpz(chbra)%n2spi1(ket)
+          d = ms%two%jpz(chbra)%n2spi2(ket)
 
           UTbra%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
           if(a/=b) UTbra%m(bra,ket) = UTbra%m(bra,ket) - ph * &
@@ -778,6 +772,7 @@ contains
     integer, intent(in) :: a, b, c, d, e, f
     integer, intent(in) :: ibra, iket, J
     integer :: i1, i2, i3, i4, i5, i6
+    integer :: P, Z
     type(Orbits), pointer :: sps
     real(8) :: me, tr
     sps => CC%one%sps
@@ -1323,6 +1318,188 @@ contains
     !$omp end parallel
     this%constructed = .true.
   end subroutine InitMonopole3
+
+  subroutine InitMonopole3_i(this, v3n)
+    use MyLibrary, only: triag
+    class(Monopole), intent(inout) :: this
+    type(ThreeBodyPart), intent(in) :: v3n
+    type(ThreeBodySpace), pointer :: ms
+    integer :: n, idx, JJ, JJJ
+    integer(8) :: i1, i2, i3, i4, i5, i6, num
+    integer :: l1, j1, z1, e1
+    integer :: l2, j2, z2, e2
+    integer :: l3, j3, z3, e3
+    integer :: l4, j4, z4, e4
+    integer :: l5, j5, z5, e5
+    integer :: l6, j6, z6, e6
+    real(8) :: v
+
+    if(this%constructed) return
+    ms => v3n%thr
+    n = 0
+    do i1 = 1, ms%sps%norbs
+      l1 = ms%sps%orb(i1)%l
+      j1 = ms%sps%orb(i1)%j
+      z1 = ms%sps%orb(i1)%z
+      e1 = ms%sps%orb(i1)%e
+
+      do i4 = 1, i1
+        l4 = ms%sps%orb(i4)%l
+        j4 = ms%sps%orb(i4)%j
+        z4 = ms%sps%orb(i4)%z
+        e4 = ms%sps%orb(i4)%e
+
+        if(j1 /= j4) cycle
+        if((-1)**l1 /= (-1)**l4) cycle
+        if(z1 /= z4) cycle
+
+        do i2 = 1, ms%sps%norbs
+          l2 = ms%sps%orb(i2)%l
+          j2 = ms%sps%orb(i2)%j
+          z2 = ms%sps%orb(i2)%z
+          e2 = ms%sps%orb(i2)%e
+
+          do i5 = 1, ms%sps%norbs
+            l5 = ms%sps%orb(i5)%l
+            j5 = ms%sps%orb(i5)%j
+            z5 = ms%sps%orb(i5)%z
+            e5 = ms%sps%orb(i5)%e
+            if(j2 /= j5) cycle
+            if((-1)**l2 /= (-1)**l5) cycle
+            if(z2 /= z5) cycle
+
+            if(e1 + e2 > ms%e2max) cycle
+            if(e4 + e5 > ms%e2max) cycle
+
+            do i3 = 1, ms%sps%norbs
+              l3 = ms%sps%orb(i3)%l
+              j3 = ms%sps%orb(i3)%j
+              z3 = ms%sps%orb(i3)%z
+              e3 = ms%sps%orb(i3)%e
+              do i6 = 1, ms%sps%norbs
+                l6 = ms%sps%orb(i6)%l
+                j6 = ms%sps%orb(i6)%j
+                z6 = ms%sps%orb(i6)%z
+                e6 = ms%sps%orb(i6)%e
+                if(j3 /= j6) cycle
+                if((-1)**l3 /= (-1)**l6) cycle
+                if(z3 /= z6) cycle
+
+                if(e1+e3 > ms%e2max) cycle
+                if(e2+e3 > ms%e2max) cycle
+                if(e4+e6 > ms%e2max) cycle
+                if(e5+e6 > ms%e2max) cycle
+                if(e1+e2+e3 > ms%e3max) cycle
+                if(e4+e5+e6 > ms%e3max) cycle
+
+                n = n + 1
+              end do
+            end do
+
+          end do
+        end do
+      end do
+    end do
+
+    this%nidx = n
+    allocate(this%idx(n))
+    allocate(this%v(n))
+
+
+    n = 0
+    do i1 = 1, ms%sps%norbs
+      l1 = ms%sps%orb(i1)%l
+      j1 = ms%sps%orb(i1)%j
+      z1 = ms%sps%orb(i1)%z
+      e1 = ms%sps%orb(i1)%e
+
+      do i4 = 1, i1
+        l4 = ms%sps%orb(i4)%l
+        j4 = ms%sps%orb(i4)%j
+        z4 = ms%sps%orb(i4)%z
+        e4 = ms%sps%orb(i4)%e
+
+        if(j1 /= j4) cycle
+        if((-1)**l1 /= (-1)**l4) cycle
+        if(z1 /= z4) cycle
+
+        do i2 = 1, ms%sps%norbs
+          l2 = ms%sps%orb(i2)%l
+          j2 = ms%sps%orb(i2)%j
+          z2 = ms%sps%orb(i2)%z
+          e2 = ms%sps%orb(i2)%e
+
+          do i5 = 1, ms%sps%norbs
+            l5 = ms%sps%orb(i5)%l
+            j5 = ms%sps%orb(i5)%j
+            z5 = ms%sps%orb(i5)%z
+            e5 = ms%sps%orb(i5)%e
+            if(j2 /= j5) cycle
+            if((-1)**l2 /= (-1)**l5) cycle
+            if(z2 /= z5) cycle
+
+            if(e1 + e2 > ms%e2max) cycle
+            if(e4 + e5> ms%e2max) cycle
+
+            do i3 = 1, ms%sps%norbs
+              l3 = ms%sps%orb(i3)%l
+              j3 = ms%sps%orb(i3)%j
+              z3 = ms%sps%orb(i3)%z
+              e3 = ms%sps%orb(i3)%e
+              do i6 = 1, ms%sps%norbs
+                l6 = ms%sps%orb(i6)%l
+                j6 = ms%sps%orb(i6)%j
+                z6 = ms%sps%orb(i6)%z
+                e6 = ms%sps%orb(i6)%e
+                if(j3 /= j6) cycle
+                if((-1)**l3 /= (-1)**l6) cycle
+                if(z3 /= z6) cycle
+
+                if(e1+e3 > ms%e2max) cycle
+                if(e2+e3 > ms%e2max) cycle
+                if(e4+e6 > ms%e2max) cycle
+                if(e5+e6 > ms%e2max) cycle
+                if(e1+e2+e3 > ms%e3max) cycle
+                if(e4+e5+e6 > ms%e3max) cycle
+
+                n = n + 1
+                this%idx(n) = GetIndex3(i1,i2,i3,i4,i5,i6)
+              end do
+            end do
+
+          end do
+        end do
+
+      end do
+    end do
+
+    !$omp parallel
+    !$omp do private(idx,num,i1,i2,i3,i4,i5,i6,j1,j2,j3,v,JJ,JJJ)
+    do idx = 1, this%nidx
+      num = this%idx(idx)
+      call GetSpLabels3(num,i1,i2,i3,i4,i5,i6)
+      j1 = ms%sps%orb(i1)%j
+      j2 = ms%sps%orb(i2)%j
+      j3 = ms%sps%orb(i3)%j
+      v = 0.d0
+      do JJ = abs(j1-j2)/2, (j1+j2)/2
+        if(i1 == i2 .and. mod(JJ,2) == 1) cycle
+        if(i4 == i5 .and. mod(JJ,2) == 1) cycle
+        do JJJ = abs(2*JJ-j3), (2*JJ+j3), 2
+          v = v + dble(JJJ+1) * &
+              & v3n%GetThBMEJ(&
+              & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
+              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
+          ! need to convert integer(8) -> integer(4)
+          !write(*,'(8i4,f12.6)') i1,i2,i3,i4,i5,i6,JJ,JJJ,v
+        end do
+      end do
+      this%v(idx) = v / dble(j1+1)
+    end do
+    !$omp end do
+    !$omp end parallel
+    this%constructed = .true.
+  end subroutine InitMonopole3_i
 
   function GetIndex2(i1,i2,i3,i4) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4

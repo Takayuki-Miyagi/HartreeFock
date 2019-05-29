@@ -244,7 +244,7 @@ contains
     real(8), intent(in), optional :: beta
     logical, intent(in), optional :: is_three_body_jt, is_three_body
     type(sys) :: s
-    integer :: Ac, Zc, Nc, A, Z, N, i, l
+    integer :: Ac, Zc, Nc, A, Z, N, i
     type(SingleParticleOrbit), pointer :: o
     real(8) :: ti
 

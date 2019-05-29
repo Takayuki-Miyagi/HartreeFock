@@ -71,6 +71,7 @@ module Operators
 contains
   subroutine FinOps(this)
     class(Ops), intent(inout) :: this
+    if(.not. associated(this%ms)) return
     this%zero = 0.d0
     call this%one%fin()
     call this%two%fin()
@@ -130,8 +131,12 @@ contains
   end subroutine InitOps
 
   subroutine CopyOps(a, b)
+    use Profiler, only: timer
     class(Ops), intent(inout) :: a
     type(Ops), intent(in) :: b
+    real(8) :: ti
+
+    ti = omp_get_wtime()
 
     a%oprtr = b%oprtr
     a%Scalar = b%Scalar
@@ -153,6 +158,7 @@ contains
     if(a%rank == 3 .and. a%ms%is_three_body) then
       a%thr = b%thr
     end if
+    call timer%Add('Copy Operator', omp_get_wtime()-ti)
   end subroutine CopyOps
 
   function SumOps(a, b) result(c)

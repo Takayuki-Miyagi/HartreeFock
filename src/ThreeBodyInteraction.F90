@@ -129,6 +129,7 @@ contains
   subroutine FinThreeBodyForce(this)
     class(ThreeBodyForce), intent(inout) :: this
     integer :: ch
+    if(.not. allocated(this%MatCh)) return
     do ch = 1, this%thr%NChan
       deallocate(this%MatCh(ch,ch)%v)
     end do
@@ -149,6 +150,7 @@ contains
       allocate(a%MatCh(ch,ch)%v(ndim,ndim))
       a%MatCh(ch,ch)%v(:,:) = b%MatCh(ch,ch)%v(:,:)
     end do
+    a%CGs = b%CGs
   end subroutine CopyThreeBodyForce
 
   function SumThreeBodyForce(a, b) result(c)

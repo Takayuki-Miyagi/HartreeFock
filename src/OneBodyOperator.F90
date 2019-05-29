@@ -317,12 +317,22 @@ contains
     integer :: chbra, chket
     type(sys) :: s
     character(:), allocatable :: msg
+    integer :: jbra, pbra, zbra, jket, pket, zket
 
+    msg = ""
     do chbra = 1, this%one%NChan
+      jbra = this%one%jpz(chbra)%j
+      pbra = this%one%jpz(chbra)%p
+      zbra = this%one%jpz(chbra)%z
       do chket = 1, this%one%NChan
+        jket = this%one%jpz(chket)%j
+        pket = this%one%jpz(chket)%p
+        zket = this%one%jpz(chket)%z
         if(.not. this%MatCh(chbra,chket)%is) cycle
-        msg = trim(this%oprtr) // " " // trim(s%str(chbra)) &
-            &  // " " // trim(s%str(chket))
+        msg = trim(this%oprtr) // " (" // trim(s%str(jbra)) // &
+            & "," // trim(s%str(pbra)) // "," // trim(s%str(zbra)) // &
+            & ")  (" // trim(s%str(jket)) // "," // &
+            & trim(s%str(pket)) // "," // trim(s%str(zket)) // ")"
         call this%MatCh(chbra,chket)%prt(msg=msg,iunit=wunit)
       end do
     end do
