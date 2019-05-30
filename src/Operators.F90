@@ -19,6 +19,7 @@ module Operators
   private :: SumOps
   private :: SubtractOps
   private :: ScaleOps
+  private :: Truncate
   private :: NormalOrdering
   private :: ReNormalOrdering2B
   private :: NO2BApprox
@@ -51,6 +52,7 @@ module Operators
     procedure :: SubtractOps
     procedure :: ScaleOps
 
+    procedure :: Truncate
     procedure :: NormalOrdering
     procedure :: ReNormalOrdering2B
     procedure :: NO2BApprox
@@ -325,6 +327,136 @@ contains
       call this%thr%prt(iunit)
     end if
   end subroutine PrintOperator
+
+  function Truncate(op, ms_new) result(op_new)
+    class(Ops), intent(inout) :: op
+    type(MSpace), intent(in), target :: ms_new
+    type(Ops) :: op_new
+    integer :: i, j, k, l, m, n
+    integer :: ii, jj, kk, ll, mm, nn
+    type(Orbits), pointer :: sps_new, sps
+    type(SingleParticleOrbit), pointer :: oii, ojj, okk, oll, omm, onn
+    integer :: chbra_new, chket_new
+    integer :: chbra_old, chket_old
+    integer :: jbra_new, pbra_new, zbra_new, jket_new, pket_new, zket_new
+    integer :: bra, ket, ibra, iket
+    real(8) :: ti
+    ti = omp_get_wtime()
+    call timer%cmemory()
+
+    sps => op%ms%sps
+    sps_new => ms_new%sps
+    call op_new%init(op%jr, op%pr, op%zr, op%oprtr, ms_new, op%rank)
+
+    op_new%zero = op%zero
+
+    do ii = 1, sps_new%norbs
+      oii => sps_new%GetOrbit(ii)
+      do jj = ii, sps_new%norbs
+        ojj => sps_new%GetOrbit(jj)
+
+        i = sps%nljz2idx(oii%n, oii%l, oii%j, oii%z)
+        j = sps%nljz2idx(ojj%n, ojj%l, ojj%j, ojj%z)
+        call op_new%one%SetOBME( ii, jj, op%One%GetOBME(i,j) )
+
+      end do
+    end do
+
+    do chbra_new = 1, ms_new%two%NChan
+      jbra_new = ms_new%two%jpz(chbra_new)%j
+      pbra_new = ms_new%two%jpz(chbra_new)%p
+      zbra_new = ms_new%two%jpz(chbra_new)%z
+      chbra_old = op%ms%two%jpz2ch(jbra_new,pbra_new,zbra_new)
+      do chket_new = 1, ms_new%two%NChan
+        jket_new = ms_new%two%jpz(chket_new)%j
+        pket_new = ms_new%two%jpz(chket_new)%p
+        zket_new = ms_new%two%jpz(chket_new)%z
+        chket_old = op%ms%two%jpz2ch(jket_new,pket_new,zket_new)
+        if(.not. op%two%MatCh(chbra_old, chket_old)%is) cycle
+        if(.not. op_new%two%MatCh(chbra_new, chket_new)%is) cycle
+
+        !$omp parallel
+        !$omp do private(bra, ii, jj, ket, kk, ll, i, j, k, l, &
+        !$omp &          oii, ojj, okk, oll)
+        do bra = 1, ms_new%two%jpz(chbra_new)%n_state
+          ii = ms_new%two%jpz(chbra_new)%n2spi1(bra)
+          jj = ms_new%two%jpz(chbra_new)%n2spi2(bra)
+          oii => sps_new%GetOrbit(ii)
+          ojj => sps_new%GetOrbit(jj)
+          do ket = 1, ms_new%two%jpz(chket_new)%n_state
+            kk = ms_new%two%jpz(chket_new)%n2spi1(ket)
+            ll = ms_new%two%jpz(chket_new)%n2spi2(ket)
+            okk => sps_new%GetOrbit(kk)
+            oll => sps_new%GetOrbit(ll)
+
+            i = sps%nljz2idx(oii%n, oii%l, oii%j, oii%z)
+            j = sps%nljz2idx(ojj%n, ojj%l, ojj%j, ojj%z)
+            k = sps%nljz2idx(okk%n, okk%l, okk%j, okk%z)
+            l = sps%nljz2idx(oll%n, oll%l, oll%j, oll%z)
+            op_new%two%MatCh(chbra_new, chket_new)%m(bra, ket) = &
+                & op%two%GetTwBME(i, j, k, l, jbra_new, jket_new)
+          end do
+        end do
+        !$omp end do
+        !$omp end parallel
+
+      end do
+    end do
+
+    do chbra_new = 1, ms_new%thr%NChan
+      jbra_new = ms_new%thr%jpz(chbra_new)%j
+      pbra_new = ms_new%thr%jpz(chbra_new)%p
+      zbra_new = ms_new%thr%jpz(chbra_new)%z
+      chbra_old = op%ms%thr%jpz2ch(jbra_new,pbra_new,zbra_new)
+      do chket_new = 1, ms_new%thr%NChan
+        jket_new = ms_new%thr%jpz(chket_new)%j
+        pket_new = ms_new%thr%jpz(chket_new)%p
+        zket_new = ms_new%thr%jpz(chket_new)%z
+        chket_old = op%ms%thr%jpz2ch(jket_new,pket_new,zket_new)
+        if(.not. op%thr%MatCh(chbra_old, chket_old)%is) cycle
+        if(.not. op_new%thr%MatCh(chbra_new, chket_new)%is) cycle
+
+        !$omp parallel
+        !$omp do private(bra, ii, jj, kk, ket, ll, mm, nn, &
+        !$omp &          i, j, k, l, m, n, ibra, iket, &
+        !$omp &          oii, ojj, okk, oll, omm, onn)
+        do bra = 1, ms_new%thr%jpz(chbra_new)%n_state
+          ii =   ms_new%thr%jpz(chbra_new)%n2spi1(bra)
+          jj =   ms_new%thr%jpz(chbra_new)%n2spi2(bra)
+          kk =   ms_new%thr%jpz(chbra_new)%n2spi3(bra)
+          ibra = ms_new%thr%jpz(chbra_new)%n2labl(bra)
+          oii => sps_new%GetOrbit(ii)
+          ojj => sps_new%GetOrbit(jj)
+          okk => sps_new%GetOrbit(kk)
+
+          do ket = 1, ms_new%thr%jpz(chket_new)%n_state
+            ll =   ms_new%thr%jpz(chket_new)%n2spi1(ket)
+            mm =   ms_new%thr%jpz(chket_new)%n2spi2(ket)
+            nn =   ms_new%thr%jpz(chket_new)%n2spi3(ket)
+            iket = ms_new%thr%jpz(chket_new)%n2labl(ket)
+            oll => sps_new%GetOrbit(ll)
+            omm => sps_new%GetOrbit(mm)
+            onn => sps_new%GetOrbit(nn)
+
+            i = sps%nljz2idx(oii%n, oii%l, oii%j, oii%z)
+            j = sps%nljz2idx(ojj%n, ojj%l, ojj%j, ojj%z)
+            k = sps%nljz2idx(okk%n, okk%l, okk%j, okk%z)
+            l = sps%nljz2idx(oll%n, oll%l, oll%j, oll%z)
+            m = sps%nljz2idx(omm%n, omm%l, omm%j, omm%z)
+            n = sps%nljz2idx(onn%n, onn%l, onn%j, onn%z)
+            op_new%thr%MatCh(chbra_new, chket_new)%m(bra, ket) = &
+                & op%thr%GetThBMEi(i, j, k, ibra, l, m, n, iket, jbra_new, jket_new)
+          end do
+        end do
+        !$omp end do
+        !$omp end parallel
+
+      end do
+    end do
+
+    call timer%countup_memory(trim(op_new%oprtr))
+    call timer%Add('Truncate Operator '//trim(op_new%oprtr), omp_get_wtime()-ti)
+  end function Truncate
 
   subroutine NormalOrdering(this) ! Normal ordering w.r.t. refernece state
     class(Ops), intent(inout), target :: this

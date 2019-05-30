@@ -1779,7 +1779,6 @@ vsum = vsum + dble(2*J2+1) * v
                   &  hamil%two%GetTwBME(b, c, i, j, JJ)
             end do
             r = r + tbme / (e_ai * e_bcij) * norm_bc * norm_ij
-            if(abs(tbme) < 1.d-8) cycle
           end do
         end do
       end do

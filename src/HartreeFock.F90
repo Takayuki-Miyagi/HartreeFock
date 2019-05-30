@@ -13,6 +13,7 @@ module HartreeFock
   private :: DiagonalizeFockMatrix
   private :: SetOccupationMatrix
   private :: UpdateDensityMatrix
+  private :: UpdateDensityMatrixFromCoef
   private :: UpdateFockMatrix
   private :: CalcEnergy
   private :: BasisTransform
@@ -78,6 +79,7 @@ module HartreeFock
     procedure :: DiagonalizeFockMatrix
     procedure :: SetOccupationMatrix
     procedure :: UpdateDensityMatrix
+    procedure :: UpdateDensityMatrixFromCoef
     procedure :: UpdateFockMatrix
     procedure :: CalcEnergy
     procedure :: BasisTransform
@@ -223,7 +225,7 @@ contains
       stop
     end if
 
-    call HF%UpdateDensityMatrix()
+    call HF%UpdateDensityMatrixFromCoef()
     if(NO2B) then
       if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
         call HF%UpdateFockMatrix()
@@ -889,15 +891,23 @@ contains
   subroutine UpdateDensityMatrix(this)
     class(HFSolver), intent(inout) :: this
     integer :: ich
-
     do ich = 1, this%rho%one%NChan
       this%rho%MatCh(ich,ich)%DMat = &
           & this%rho%MatCh(ich,ich)%DMat * (1.d0-this%alpha) + &
           & (this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
           & this%C%MatCh(ich,ich)%DMat%T()) * this%alpha
     end do
-
   end subroutine UpdateDensityMatrix
+
+  subroutine UpdateDensityMatrixFromCoef(this)
+    class(HFSolver), intent(inout) :: this
+    integer :: ich
+    do ich = 1, this%rho%one%NChan
+      this%rho%MatCh(ich,ich)%DMat = &
+          & (this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
+          & this%C%MatCh(ich,ich)%DMat%T())
+    end do
+  end subroutine UpdateDensityMatrixFromCoef
 
   subroutine UpdateFockMatrix(this)
     class(HFSolver), intent(inout) :: this
