@@ -59,7 +59,7 @@ contains
     integer :: e3max=-1
     integer :: lmax=-1
     real(8) :: hw=20.d0
-    real(8) :: beta_cm = 0.d0 ! lowson's cm parameter, H => H + beta_cm * (hw/A) * Hcm
+    real(8) :: beta_cm = 0.d0 ! lowson's cm parameter, H => H + beta_cm * Hcm in the unit of MeV
     real(8) :: alpha=0.7d0
     character(20) :: Nucl='O16'
     character(20) :: Core=""
@@ -198,7 +198,7 @@ contains
     write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_3n, &
         & ", e2max =",this%e2max_3n, ", e3max =", this%e3max_3n, &
         & ", lmax =",this%lmax_3n
-    if(this%beta_cm > 1.d-4) write(iut,'(a,f6.3)') "#  Lawson's beta parameter is ", this%beta_cm
+    if(this%beta_cm > 1.d-4) write(iut,'(a,f6.3,a)') "#  Lawson's beta parameter: ", this%beta_cm, " MeV"
     do n = 1, size(this%Ops)
       if( this%Ops(n) == 'none' .or. this%Ops(n) == '') cycle
       write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))

@@ -506,7 +506,8 @@ contains
         idx = this%sps%GetIndexFromLabel(vlabel)
         o => this%sps%orb(idx)
         if(o%ph == 0) then
-          write(*,"(2a)") "Error: conflict occurs core and valence orbit", trim(vlabel)
+          write(*,"(2a)") "Error: conflict occurs core and valence orbit ", trim(vlabel)
+          stop
         end if
         call o%SetHoleParticleValence(2)
       end do

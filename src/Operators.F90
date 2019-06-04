@@ -275,9 +275,9 @@ contains
         call Hcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
         call Hcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
 
-        this%zero = this%zero - (1.5d0 * ms%hw * ms%beta)
-        this%one = this%one + (Hcm_one * ms%beta)
-        this%two = this%two + (Hcm_two * ms%beta)
+        this%zero = this%zero - (1.5d0 * ms%beta)
+        this%one = this%one + (Hcm_one * (ms%beta / ms%hw))
+        this%two = this%two + (Hcm_two * (ms%beta / ms%hw))
       end if
     case default
       return

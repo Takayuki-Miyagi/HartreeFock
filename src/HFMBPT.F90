@@ -1489,10 +1489,10 @@ vsum = vsum + dble(2*J2+1) * v
     cnt = 0
     do a = 1, sps%norbs
       oa => sps%GetOrbit(a)
-      if(oa%ph == 0) cycle
+      if(abs(oa%occ) > 1.d-6) cycle
       do b = a, sps%norbs
         ob => sps%GetOrbit(b)
-        if(ob%ph == 0) cycle
+        if(abs(ob%occ) > 1.d-6) cycle
         if(oa%l /= ob%l) cycle
         if(oa%j /= ob%j) cycle
         if(oa%z /= ob%z) cycle
@@ -1506,10 +1506,10 @@ vsum = vsum + dble(2*J2+1) * v
     cnt = 0
     do a = 1, sps%norbs
       oa => sps%GetOrbit(a)
-      if(oa%ph == 0) cycle
+      if(abs(oa%occ) > 1.d-6) cycle
       do b = a, sps%norbs
         ob => sps%GetOrbit(b)
-        if(ob%ph == 0) cycle
+        if(abs(ob%occ) > 1.d-6) cycle
         if(oa%l /= ob%l) cycle
         if(oa%j /= ob%j) cycle
         if(oa%z /= ob%z) cycle
@@ -1532,13 +1532,13 @@ vsum = vsum + dble(2*J2+1) * v
       r = 0.d0
       do c = 1, sps%norbs
         oc => sps%GetOrbit(c)
-        if(oc%ph == 0) cycle
+        if(abs(oc%occ) > 1.d-6) cycle
         do i = 1, sps%norbs
           oi => sps%GetOrbit(i)
-          if(oi%ph == 1) cycle
+          if(abs(oi%occ) < 1.d-6) cycle
           do j = 1, sps%norbs
             oj => sps%GetOrbit(j)
-            if(oj%ph == 1) cycle
+            if(abs(oj%occ) < 1.d-6) cycle
 
             if((-1)**(oa%l+oc%l+oi%l+oj%l) == -1) cycle
             if(oa%z+oc%z /= oi%z+oj%z) cycle
@@ -1597,10 +1597,10 @@ vsum = vsum + dble(2*J2+1) * v
     cnt = 0
     do i = 1, sps%norbs
       oi => sps%GetOrbit(i)
-      if(oi%ph == 1) cycle
+      if(abs(oi%occ) < 1.d-6) cycle
       do j = i, sps%norbs
         oj => sps%GetOrbit(j)
-        if(oj%ph == 1) cycle
+        if(abs(oj%occ) < 1.d-6) cycle
         if(oi%l /= oj%l) cycle
         if(oi%j /= oj%j) cycle
         if(oi%z /= oj%z) cycle
@@ -1614,10 +1614,10 @@ vsum = vsum + dble(2*J2+1) * v
     cnt = 0
     do i = 1, sps%norbs
       oi => sps%GetOrbit(i)
-      if(oi%ph == 1) cycle
+      if(abs(oi%occ) < 1.d-6) cycle
       do j = i, sps%norbs
         oj => sps%GetOrbit(j)
-        if(oj%ph == 1) cycle
+        if(abs(oj%occ) < 1.d-6) cycle
         if(oi%l /= oj%l) cycle
         if(oi%j /= oj%j) cycle
         if(oi%z /= oj%z) cycle
@@ -1640,15 +1640,15 @@ vsum = vsum + dble(2*J2+1) * v
       r = 0.d0
       do a = 1, sps%norbs
         oa => sps%GetOrbit(a)
-        if(oa%ph == 0) cycle
+        if(abs(oa%occ) > 1.d-6) cycle
 
         do b = 1, sps%norbs
           ob => sps%GetOrbit(b)
-          if(ob%ph == 0) cycle
+          if(abs(ob%occ) > 1.d-6) cycle
 
           do k = 1, sps%norbs
             ok => sps%GetOrbit(k)
-            if(ok%ph == 1) cycle
+            if(abs(ok%occ) < 1.d-6) cycle
 
             if((-1)**(oa%l+ob%l+oi%l+ok%l) == -1) cycle
             if(oa%z + ob%z /= oi%z + ok%z) cycle
@@ -1708,10 +1708,10 @@ vsum = vsum + dble(2*J2+1) * v
     cnt = 0
     do a = 1, sps%norbs
       oa => sps%GetOrbit(a)
-      if(oa%ph == 0) cycle
+      if(abs(oa%occ) > 1.d-6) cycle
       do i = 1, sps%norbs
         oi => sps%GetOrbit(i)
-        if(oi%ph == 1) cycle
+        if(abs(oi%occ) < 1.d-6) cycle
         if(oa%l /= oi%l) cycle
         if(oa%j /= oi%j) cycle
         if(oa%z /= oi%z) cycle
@@ -1725,10 +1725,10 @@ vsum = vsum + dble(2*J2+1) * v
     cnt = 0
     do a = 1, sps%norbs
       oa => sps%GetOrbit(a)
-      if(oa%ph == 0) cycle
+      if(abs(oa%occ) > 1.d-6) cycle
       do i = 1, sps%norbs
         oi => sps%GetOrbit(i)
-        if(oi%ph == 1) cycle
+        if(abs(oi%occ) < 1.d-6) cycle
         if(oa%l /= oi%l) cycle
         if(oa%j /= oi%j) cycle
         if(oa%z /= oi%z) cycle
@@ -1751,13 +1751,13 @@ vsum = vsum + dble(2*J2+1) * v
       r = 0.d0
       do b = 1, sps%norbs
         ob => sps%GetOrbit(b)
-        if(ob%ph == 0) cycle
+        if(abs(ob%occ) > 1.d-6) cycle
         do c = 1, sps%norbs
           oc => sps%GetOrbit(c)
-          if(oc%ph == 0) cycle
+          if(abs(oc%occ) > 1.d-6) cycle
           do j = 1, sps%norbs
             oj => sps%GetOrbit(j)
-            if(oj%ph == 1) cycle
+            if(abs(oj%occ) < 1.d-6) cycle
             if((-1)**(oa%l+oj%l+ob%l+oc%l) == -1) cycle
             if(oa%z+oj%z /= ob%z+oc%z) cycle
             e_ai = denom1b(hamil%one, i, a)
@@ -1785,13 +1785,13 @@ vsum = vsum + dble(2*J2+1) * v
 
       do b = 1, sps%norbs
         ob => sps%GetOrbit(b)
-        if(ob%ph == 0) cycle
+        if(abs(ob%occ) > 1.d-6) cycle
         do j = 1, sps%norbs
           oj => sps%GetOrbit(j)
-          if(oj%ph == 1) cycle
+          if(abs(oj%occ) < 1.d-6) cycle
           do k = 1, sps%norbs
             ok => sps%GetOrbit(k)
-            if(ok%ph == 1) cycle
+            if(abs(ok%occ) < 1.d-6) cycle
 
             if((-1)**(oa%l+ob%l+oj%l+ok%l) == -1) cycle
             if(oa%z + ob%z /= oj%z + ok%z) cycle
