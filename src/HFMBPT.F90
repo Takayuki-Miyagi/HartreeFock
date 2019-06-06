@@ -567,7 +567,7 @@ vsum = vsum + dble(2*J2+1) * v
           if( ms%sps%orb(i)%ph /= 0 ) cycle
           if( ms%sps%orb(j)%ph /= 0 ) cycle
           max_val = max(max_val, &
-              & h%two%GetTwBME(i,j,a,b,J2) / abs(denom2b(h%one,i,j,a,b)))
+              & abs(h%two%GetTwBME(i,j,a,b,J2)) / abs(denom2b(h%one,i,j,a,b)))
 
         end do
       end do

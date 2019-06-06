@@ -141,11 +141,10 @@ module StoreCouplings
   end type NineJs_final
 
   type :: NineJs_intermediate
-    type(NineJs_final), allocatable :: v(:,:,:,:)
-    integer :: j12min, j12max
-    integer :: j34min, j34max
-    integer :: j13min, j13max
-    integer :: j24min, j24max
+    type(NineJs_final), allocatable :: v(:,:)
+    integer, allocatable :: jds2i_1234(:,:), jds2i_1324(:,:)
+    integer, allocatable :: i2j12d(:), i2j34d(:), i2j13d(:), i2j24d(:)
+    integer :: imax_1234, imax_1324
   contains
     procedure :: InitNineJs_intermediate
     procedure :: FinNineJs_intermediate
@@ -164,10 +163,6 @@ module StoreCouplings
     logical :: half_j2
     logical :: half_j3
     logical :: half_j4
-    logical :: half_j12
-    logical :: half_j34
-    logical :: half_j13
-    logical :: half_j24
     logical :: half_j
   contains
     procedure :: InitNineJsStore
@@ -662,11 +657,6 @@ contains
       write(*,*) "Error occures in 9-j symbol storing"
       return
     end if
-
-    this%half_j12 = half_j12
-    this%half_j34 = half_j34
-    this%half_j13 = half_j13
-    this%half_j24 = half_j24
     this%half_j = half_j1234
 
     allocate(this%v(j1min:j1max,j2min:j2max,j3min:j3max,j4min:j4max))
@@ -698,42 +688,38 @@ contains
     ! inputs are double j
     class(NineJsStore), intent(in) :: this
     integer, intent(in) :: j1d, j2d, j3d, j4d, j12d, j34d, j13d, j24d, jd
-    integer :: j1, j2, j3, j4, j12, j34, j13, j24, j
+    integer :: j1, j2, j3, j4, j
+    integer :: i1234, i1324
     real(8) :: r
 
     j1 = j1d / 2
     j2 = j2d / 2
     j3 = j3d / 2
     j4 = j4d / 2
-    j12 = j12d / 2
-    j34 = j34d / 2
-    j13 = j13d / 2
-    j24 = j24d / 2
     j = jd / 2
 
     if(this%half_j1 ) j1  = (j1d +1) / 2
     if(this%half_j2 ) j2  = (j2d +1) / 2
     if(this%half_j3 ) j3  = (j3d +1) / 2
     if(this%half_j4 ) j4  = (j4d +1) / 2
-    if(this%half_j12) j12 = (j12d+1) / 2
-    if(this%half_j34) j34 = (j34d+1) / 2
-    if(this%half_j13) j13 = (j13d+1) / 2
-    if(this%half_j24) j24 = (j24d+1) / 2
     if(this%half_j  ) j   = (jd  +1) / 2
 
-    r = this%v(j1,j2,j3,j4)%v(j12,j34,j13,j24)%v(j)
+    i1234 = this%v(j1,j2,j3,j4)%jds2i_1234(j12d,j34d)
+    i1324 = this%v(j1,j2,j3,j4)%jds2i_1324(j13d,j24d)
+    if(i1234 * i1324 == 0) then
+      write(*,"(a)") "Warning: GetStoredNineJ"
+      return
+    end if
+
+    r = this%v(j1,j2,j3,j4)%v(i1234,i1324)%v(j)
   end function GetStoredNineJ
 
   subroutine FinNineJs_intermediate(this)
     class(NineJs_intermediate), intent(inout) :: this
-    integer :: j12, j34, j13, j24
-    do j12 = this%j12min, this%j12max
-      do j34 = this%j34min, this%j34max
-        do j13 = this%j13min, this%j13max
-          do j24 = this%j24min, this%j24max
-            call this%v(j12,j34,j13,j24)%fin()
-          end do
-        end do
+    integer :: i1234, i1324
+    do i1234 = 1, this%imax_1234
+      do i1324 = 1, this%imax_1324
+        call this%v(i1234,i1324)%fin()
       end do
     end do
     deallocate(this%v)
@@ -741,21 +727,19 @@ contains
 
   subroutine InitNineJs_intermediate(this,j1d,j2d,j3d,j4d,&
         & half_j12,half_j34,half_j13,half_j24,jd)
+    use MyLibrary, only: triag
     class(NineJs_intermediate), intent(inout) :: this
     integer, intent(in) :: j1d,j2d,j3d,j4d
     logical, intent(in) :: half_j12, half_j34, half_j13, half_j24
     integer, intent(in), optional :: jd
-    logical :: half_j1234, half_j1324, half_j
+    logical :: half_j
     integer :: j12,j34,j13,j24
     integer :: j12d,j34d,j13d,j24d
-    integer :: j12min = -1,j12max = -1
-    integer :: j34min = -1,j34max = -1
-    integer :: j13min = -1,j13max = -1
-    integer :: j24min = -1,j24max = -1
     integer :: j12dmin,j12dmax
     integer :: j34dmin,j34dmax
     integer :: j13dmin,j13dmax
     integer :: j24dmin,j24dmax
+    integer :: cnt, i1234, i1324
 
     j12dmin = abs(j1d-j2d)
     j34dmin = abs(j3d-j4d)
@@ -766,57 +750,70 @@ contains
     j13dmax =     j1d+j3d
     j24dmax =     j2d+j4d
 
-    j12min = j12dmin / 2
-    j12max = j12dmax / 2
-    j34min = j34dmin / 2
-    j34max = j34dmax / 2
-    j13min = j13dmin / 2
-    j13max = j13dmax / 2
-    j24min = j24dmin / 2
-    j24max = j24dmax / 2
-    if(half_j12) j12min = (j12dmin+1)/2
-    if(half_j12) j12max = (j12dmax+1)/2
-    if(half_j34) j34min = (j34dmin+1)/2
-    if(half_j34) j34max = (j34dmax+1)/2
-    if(half_j13) j13min = (j13dmin+1)/2
-    if(half_j13) j13max = (j13dmax+1)/2
-    if(half_j24) j24min = (j24dmin+1)/2
-    if(half_j24) j24max = (j24dmax+1)/2
+    half_j = half_j12 .neqv. half_j34
+    cnt = 0
+    do j12d = j12dmin, j12dmax, 2
+      do j34d = j34dmin, j34dmax, 2
+        if(present(jd)) then
+          if(triag(j12d, j34d, jd)) cycle
+        end if
+        cnt = cnt + 1
+      end do
+    end do
+    this%imax_1234 = cnt
+    allocate(this%jds2i_1234(j12dmin:j12dmax, j34dmin:j34dmax))
+    allocate(this%i2j12d(this%imax_1234))
+    allocate(this%i2j34d(this%imax_1234))
+    this%jds2i_1234(:,:) = 0
+    cnt = 0
+    do j12d = j12dmin, j12dmax, 2
+      do j34d = j34dmin, j34dmax, 2
+        if(present(jd)) then
+          if(triag(j12d, j34d, jd)) cycle
+        end if
+        cnt = cnt + 1
+        this%jds2i_1234(j12d,j34d) = cnt
+        this%i2j12d(cnt) = j12d
+        this%i2j34d(cnt) = j34d
+      end do
+    end do
 
-    half_j1234 = half_j12 .neqv. half_j34
-    half_j1324 = half_j13 .neqv. half_j24
-    if(half_j1234 .neqv. half_j1324) then
-      write(*,*) "Error occures in 9-j symbol storing"
-      return
-    end if
-    half_j = half_j1234
+    cnt = 0
+    do j13d = j13dmin, j13dmax, 2
+      do j24d = j24dmin, j24dmax, 2
+        if(present(jd)) then
+          if(triag(j13d, j24d, jd)) cycle
+        end if
+        cnt = cnt + 1
+      end do
+    end do
+    this%imax_1324 = cnt
+    allocate(this%jds2i_1324(j13dmin:j13dmax, j24dmin:j24dmax))
+    allocate(this%i2j13d(this%imax_1324))
+    allocate(this%i2j24d(this%imax_1324))
+    this%jds2i_1324(:,:) = 0
+    cnt = 0
+    do j13d = j13dmin, j13dmax, 2
+      do j24d = j24dmin, j24dmax, 2
+        if(present(jd)) then
+          if(triag(j13d, j24d, jd)) cycle
+        end if
+        cnt = cnt + 1
+        this%jds2i_1324(j13d,j24d) = cnt
+        this%i2j13d(cnt) = j13d
+        this%i2j24d(cnt) = j24d
+      end do
+    end do
 
-    allocate(this%v(j12min:j12max,j34min:j34max,j13min:j13max,j24min:j24max))
-    this%j12min = j12min
-    this%j12max = j12max
-    this%j34min = j34min
-    this%j34max = j34max
-    this%j13min = j13min
-    this%j13max = j13max
-    this%j24min = j24min
-    this%j24max = j24max
-
-    do j12 = j12min, j12max
-      j12d = 2*j12
-      if(half_j12) j12d = 2*j12-1
-      do j34 = j34min, j34max
-        j34d = 2*j34
-        if(half_j34) j34d = 2*j34-1
-        do j13 = j13min, j13max
-          j13d = 2*j13
-          if(half_j13) j13d = 2*j13-1
-          do j24 = j24min, j24max
-            j24d = 2*j24
-            if(half_j24) j24d = 2*j24-1
-            call this%v(j12,j34,j13,j24)%init(j1d,j2d,j3d,j4d,&
-                & j12d,j34d,j13d,j24d,half_j,jd)
-          end do
-        end do
+    allocate(this%v(this%imax_1234,this%imax_1324))
+    do i1234 = 1, this%imax_1234
+      j12d = this%i2j12d(i1234)
+      j34d = this%i2j34d(i1234)
+      do i1324 = 1, this%imax_1324
+        j13d = this%i2j13d(i1324)
+        j24d = this%i2j24d(i1324)
+        call this%v(i1234,i1324)%init(j1d,j2d,j3d,j4d,&
+            & j12d,j34d,j13d,j24d,half_j,jd)
       end do
     end do
   end subroutine InitNineJs_intermediate

@@ -4,6 +4,7 @@ program HFMain
   use HFInput
   use ModelSpace
   use Operators
+  use ThreeBodyMonInteraction
   use HartreeFock
   use HFMBPT
   use WriteOperator
@@ -12,6 +13,8 @@ program HFMain
   type(InputParameters) :: p
   type(MSpace) :: ms
   type(Ops) :: h, opr, htr
+  type(ThreeBodyMonForce) :: mon
+  type(Read3BodyMonopole) :: read3mon
   type(HFSolver) :: HF
   type(MBPTEnergy) :: PT
   type(MBPTScalar) :: PTs
@@ -66,6 +69,7 @@ program HFMain
   end select
   call w%init(p%emax, p%e2max)
 
+
   ! Hamiltonian -----
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
@@ -77,10 +81,20 @@ program HFMain
       & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
       & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
-  call HF%init(h,alpha=p%alpha)
-  call HF%solve()
+  select case(p%int_3n_mon_file)
+  case("none", "None", "NONE")
+    call HF%init(h,alpha=p%alpha)
+  case default
+    call mon%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
+    call read3mon%set(p%int_3n_mon_file)
+    call read3mon%set(p%emax_mon, p%e2max_mon, p%e3max_mon, p%lmax_mon)
+    call read3mon%ReadThreeBodyMonopole(mon)
+    call HF%init(h,mon=mon,alpha=p%alpha)
+  end select
 
+  call HF%solve()
   htr = HF%BasisTransform(h)
+
   if(p%is_MBPTEnergy) then
     call PT%calc(htr)
     open(wunit, file = p%summary_file, action='write',status='replace')
