@@ -96,7 +96,7 @@ program HFMain
   htr = HF%BasisTransform(h)
 
   if(p%is_MBPTEnergy) then
-    call PT%calc(htr)
+    call PT%calc(htr, p%is_4th_order)
     open(wunit, file = p%summary_file, action='write',status='replace')
     call p%PrintInputParameters(wunit)
     write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b

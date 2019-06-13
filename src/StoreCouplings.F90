@@ -674,7 +674,7 @@ contains
             j4d = 2*j4
             if(half_j4) j4d = 2*j4-1
             call this%v(j1,j2,j3,j4)%init(j1d,j2d,j3d,j4d, &
-                & half_j12,half_j34,half_j13,half_j24,jd)
+                & half_j12,half_j34,jd)
           end do
         end do
       end do
@@ -706,6 +706,7 @@ contains
 
     i1234 = this%v(j1,j2,j3,j4)%jds2i_1234(j12d,j34d)
     i1324 = this%v(j1,j2,j3,j4)%jds2i_1324(j13d,j24d)
+    r = 0.d0
     if(i1234 * i1324 == 0) then
       write(*,"(a)") "Warning: GetStoredNineJ"
       return
@@ -726,14 +727,13 @@ contains
   end subroutine FinNineJs_intermediate
 
   subroutine InitNineJs_intermediate(this,j1d,j2d,j3d,j4d,&
-        & half_j12,half_j34,half_j13,half_j24,jd)
+        & half_j12,half_j34,jd)
     use MyLibrary, only: triag
     class(NineJs_intermediate), intent(inout) :: this
     integer, intent(in) :: j1d,j2d,j3d,j4d
-    logical, intent(in) :: half_j12, half_j34, half_j13, half_j24
+    logical, intent(in) :: half_j12, half_j34
     integer, intent(in), optional :: jd
     logical :: half_j
-    integer :: j12,j34,j13,j24
     integer :: j12d,j34d,j13d,j24d
     integer :: j12dmin,j12dmax
     integer :: j34dmin,j34dmax

@@ -8,19 +8,46 @@ module HFMBPT
 
   public :: MBPTEnergy, MBPTScalar, MBPTDMat
 
+  ! Methods for MBPTEnergy
   private :: CalcEnergyCorr
-  private :: energy_second
-  private :: denom1b
-  private :: denom2b
-  private :: Eket
-  private :: Pari
-  private :: Tz
-  private :: energy_third_pp
-  private :: energy_third_hh
-  private :: energy_third_ph
-  private :: cross_couple
   private :: MBPTCriteria
+  private :: energy_second
+  private :: energy_third_hh
+  private :: energy_third_pp
+  private :: energy_third_ph
+  private :: energy_fourth_F1
+  !private :: energy_fourth_F3
+  !private :: energy_fourth_F4
+  !private :: energy_fourth_F5
+  !private :: energy_fourth_F7
+  !private :: energy_fourth_F8
+  !private :: energy_fourth_F10
+  !private :: energy_fourth_F12
+  !private :: energy_fourth_F13
+  !private :: energy_fourth_F14
+  !private :: energy_fourth_F15
+  !private :: energy_fourth_F16
+  !private :: energy_fourth_F17
+  !private :: energy_fourth_F19
+  !private :: energy_fourth_F20
+  !private :: energy_fourth_F21
+  !private :: energy_fourth_F23
+  !private :: energy_fourth_F25
+  !private :: energy_fourth_F26
+  !private :: energy_fourth_F27
+  !private :: energy_fourth_F28
+  !private :: energy_fourth_F29
+  !private :: energy_fourth_F31
+  !private :: energy_fourth_F32
+  !private :: energy_fourth_F33
+  !private :: energy_fourth_F34
+  !private :: energy_fourth_F35
+  !private :: energy_fourth_F36
+  !private :: energy_fourth_F37
+  !private :: energy_fourth_F38
+  !private :: energy_fourth_F39
 
+  ! Methods for Scalar Operator
   private :: CalcScalarCorr
   private :: scalar_first
   private :: scalar_second
@@ -34,6 +61,24 @@ module HFMBPT
   private :: scalar_second_v2hh
   private :: scalar_second_v2ph
 
+  ! Methods for density matrix
+  private :: InitMBPTDMat
+  private :: FinMBPTDMat
+  private :: density_matrix_pp
+  private :: density_matrix_hh
+  private :: density_matrix_ph
+  private :: GetCoef
+
+  ! Methods for general
+  private :: denom1b
+  private :: denom2b
+  private :: denom3b
+  private :: denom4b
+  private :: Eket
+  private :: Pari
+  private :: Tz
+  private :: cross_couple
+
   type :: MBPTEnergy
     real(8) :: e_0 = 0.d0
     real(8) :: e_2 = 0.d0
@@ -41,16 +86,14 @@ module HFMBPT
     real(8) :: e_3_pp = 0.d0
     real(8) :: e_3_hh = 0.d0
     real(8) :: e_3_ph = 0.d0
+    real(8) :: e_4(39)= 0.d0
     real(8) :: perturbativity1b = 0.d0
     real(8) :: perturbativity2b = 0.d0
     real(8) :: energy_gap = 0.d0
   contains
     procedure :: calc => CalcEnergyCorr
-    procedure :: energy_second
     procedure :: energy_third
-    procedure :: energy_third_pp
-    procedure :: energy_third_hh
-    procedure :: energy_third_ph
+    procedure :: energy_fourth
     procedure :: MBPTCriteria
   end type MBPTEnergy
 
@@ -85,28 +128,26 @@ module HFMBPT
     real(8) :: s_2_v2ph = 0.d0
   contains
     procedure :: calc => CalcScalarCorr
-    procedure :: scalar_first
     procedure :: scalar_second
-    procedure :: scalar_second_s1p
-    procedure :: scalar_second_s1h
-    procedure :: scalar_second_s1ph
-    procedure :: scalar_second_s2pp
-    procedure :: scalar_second_s2hh
-    procedure :: scalar_second_s2ph
-    procedure :: scalar_second_v2pp
-    procedure :: scalar_second_v2hh
-    procedure :: scalar_second_v2ph
   end type MBPTScalar
   type(SixJsStore), private :: sixjs
 contains
 
-  subroutine CalcEnergyCorr(this,hamil)
+  subroutine CalcEnergyCorr(this,hamil,fourth_order)
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: hamil
-    integer :: jmax
+    logical, intent(in), optional :: fourth_order
+    logical :: is_4th_order=.false.
+    integer :: i, jmax
 
+    if(present(fourth_order)) is_4th_order=fourth_order
     write(*,*)
-    write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
+    if(.not. is_4th_order) then
+      write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
+    end if
+    if(is_4th_order) then
+      write(*,'(a)') " Many-body perturbation calculation up to 4th order"
+    end if
     write(*,*)
 
     if(.not. hamil%is_normal_ordered) then
@@ -120,18 +161,30 @@ contains
     call this%MBPTCriteria(hamil)
 
     this%e_0 = hamil%zero
-    call this%energy_second(hamil)
+    this%e_2 = energy_second(hamil)
     write(*,'(a,f16.8)') "Second order correction: ", this%e_2
 
     call this%energy_third(hamil)
     write(*,'(a,4f16.8)') "Third order corrections pp, hh, ph, and total: ", &
         & this%e_3_pp, this%e_3_hh, this%e_3_ph, this%e_3
-    write(*,'(a,f16.8)') "Third order MBPT energy: ", this%e_0 + this%e_2 + this%e_3
+    if(.not. is_4th_order) then
+      write(*,'(a,f16.8)') "Third order MBPT energy: ", this%e_0 + this%e_2 + this%e_3
+    end if
+
+    if(is_4th_order) then
+      call this%energy_fourth(hamil)
+      do i = 1, 39
+        write(*,"(a,i2,f16.8)") "Fourth order correction F", i, this%e_4(i)
+      end do
+      write(*,'(a,f16.8)') "Total Fourth order correction: ", sum(this%e_4)
+      write(*,'(a,f16.8)') "Fourth order MBPT energy: ", this%e_0 + &
+          & this%e_2 + this%e_3 + sum(this%e_4)
+    end if
     call sixjs%fin()
 
   end subroutine CalcEnergyCorr
 
-  subroutine energy_second(this,h)
+  function energy_second(h) result(r)
     ! a, b : particle
     ! i, j : hole
     !     _____________
@@ -145,13 +198,12 @@ contains
     !
     ! \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
     use Profiler, only: timer
-    class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
-    real(8) :: vsum, v, ti
+    real(8) :: vsum, v, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -162,7 +214,6 @@ contains
       n = ch_two%n_state
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
-
       v = 0.d0
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
@@ -181,11 +232,9 @@ contains
       !$omp end parallel
       vsum = vsum + v * dble(2*J2+1)
     end do
-
-    this%e_2 = vsum
-
+    r = vsum
     call timer%Add("Second order MBPT",omp_get_wtime()-ti)
-  end subroutine energy_second
+  end function energy_second
 
   function denom1b(f,h1,p1) result(r)
     type(OneBodyPart), intent(in) :: f
@@ -203,6 +252,26 @@ contains
     r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) - &
         & f%GetOBME(p1,p1) - f%GetOBME(p2,p2)
   end function denom2b
+
+  function denom3b(f,h1,h2,h3,p1,p2,p3) result(r)
+    type(OneBodyPart), intent(in) :: f
+    integer, intent(in) :: h1, h2, h3, p1, p2, p3
+    real(8) :: r
+
+    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) + f%GetOBME(h3,h3) - &
+        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - f%GetOBME(p3,p3)
+  end function denom3b
+
+  function denom4b(f,h1,h2,h3,h4,p1,p2,p3,p4) result(r)
+    type(OneBodyPart), intent(in) :: f
+    integer, intent(in) :: h1, h2, h3, h4, p1, p2, p3, p4
+    real(8) :: r
+
+    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) + &
+        & f%GetOBME(h3,h3) + f%GetOBME(h4,h4) - &
+        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - &
+        & f%GetOBME(p3,p3) - f%GetOBME(p4,p4)
+  end function denom4b
 
   function Eket(sps,a,b)
     type(Orbits), intent(in) :: sps
@@ -229,13 +298,58 @@ contains
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
 
-    call this%energy_third_hh(h)
-    call this%energy_third_pp(h)
-    call this%energy_third_ph(h)
+    this%e_3_hh = energy_third_hh(h)
+    this%e_3_pp = energy_third_pp(h)
+    this%e_3_ph = energy_third_ph(h)
     this%e_3 = this%e_3_hh + this%e_3_pp + this%e_3_ph
   end subroutine energy_third
 
-  subroutine energy_third_pp(this,h)
+  subroutine energy_fourth(this,h)
+    class(MBPTEnergy), intent(inout) :: this
+    type(Ops), intent(in) :: h
+
+    this%e_4(1) = energy_fourth_F1(h)
+    this%e_4(2) = this%e_4(1)
+    !call this%energy_fourth_F3(h)
+    !call this%energy_fourth_F4(h)
+    !call this%energy_fourth_F5(h)
+    !this%e_4(6) = this%e_4(5)
+    !call this%energy_fourth_F7(h)
+    !call this%energy_fourth_F8(h)
+    !this%e_4(9) = this%e_4(8)
+    !call this%energy_fourth_F10(h)
+    !this%e_4(11) = this%e_4(10)
+    !call this%energy_fourth_F12(h)
+    !call this%energy_fourth_F13(h)
+    !call this%energy_fourth_F14(h)
+    !call this%energy_fourth_F15(h)
+    !call this%energy_fourth_F16(h)
+    !call this%energy_fourth_F17(h)
+    !this%e_4(18) = this%e_4(17)
+    !call this%energy_fourth_F19(h)
+    !call this%energy_fourth_F20(h)
+    !call this%energy_fourth_F21(h)
+    !this%e_4(22) = this%e_4(21)
+    !call this%energy_fourth_F23(h)
+    !this%e_4(24) = this%e_4(23)
+    !call this%energy_fourth_F25(h)
+    !call this%energy_fourth_F26(h)
+    !call this%energy_fourth_F27(h)
+    !call this%energy_fourth_F28(h)
+    !call this%energy_fourth_F29(h)
+    !this%e_4(30) = this%e_4(31)
+    !call this%energy_fourth_F31(h)
+    !call this%energy_fourth_F32(h)
+    !call this%energy_fourth_F33(h)
+    !call this%energy_fourth_F34(h)
+    !call this%energy_fourth_F35(h)
+    !call this%energy_fourth_F36(h)
+    !call this%energy_fourth_F37(h)
+    !call this%energy_fourth_F38(h)
+    !call this%energy_fourth_F39(h)
+  end subroutine energy_fourth
+
+  function energy_third_pp(h) result(r)
     ! a, b, c, d: particle
     ! i, j      : hole
     !     _____________
@@ -250,13 +364,12 @@ contains
     !
     ! <ij||ab> <ab||cd> <cd||ij> / 8 denominator
     use Profiler, only: timer
-    class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
-    real(8) :: v, vsum, ti
+    real(8) :: v, vsum, ti, r
 
     ms => h%ms
     ti = omp_get_wtime()
@@ -294,11 +407,11 @@ contains
       !$omp end parallel
       vsum = vsum + v * dble(2*J2+1)
     end do
-    this%e_3_pp = vsum
+    r = vsum
     call timer%Add("Third order MBPT pp ladder",omp_get_wtime()-ti)
-  end subroutine energy_third_pp
+  end function energy_third_pp
 
-  subroutine energy_third_hh(this,h)
+  function energy_third_hh(h) result(r)
     ! a, b      : particle
     ! i, j, k, l: hole
     !     _____________
@@ -313,13 +426,12 @@ contains
     !
     ! <ij||ab> <kl||ij> <ab||kl> / 8 denominator
     use Profiler, only: timer
-    class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
-    real(8) :: v, vsum, ti
+    real(8) :: v, vsum, ti, r
 
     ti = omp_get_wtime()
 
@@ -359,11 +471,11 @@ contains
 vsum = vsum + dble(2*J2+1) * v
     end do
 
-    this%e_3_hh = vsum
+    r = vsum
     call timer%Add("Third order MBPT hh ladder",omp_get_wtime()-ti)
-  end subroutine energy_third_hh
+  end function energy_third_hh
 
-  subroutine energy_third_ph(this,h)
+  function energy_third_ph(h) result(r)
     ! a, b, c : particle
     ! i, j, k : hole
     !     _____________
@@ -382,14 +494,13 @@ vsum = vsum + dble(2*J2+1) * v
     !                              {a b L}
     use Profiler, only: timer
     use MyLibrary, only: triag
-    class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     integer :: J2
     integer :: a, b, c, i, j, k
     integer :: ia, ib, ic, ii, ij, ik
     integer :: ja, jb, jc, ji, jj, jk
-    real(8) :: v, vsum, norm, ti
+    real(8) :: v, vsum, norm, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -465,9 +576,495 @@ vsum = vsum + dble(2*J2+1) * v
     !$omp end do
     !$omp end parallel
 
-    this%e_3_ph = - vsum
+    r = - vsum
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
-  end subroutine energy_third_ph
+  end function energy_third_ph
+
+  function energy_fourth_F1(h) result(r)
+    ! p1, p2, p3, p4: particle
+    ! h1, h2, h3, h4: hole
+    !     _____________
+    !    /\           /\
+    !   /  \ h1   p2 /  \ h2
+    !p1 |  |         \  /
+    !   |__|__________\/
+    !   |  |
+    !   |  | h3
+    !   |  |__________
+    !p3 |  |          /\
+    !   |  | h3   p4 /  \ h4
+    !   \  /         \  /
+    !    \/___________\/
+    !
+    ! F1 = - (1/4) [J1][J2][K][L]
+    ! { jh1 jh2 J1 } { jh1 jp4 J2 } { jh2 jh2 K }
+    ! { jh2 jp3 K  } { jp4 jp3 K  } { jp4 jp4 L }
+    ! <p1p2:J1||h1h2:J1> <p3h2:J1||p1p2:J1>
+    ! <h1p4:J2||h3h4:J2> <h3h4:J2||p3p4:J2> / denominator
+    !
+    use Profiler, only: timer
+    type(Ops), intent(in) :: h
+    type(MSPace), pointer :: ms
+    type(TwoBodyChannel), pointer :: tbs
+    type(Orbits), pointer :: sps
+    type(Ops) :: v_h1h2p3h2, v_h1p4p3p4
+    type(DMat) :: m1, m2
+    integer :: ch, bra, ket
+    real(8) :: r, ti, vsum
+
+    ti = omp_get_wtime()
+    ms => h%ms
+    sps => ms%sps
+
+    call v_h1h2p3h2%init(0,1,0,"v",ms,2)
+    call v_h1p4p3p4%init(0,1,0,"v",ms,2)
+    do ch = 1, ms%two%NChan
+      tbs => ms%two%jpz(ch)
+      m1 = interaction_channel_pphh(h%two%MatCh(ch,ch), tbs, sps, f=h%one)
+      m2 = interaction_channel_phpp(h%two%MatCh(ch,ch), tbs, sps)
+      v_h1h2p3h2%two%MatCh(ch,ch)%DMat = m1%T() * m2%T()
+      m2 = interaction_channel_phhh(h%two%MatCh(ch,ch), tbs, sps)
+      v_h1p4p3p4%two%MatCh(ch,ch)%DMat = m2 * m1%T()
+      call m1%fin()
+      call m2%fin()
+    end do
+
+
+    call v_h1h2p3h2%fin()
+    call v_h1p4p3p4%fin()
+    r = -0.25d0 * vsum
+    call timer%Add("Fourth order MBPT F1",omp_get_wtime()-ti)
+  end function energy_fourth_F1
+
+  function interaction_channel_pppp(vch, tbs, sps) result(m)
+    type(TwoBodyPartChannel), intent(in) :: vch
+    type(TwoBodyChannel), intent(in) :: tbs
+    type(Orbits), intent(in) :: sps
+    type(DMat) :: m
+    integer :: bra, ket
+    integer :: a, b, c, d
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+
+    call m%zeros(tbs%n_state, tbs%n_state)
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ+ob%occ) > 1.d-6) cycle
+      do ket = 1, tbs%n_state
+        c = tbs%n2spi1(ket)
+        d = tbs%n2spi2(ket)
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ+od%occ) > 1.d-6) cycle
+        m%m(bra,ket) = vch%m(bra,ket)
+      end do
+    end do
+  end function interaction_channel_pppp
+
+  function interaction_channel_hhhh(vch, tbs, sps) result(m)
+    type(TwoBodyPartChannel), intent(in) :: vch
+    type(TwoBodyChannel), intent(in) :: tbs
+    type(Orbits), intent(in) :: sps
+    type(DMat) :: m
+    integer :: bra, ket
+    integer :: a, b, c, d
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+
+    call m%zeros(tbs%n_state, tbs%n_state)
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)*abs(ob%occ) < 1.d-6) cycle
+      do ket = 1, tbs%n_state
+        c = tbs%n2spi1(ket)
+        d = tbs%n2spi2(ket)
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        m%m(bra,ket) = vch%m(bra,ket)
+      end do
+    end do
+  end function interaction_channel_hhhh
+
+  function interaction_channel_pphh(vch, tbs, sps, f) result(m)
+    type(TwoBodyPartChannel), intent(in) :: vch
+    type(TwoBodyChannel), intent(in) :: tbs
+    type(Orbits), intent(in) :: sps
+    type(OneBodyPart), intent(in), optional :: f
+    logical :: denom = .true.
+    type(DMat) :: m
+    integer :: bra, ket
+    integer :: a, b, c, d
+    real(8) :: eps
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+
+    if(present(f)) denom = .true.
+    call m%zeros(tbs%n_state, tbs%n_state)
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+      do ket = 1, tbs%n_state
+        c = tbs%n2spi1(ket)
+        d = tbs%n2spi2(ket)
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        eps = 1.d0
+        if(denom) eps = 1.d0 / denom2b(f,c,d,a,b)
+        m%m(bra,ket) = vch%m(bra,ket) * eps
+      end do
+    end do
+  end function interaction_channel_pphh
+
+  function interaction_channel_phhh(vch, tbs, sps) result(m)
+    type(TwoBodyPartChannel), intent(in) :: vch
+    type(TwoBodyChannel), intent(in) :: tbs
+    type(Orbits), intent(in) :: sps
+    type(DMat) :: m
+    integer :: bra, ket
+    integer :: a, b, c, d
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+
+    call m%zeros(tbs%n_state, tbs%n_state)
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      do ket = 1, tbs%n_state
+        c = tbs%n2spi1(ket)
+        d = tbs%n2spi2(ket)
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        m%m(bra,ket) = vch%m(bra,ket)
+      end do
+    end do
+  end function interaction_channel_phhh
+
+  function interaction_channel_phpp(vch, tbs, sps) result(m)
+    type(TwoBodyPartChannel), intent(in) :: vch
+    type(TwoBodyChannel), intent(in) :: tbs
+    type(Orbits), intent(in) :: sps
+    type(DMat) :: m
+    integer :: bra, ket
+    integer :: a, b, c, d
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+
+    call m%zeros(tbs%n_state, tbs%n_state)
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      do ket = 1, tbs%n_state
+        c = tbs%n2spi1(ket)
+        d = tbs%n2spi2(ket)
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+        m%m(bra,ket) = vch%m(bra,ket)
+      end do
+    end do
+  end function interaction_channel_phpp
+
+  function energy_fourth_F1_old(h) result(r)
+    ! p1, p2, p3, p4: particle
+    ! h1, h2, h3, h4: hole
+    !     _____________
+    !    /\           /\
+    !   /  \ h1   p2 /  \ h2
+    !p1 |  |         \  /
+    !   |__|__________\/
+    !   |  |
+    !   |  | h3
+    !   |  |__________
+    !p3 |  |          /\
+    !   |  | h3   p4 /  \ h4
+    !   \  /         \  /
+    !    \/___________\/
+    !
+    ! F1 = - (1/4) [J1][J2][K][L]
+    ! { jh1 jh2 J1 } { jh1 jp4 J2 } { jh2 jh2 K }
+    ! { jh2 jp3 K  } { jp4 jp3 K  } { jp4 jp4 L }
+    ! <p1p2:J1||h1h2:J1> <p3h2:J1||p1p2:J1>
+    ! <h1p4:J2||h3h4:J2> <h3h4:J2||p3p4:J2> / denominator
+    !
+    use Profiler, only: timer
+    use MyLibrary, only: triag
+    type(Ops), intent(in) :: h
+    type(MSPace), pointer :: ms
+    type(Orbits), pointer :: sps
+    integer :: p1, p2, p3, p4
+    integer :: h1, h2, h3, h4
+    type(SingleParticleOrbit), pointer :: op1, op2, op3, op4
+    type(SingleParticleOrbit), pointer :: oh1, oh2, oh3, oh4
+    integer :: J1min, J1max, J2min, J2max, Kmin, Kmax, Lmin, Lmax
+    integer :: J1, J2, K, L
+    real(8) :: delp12, delh12, delh34, delp34
+    real(8) :: v1, v2, v, vsum, ti, r
+
+    ti = omp_get_wtime()
+    ms => h%ms
+    sps => ms%sps
+    vsum = 0.d0
+    do p1 = 1, sps%norbs
+      op1 => sps%GetOrbit(p1)
+      if(abs(op1%occ) > 1.d-6) cycle
+      do p2 = 1, sps%norbs
+        op2 => sps%GetOrbit(p2)
+        if(abs(op2%occ) > 1.d-6) cycle
+        if(op1%e + op2%e > ms%e2max) cycle
+        do p3 = 1, sps%norbs
+          op3 => sps%GetOrbit(p3)
+          if(abs(op3%occ) > 1.d-6) cycle
+          do p4 = 1, sps%norbs
+            op4 => sps%GetOrbit(p4)
+            if(abs(op4%occ) > 1.d-6) cycle
+            if(op3%e + op4%e > ms%e2max) cycle
+
+            do h1 = 1, sps%norbs
+              oh1 => sps%GetOrbit(h1)
+              if(abs(oh1%occ) < 1.d-6) cycle
+              if(oh1%e + op4%e > ms%e2max) cycle
+              do h2 = 1, sps%norbs
+                oh2 => sps%GetOrbit(h2)
+                if(abs(oh2%occ) < 1.d-6) cycle
+                if(oh1%e + oh2%e > ms%e2max) cycle
+                if(op3%e + oh2%e > ms%e2max) cycle
+                if(mod(op1%l + op2%l + oh1%l + oh2%l, 2)==1) cycle
+                if(mod(op3%l + oh2%l + op1%l + op2%l, 2)==1) cycle
+                if(op1%z + op2%z /= oh1%z + oh2%z) cycle
+                if(op3%z + oh2%z /= op1%z + op2%z) cycle
+                do h3 = 1, sps%norbs
+                  oh3 => sps%GetOrbit(h3)
+                  if(abs(oh3%occ) < 1.d-6) cycle
+                  do h4 = 1, sps%norbs
+                    oh4 => sps%GetOrbit(h4)
+                    if(abs(oh4%occ) < 1.d-6) cycle
+                    if(oh3%e + oh4%e > ms%e2max) cycle
+                    if(mod(oh1%l + op4%l + oh3%l + oh4%l, 2)==1) cycle
+                    if(mod(op3%l + op4%l + oh3%l + oh4%l, 2)==1) cycle
+                    if(oh1%z + op4%z /= oh3%z + oh4%z) cycle
+                    if(op3%z + op4%z /= oh3%z + oh4%z) cycle
+
+                    J1min = max(abs(op1%j-op2%j), abs(oh1%j-oh2%j), abs(op3%j-oh2%j))/2
+                    J1max = min(   (op1%j+op2%j),    (oh1%j+oh2%j),    (op3%j+oh2%j))/2
+                    J2min = max(abs(oh1%j-op4%j), abs(oh3%j-oh4%j), abs(op3%j-op4%j))/2
+                    J2max = min(   (oh1%j+op4%j),    (oh3%j+oh4%j),    (op3%j+op4%j))/2
+                    Kmin = max(abs(oh1%j-op3%j), 0)/2
+                    Kmax = min(   (oh1%j+op3%j), 2*oh2%j, 2*op4%j)/2
+                    Lmin = abs(oh2%j-op4%j)/2
+                    Lmax = (oh2%j+op4%j)/2
+                    if(J1min>J1max) cycle
+                    if(J2min>J2max) cycle
+                    if(Kmin>Kmax) cycle
+                    if(Lmin>Lmax) cycle
+
+                    v = 0.d0
+                    do L = Lmin, Lmax
+                      v1 = 0.d0
+                      v2 = 0.d0
+                      do K = Kmin, Kmax
+
+                        do J1 = J1min, J1max
+                          if(p1==p2 .and. mod(J1,2)==1) cycle
+                          if(h1==h2 .and. mod(J1,2)==1) cycle
+                          v1 = v1 + h%two%GetTwBME(p1,p2,h1,h2,J1) * &
+                              &     h%two%GetTwBME(p3,h2,p1,p2,J1) * &
+                              &     sixjs%get(oh1%j,oh2%j,2*J1,oh2%j,op3%j,2*K) * &
+                              &     dble(2*J1+1)
+                        end do
+
+                        do J2 = J2min, J2max
+                          if(h3==h4 .and. mod(J2,2)==1) cycle
+                          if(p3==p4 .and. mod(J2,2)==1) cycle
+                          v2 = v2 + h%two%GetTwBME(h1,p4,h3,h4,J2) * &
+                              &     h%two%GetTwBME(h3,h4,p3,p4,J2) * &
+                              &     sixjs%get(oh1%j,op4%j,2*J2,op4%j,op3%j,2*K) * &
+                              &     dble(2*J2+1)
+                        end do
+                        v = v + v1 * v2 * dble(2*K+1)*dble(2*L+1)* &
+                            &   sixjs%get(oh2%j,oh2%j,2*K,op4%j,op4%j,2*L)
+                      end do
+                    end do
+                    delp12 = 1.d0
+                    delh12 = 1.d0
+                    delh34 = 1.d0
+                    delp34 = 1.d0
+                    if(p1==p2) delp12 = 2.d0
+                    if(h1==h2) delh12 = sqrt(2.d0)
+                    if(p3==p4) delp34 = sqrt(2.d0)
+                    if(h3==h4) delh34 = 2.d0
+                    vsum = vsum + v * delp12*delh12*delp34*delh34 / ( &
+                        & denom2b(h%one,h1,h2,p1,p2) * &
+                        & denom1b(h%one,h3,p3) * denom2b(h%one,h3,h4,p3,p4))
+                  end do
+                end do
+              end do
+            end do
+
+          end do
+        end do
+      end do
+    end do
+    r = -0.25d0 * vsum
+    call timer%Add("Fourth order MBPT F1",omp_get_wtime()-ti)
+  end function energy_fourth_F1_old
+
+!  function energy_fourth_F4(h) result(r)
+!    ! p1, p2, p3         : particle
+!    ! h1, h2, h3, h4, h5 : hole
+!    !     _____________
+!    !    /\           /\
+!    !   /  \ h1   p2 /  \ h2
+!    !p1 |  |         \  /
+!    !   |  |__________\/
+!    !   |  |
+!    !   |  | h3
+!    !   |  |__________
+!    !   |  |          /\
+!    !   |  | h4   p3 /  \ h5
+!    !   \  /         \  /
+!    !    \/___________\/
+!    !
+!    ! F4 = - (1/4) [J1][J2][K][L]
+!    ! { jp1 jp2 J1 } { jp1 jp3 J2 } { jp2 jp2 K }
+!    ! { jp2 jh3 K  } { jp3 jh3 K  } { jp3 jp3 L }
+!    ! <p1p2:J1||h1h2:J1> <h1h2:J1||h3p2:J1>
+!    ! <h3p3:J2||h4h5:J2> <h4h5:J2||p1p3:J2> / denominator
+!    !
+!    !
+!    use Profiler, only: timer
+!    use MyLibrary, only: triag
+!    type(Ops), intent(in) :: h
+!    type(MSPace), pointer :: ms
+!    type(Orbits), pointer :: sps
+!    integer :: p1, p2, p3
+!    integer :: h1, h2, h3, h4, h5
+!    type(SingleParticleOrbit), pointer :: op1, op2, op3
+!    type(SingleParticleOrbit), pointer :: oh1, oh2, oh3, oh4, oh5
+!    integer :: J1min, J1max, J2min, J2max, Kmin, Kmax, Lmin, Lmax
+!    integer :: J1, J2, K, L
+!    real(8) :: delp12, delh12, delh45, delp13
+!    real(8) :: v1, v2, v, vsum, ti, r
+!
+!
+!    ti = omp_get_wtime()
+!    ms => h%ms
+!    sps => ms%sps
+!    vsum = 0.d0
+!    do p1 = 1, sps%norbs
+!      op1 => sps%GetOrbit(p1)
+!      if(abs(op1%occ) > 1.d-6) cycle
+!      do p2 = 1, sps%norbs
+!        op2 => sps%GetOrbit(p2)
+!        if(abs(op2%occ) > 1.d-6) cycle
+!        if(op1%e + op2%e > ms%e2max) cycle
+!        do p3 = 1, sps%norbs
+!          op3 => sps%GetOrbit(p3)
+!          if(abs(op3%occ) > 1.d-6) cycle
+!          if(op1%e + op3%e > ms%e2max) cycle
+!
+!          do h1 = 1, sps%norbs
+!            oh1 => sps%GetOrbit(h1)
+!            if(abs(oh1%occ) < 1.d-6) cycle
+!            do h2 = 1, sps%norbs
+!              oh2 => sps%GetOrbit(h2)
+!              if(abs(oh2%occ) < 1.d-6) cycle
+!              if(oh1%e + oh2%e > ms%e2max) cycle
+!              if(mod(op1%l + op2%l + oh1%l + oh2%l, 2)==1) cycle
+!              if(op1%z + op2%z /= oh1%z + oh2%z) cycle
+!              do h3 = 1, sps%norbs
+!                oh3 => sps%GetOrbit(h3)
+!                if(abs(oh3%occ) < 1.d-6) cycle
+!                if(oh3%e + op3%e > ms%e2max) cycle
+!                if(oh3%e + op2%e > ms%e2max) cycle
+!                if(mod(oh1%l + oh2%l + oh3%l + op2%l, 2)==1) cycle
+!                if(oh1%z + oh2%z /= oh3%z + op2%z) cycle
+!                do h4 = 1, sps%norbs
+!                  oh4 => sps%GetOrbit(h4)
+!                  if(abs(oh4%occ) < 1.d-6) cycle
+!                  do h5 = 1, sps%norbs
+!                    oh5 => sps%GetOrbit(h5)
+!                    if(abs(oh5%occ) < 1.d-6) cycle
+!                    if(oh4%e + oh5%e > ms%e2max) cycle
+!                    if(mod(oh3%l + op3%l + oh4%l + oh5%l, 2)==1) cycle
+!                    if(mod(oh4%l + oh5%l + op1%l + op3%l, 2)==1) cycle
+!                    if(oh3%z + op3%z /= oh4%z + oh5%z) cycle
+!                    if(oh4%z + oh5%z /= op1%z + op3%z) cycle
+!                    J1min = max(abs(op1%j-op2%j), abs(oh1%j-oh2%j), abs(oh3%j-op2%j))/2
+!                    J1max = min(   (op1%j+op2%j),    (oh1%j+oh2%j),    (oh3%j+op2%j))/2
+!                    J2min = max(abs(oh3%j-op3%j), abs(oh4%j-oh5%j), abs(op1%j-op3%j))/2
+!                    J2max = min(   (oh3%j+op3%j),    (oh4%j+oh5%j),    (op1%j+op3%j))/2
+!                    Kmin = max(abs(op1%j-oh3%j), 0)/2
+!                    Kmax = min( (op1%j+oh3%j), 2*op2%j, 2*op3%j)/2
+!                    Lmin = abs(op2%j-op3%j)/2
+!                    Lmax = (op2%j+op3%j)/2
+!                    if(J1min>J1max) cycle
+!                    if(J2min>J2max) cycle
+!                    if(Kmin>Kmax) cycle
+!                    if(Lmin>Lmax) cycle
+!
+!                    v = 0.d0
+!                    do L = Lmin, Lmax
+!                      v1 = 0.d0
+!                      v2 = 0.d0
+!                      do K = Kmin, Kmax
+!
+!                        do J1 = J1min, J1max
+!                          if(p1==p2 .and. mod(J1,2)==1) cycle
+!                          if(h1==h2 .and. mod(J1,2)==1) cycle
+!                          v1 = v1 + h%two%GetTwBME(p1,p2,h1,h2,J1) * &
+!                              &     h%two%GetTwBME(h1,h2,h3,p2,J1) * &
+!                              &     sixjs%get(op1%j,op2%j,2*J1,op2%j,oh3%j,2*K) * &
+!                              &     dble(2*J1+1)
+!                        end do
+!
+!                        do J2 = J2min, J2max
+!                          if(p1==p3 .and. mod(J2,2)==1) cycle
+!                          if(h4==h5 .and. mod(J2,2)==1) cycle
+!                          v2 = v2 + h%two%GetTwBME(h3,p3,h4,h5,J2) * &
+!                              &     h%two%GetTwBME(h4,h5,p1,p3,J2) * &
+!                              &     sixjs%get(op1%j,op3%j,2*J2,op3%j,oh3%j,2*K) * &
+!                              &     dble(2*J2+1)
+!                        end do
+!                        v = v + v1 * v2 * dble(2*K+1) * dble(2*L+1) * &
+!                            &   sixjs%get(op2%j,op2%j,2*K,op3%j,op3%j,2*L)
+!                      end do
+!                    end do
+!                    delp12 = 1.d0
+!                    delp13 = 1.d0
+!                    delh12 = 1.d0
+!                    delh45 = 1.d0
+!                    if(p1==p2) delp12 = sqrt(2.d0)
+!                    if(h1==h2) delh12 = 2.d0
+!                    if(p1==p3) delp13 = sqrt(2.d0)
+!                    if(h4==h5) delh45 = 2.d0
+!                    vsum = vsum + v * delp12*delh12*delp13*delh45 / ( &
+!                        & denom2b(h%one,h1,h2,p1,p2) * &
+!                        & denom1b(h%one,h3,p1) * denom2b(h%one,h4,h5,p1,p3))
+!                  end do
+!                end do
+!              end do
+!            end do
+!          end do
+!
+!        end do
+!      end do
+!    end do
+!    r = -0.25d0 * vsum
+!    call timer%Add("Fourth order MBPT F4",omp_get_wtime()-ti)
+!  end function energy_fourth_F4
 
   function cross_couple(v,i,j,a,b,L) result(r)
     use MyLibrary, only: triag,sjs
@@ -568,7 +1165,6 @@ vsum = vsum + dble(2*J2+1) * v
           if( ms%sps%orb(j)%ph /= 0 ) cycle
           max_val = max(max_val, &
               & abs(h%two%GetTwBME(i,j,a,b,J2)) / abs(denom2b(h%one,i,j,a,b)))
-
         end do
       end do
       !$omp end do
@@ -614,7 +1210,7 @@ vsum = vsum + dble(2*J2+1) * v
     ms => hamil%ms
     this%s_0 = opr%zero
     if(is_MBPT_full) then
-      call this%scalar_first(hamil,opr)
+      this%s_1 = scalar_first(hamil,opr)
       write(*,'(a,f16.8)') "First order correction: ", this%s_1
     end if
 
@@ -636,7 +1232,7 @@ vsum = vsum + dble(2*J2+1) * v
     call sixjs%fin()
   end subroutine CalcScalarCorr
 
-  subroutine scalar_first(this,h,s)
+  function scalar_first(h,s) result(r)
     ! a, b : particle
     ! i, j : hole
     !
@@ -650,13 +1246,12 @@ vsum = vsum + dble(2*J2+1) * v
     !
     ! 2 \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, ab, ij, J2, n
     integer :: a, b, i, j
-    real(8) :: vsum, v, ti
+    real(8) :: vsum, v, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -687,24 +1282,24 @@ vsum = vsum + dble(2*J2+1) * v
       vsum = vsum + v * dble(2*J2+1)
     end do
 
-    this%s_1 = 2.d0 * vsum
+    r = 2.d0 * vsum
     call timer%Add("First order MBPT for Scalar",omp_get_wtime()-ti)
-  end subroutine scalar_first
+  end function scalar_first
 
   subroutine scalar_second(this,h,s, is_MBPT_full)
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     logical, intent(in) :: is_MBPT_full
-    call this%scalar_second_s1p( h,s)
-    call this%scalar_second_s1h( h,s)
-    call this%scalar_second_s1ph(h,s)
+    this%s_2_s1p = scalar_second_s1p( h,s)
+    this%s_2_s1h = scalar_second_s1h( h,s)
+    this%s_2_s1ph= scalar_second_s1ph(h,s)
     if(is_MBPT_full) then
-      call this%scalar_second_s2pp(h,s)
-      call this%scalar_second_s2hh(h,s)
-      call this%scalar_second_s2ph(h,s)
-      call this%scalar_second_v2pp(h,s)
-      call this%scalar_second_v2hh(h,s)
-      call this%scalar_second_v2ph(h,s)
+      this%s_2_s2pp = scalar_second_s2pp(h,s)
+      this%s_2_s2hh = scalar_second_s2hh(h,s)
+      this%s_2_s2ph = scalar_second_s2ph(h,s)
+      this%s_2_v2pp = scalar_second_v2pp(h,s)
+      this%s_2_v2hh = scalar_second_v2hh(h,s)
+      this%s_2_v2ph = scalar_second_v2ph(h,s)
     end if
 
     this%s_2 = this%s_2_s1h + this%s_2_s1p + this%s_2_s1ph + &
@@ -712,7 +1307,7 @@ vsum = vsum + dble(2*J2+1) * v
         & this%s_2_v2pp + this%s_2_v2hh + this%s_2_v2ph
   end subroutine scalar_second
 
-  subroutine scalar_second_s1p(this,h,s)
+  function scalar_second_s1p(h,s) result(r)
     ! a, b, c : particle
     ! i, j    : hole
     !     ____________
@@ -726,13 +1321,12 @@ vsum = vsum + dble(2*J2+1) * v
     !
     ! <ab||ij> <ij||ac> <b|x|c> / 2 denominator
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
     integer :: ia, ib, ic, ii, ij
     integer :: a, b, c, i, j
     integer :: ja, jb, ji, jj, J2
-    real(8) :: vsum, v, norm, ti
+    real(8) :: vsum, v, norm, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -787,11 +1381,11 @@ vsum = vsum + dble(2*J2+1) * v
     end do
     !$omp end do
     !$omp end parallel
-    this%s_2_s1p = vsum * 0.5d0
+    r = vsum * 0.5d0
     call timer%Add("Second order MBPT s1 p ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_s1p
+  end function scalar_second_s1p
 
-  subroutine scalar_second_s1h(this,h,s)
+  function scalar_second_s1h(h,s) result(r)
     ! a, b    : particle
     ! i, j, k : hole
     !     ____________
@@ -805,13 +1399,12 @@ vsum = vsum + dble(2*J2+1) * v
     !
     ! - <ab||ij> <ik||ac> <j|x|k> / 2 denominator
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     integer :: ia, ib, ii, ij, ik
     integer :: a, b, i, j, k
     integer :: ja, jb, ji, jj, J2
-    real(8) :: vsum, v, norm, ti
+    real(8) :: vsum, v, norm, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -867,11 +1460,11 @@ vsum = vsum + dble(2*J2+1) * v
     end do
     !$omp end do
     !$omp end parallel
-    this%s_2_s1h = vsum * 0.5d0
+    r = vsum * 0.5d0
     call timer%Add("Second order MBPT s1 h ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_s1h
+  end function scalar_second_s1h
 
-  subroutine scalar_second_s1ph(this,h,s)
+  function scalar_second_s1ph(h,s) result(r)
     ! a, b, c : particle
     ! i, j, k : hole
     !
@@ -886,13 +1479,12 @@ vsum = vsum + dble(2*J2+1) * v
     ! - <ab||ij> <ij||kb> <a|x|k> / denominator
     ! + <ab||ij> <cj||ab> <c|x|i> / denominator
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
     integer :: ia, ib, ic, ii, ij, ik
     integer :: a, b, c, i, j, k
     integer :: ja, jb, ji, jj, J2
-    real(8) :: vsum, v, norm, ti
+    real(8) :: vsum, v, norm, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -977,11 +1569,11 @@ vsum = vsum + dble(2*J2+1) * v
     end do
     !$omp end do
     !$omp end parallel
-    this%s_2_s1ph = vsum
+    r = vsum
     call timer%Add("Second order MBPT s1 ph bubble",omp_get_wtime()-ti)
-  end subroutine scalar_second_s1ph
+  end function scalar_second_s1ph
 
-  subroutine scalar_second_s2pp(this,h,s)
+  function scalar_second_s2pp(h,s) result(r)
     ! a, b, c, d: particle
     ! i, j      : hole
     !     _____________
@@ -995,13 +1587,12 @@ vsum = vsum + dble(2*J2+1) * v
     !    \/___________\/
     !
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
-    real(8) :: v, vsum, ti
+    real(8) :: v, vsum, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -1039,11 +1630,11 @@ vsum = vsum + dble(2*J2+1) * v
       !$omp end parallel
       vsum = vsum + v * dble(2*J2+1)
     end do
-    this%s_2_s2pp = vsum
+    r = vsum
     call timer%Add("Second order MBPT s2 pp ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_s2pp
+  end function scalar_second_s2pp
 
-  subroutine scalar_second_s2hh(this,h,s)
+  function scalar_second_s2hh(h,s) result(r)
     ! a, b      : particle
     ! i, j, k, l: hole
     !     _____________
@@ -1057,13 +1648,12 @@ vsum = vsum + dble(2*J2+1) * v
     !    \/___________\/
     !
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
-    real(8) :: v, vsum, ti
+    real(8) :: v, vsum, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -1104,11 +1694,11 @@ vsum = vsum + dble(2*J2+1) * v
       vsum = vsum + dble(2*J2+1) * v
     end do
 
-    this%s_2_s2hh = vsum
+    r = vsum
     call timer%Add("Second order MBPT s2 hh ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_s2hh
+  end function scalar_second_s2hh
 
-  subroutine scalar_second_s2ph(this,h,s)
+  function scalar_second_s2ph(h,s) result(r)
     ! a, b, c : particle
     ! i, j, k : hole
     !     _____________
@@ -1122,14 +1712,13 @@ vsum = vsum + dble(2*J2+1) * v
     !    \/___________\/
     !
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     integer :: J2
     integer :: a, b, c, i, j, k
     integer :: ia, ib, ic, ii, ij, ik
     integer :: ja, jb, jc, ji, jj, jk
-    real(8) :: v, vsum, norm, ti
+    real(8) :: v, vsum, norm, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -1206,11 +1795,11 @@ vsum = vsum + dble(2*J2+1) * v
     !$omp end do
     !$omp end parallel
 
-    this%s_2_s2ph = - vsum
+    r = - vsum
     call timer%Add("Second order MBPT s2 ph ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_s2ph
+  end function scalar_second_s2ph
 
-  subroutine scalar_second_v2pp(this,h,s)
+  function scalar_second_v2pp(h,s) result(r)
     ! a, b, c, d: particle
     ! i, j      : hole
     !
@@ -1224,13 +1813,12 @@ vsum = vsum + dble(2*J2+1) * v
     !    \/___________\/
     !
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, cd, ij
     integer :: i, j, a, b, c, d
-    real(8) :: v, vsum, ti
+    real(8) :: v, vsum, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -1268,11 +1856,11 @@ vsum = vsum + dble(2*J2+1) * v
       !$omp end parallel
       vsum = vsum + v * dble(2*J2+1)
     end do
-    this%s_2_v2pp = 2.d0 * vsum
+    r = 2.d0 * vsum
     call timer%Add("Second order MBPT v2 pp ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_v2pp
+  end function scalar_second_v2pp
 
-  subroutine scalar_second_v2hh(this,h,s)
+  function scalar_second_v2hh(h,s) result(r)
     ! a, b      : particle
     ! i, j, k, l: hole
     !
@@ -1286,13 +1874,12 @@ vsum = vsum + dble(2*J2+1) * v
     !    \/___________\/
     !
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
     integer :: ch, J2, n, ab, ij, kl
     integer :: a, b, i, j, k, l
-    real(8) :: v, vsum, ti
+    real(8) :: v, vsum, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -1333,11 +1920,11 @@ vsum = vsum + dble(2*J2+1) * v
       vsum = vsum + dble(2*J2+1) * v
     end do
 
-    this%s_2_v2hh = 2.d0 * vsum
+    r = 2.d0 * vsum
     call timer%Add("Second order MBPT v2 hh ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_v2hh
+  end function scalar_second_v2hh
 
-  subroutine scalar_second_v2ph(this,h,s)
+  function scalar_second_v2ph(h,s) result(r)
     ! a, b, c : particle
     ! i, j, k : hole
     !
@@ -1351,14 +1938,13 @@ vsum = vsum + dble(2*J2+1) * v
     !    \/___________\/
     !
     use Profiler, only: timer
-    class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     integer :: J2
     integer :: a, b, c, i, j, k
     integer :: ia, ib, ic, ii, ij, ik
     integer :: ja, jb, jc, ji, jj, jk
-    real(8) :: v, vsum, norm, ti
+    real(8) :: v, vsum, norm, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
@@ -1435,9 +2021,9 @@ vsum = vsum + dble(2*J2+1) * v
     !$omp end do
     !$omp end parallel
 
-    this%s_2_v2ph = - 2.d0 * vsum
+    r = - 2.d0 * vsum
     call timer%Add("Second order MBPT v2 ph ladder",omp_get_wtime()-ti)
-  end subroutine scalar_second_v2ph
+  end function scalar_second_v2ph
 
   subroutine FinMBPTDMat(this)
     class(MBPTDMat), intent(inout) :: this
@@ -1839,7 +2425,7 @@ vsum = vsum + dble(2*J2+1) * v
       call sol%DiagSym(this%rho%MatCh(ch,ch)%DMat)
       m = size(sol%eig%v)
       do i = 1, m
-        this%C_HF2NAT%MatCh(ch,ch)%m(i,:) = sol%vec%m(m-i+1,:)
+        this%C_HF2NAT%MatCh(ch,ch)%m(:,i) = sol%vec%m(:,m-i+1)
         this%Occ%MatCh(ch,ch)%m(i,i) = sol%eig%v(m-i+1)
       end do
       this%C_HO2NAT%MatCh(ch,ch)%DMat = &
