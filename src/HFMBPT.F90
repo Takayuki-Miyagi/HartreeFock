@@ -64,9 +64,9 @@ module HFMBPT
   ! Methods for density matrix
   private :: InitMBPTDMat
   private :: FinMBPTDMat
-  private :: density_matrix_pp
-  private :: density_matrix_hh
-  private :: density_matrix_ph
+  private :: density_matrix_element_pp
+  private :: density_matrix_element_hh
+  private :: density_matrix_element_ph
   private :: GetCoef
 
   ! Methods for general
@@ -107,9 +107,6 @@ module HFMBPT
   contains
     procedure :: init => InitMBPTDMat
     procedure :: fin => FinMBPTDMat
-    procedure :: density_matrix_pp
-    procedure :: density_matrix_hh
-    procedure :: density_matrix_ph
     procedure :: GetCoef
   end type MBPTDMat
 
@@ -609,7 +606,7 @@ vsum = vsum + dble(2*J2+1) * v
     type(Orbits), pointer :: sps
     type(Ops) :: v_h1h2p3h2, v_h1p4p3p4
     type(DMat) :: m1, m2
-    integer :: ch, bra, ket
+    integer :: ch
     real(8) :: r, ti, vsum
 
     ti = omp_get_wtime()
@@ -2036,12 +2033,19 @@ vsum = vsum + dble(2*J2+1) * v
   end subroutine FinMBPTDMat
 
   subroutine InitMBPTDMat(this, HF, hamil)
+    use Profiler, only: timer
     class(MBPTDMat), intent(inout) :: this
     type(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: hamil
     type(MSPace), pointer :: ms
+    type(Orbits), pointer :: sps
+    integer :: idx, a, b
+    integer, allocatable :: aa(:), bb(:)
+    type(SingleParticleOrbit), pointer :: oa, ob
+    real(8) :: me, ti
     ms => hamil%ms
     this%ms => hamil%ms
+    sps => ms%sps
     write(*,"(a)") "# Calculating density matrix w/ MBPT"
     call this%rho%init(ms%one, .true., 'DenMat',  0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occupation',  0, 1, 0)
@@ -2049,367 +2053,243 @@ vsum = vsum + dble(2*J2+1) * v
     call this%C_HO2NAT%init(ms%one, .true., 'UT',  0, 1, 0)
 
     this%C_HO2HF = HF%C
-    call this%density_matrix_pp(hamil)
-    call this%density_matrix_hh(hamil)
-    call this%density_matrix_ph(hamil)
+
+    allocate(aa(sps%norbs*(sps%norbs+1)/2))
+    allocate(bb(sps%norbs*(sps%norbs+1)/2))
+    idx = 0
+    do a = 1, sps%norbs
+      do b = 1, a
+        idx = idx + 1
+        aa(idx) = a
+        bb(idx) = b
+      end do
+    end do
+    ti = omp_get_wtime()
+    !$omp parallel
+    !$omp do private(idx, a, b, oa, ob, me) schedule(dynamic)
+    do idx = 1, sps%norbs*(sps%norbs+1)/2
+      a = aa(idx)
+      b = bb(idx)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(oa%j /= ob%j) cycle
+      if(oa%l /= ob%l) cycle
+      if(oa%z /= ob%z) cycle
+      me = 0.d0
+      if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_hh(a, b, hamil)
+      if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_ph(a, b, hamil)
+      if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_ph(b, a, hamil)
+      if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_pp(a, b, hamil)
+      call this%rho%SetOBME(a,b,me)
+      call this%rho%SetOBME(b,a,me)
+    end do
+    !$omp end do
+    !$omp end parallel
+    call timer%Add("Density matrix @ 2nd order MBPT",omp_get_wtime()-ti)
+    deallocate(aa,bb)
+
     call this%GetCoef()
   end subroutine InitMBPTDMat
 
-  subroutine density_matrix_pp(this, hamil)
-    use Profiler, only: timer
-    class(MBPTDMat), intent(inout) :: this
+  function density_matrix_element_pp(a, b, hamil) result(r)
+    integer, intent(in) :: a, b
     type(Ops), intent(in) :: hamil
     type(MSPace), pointer :: ms
     type(Orbits), pointer :: sps
-    integer :: a, b, c, i, j
-    integer :: cnt, Nab, Jmin, Jmax, JJ
+    real(8) :: r
+    integer :: c, i, j, JJ, Jmin, Jmax
+    real(8) :: e_acij, e_bcij
+    real(8) :: norm_ac, norm_bc, norm_ij, tbme
     type(SingleParticleOrbit), pointer :: oa, ob, oc, oi, oj
-    real(8) :: r, e_acij, e_bcij, tbme, norm_ac, norm_ij, norm_bc
-    integer, allocatable :: temp_a(:), temp_b(:)
-    real(8) :: ti
-
-    ti = omp_get_wtime()
     ms => hamil%ms
     sps => ms%sps
-
-    cnt = 0
-    do a = 1, sps%norbs
-      oa => sps%GetOrbit(a)
-      if(abs(oa%occ) > 1.d-6) cycle
-      do b = a, sps%norbs
-        ob => sps%GetOrbit(b)
-        if(abs(ob%occ) > 1.d-6) cycle
-        if(oa%l /= ob%l) cycle
-        if(oa%j /= ob%j) cycle
-        if(oa%z /= ob%z) cycle
-        cnt = cnt + 1
-      end do
-    end do
-    Nab = cnt
-    if(Nab == 0) return
-    allocate(temp_a(Nab), temp_b(Nab))
-
-    cnt = 0
-    do a = 1, sps%norbs
-      oa => sps%GetOrbit(a)
-      if(abs(oa%occ) > 1.d-6) cycle
-      do b = a, sps%norbs
-        ob => sps%GetOrbit(b)
-        if(abs(ob%occ) > 1.d-6) cycle
-        if(oa%l /= ob%l) cycle
-        if(oa%j /= ob%j) cycle
-        if(oa%z /= ob%z) cycle
-        cnt = cnt + 1
-        temp_a(cnt) = a
-        temp_b(cnt) = b
-      end do
-    end do
-
-
-    !$omp parallel
-    !$omp do private(cnt, a, b, oa, ob, r, c, oc, i, oi, j, oj, &
-    !$omp &          e_acij, e_bcij, Jmin, Jmax, tbme, JJ, norm_ac, norm_bc, norm_ij)
-    do cnt = 1, Nab
-      a = temp_a(cnt)
-      b = temp_b(cnt)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-
-      r = 0.d0
-      do c = 1, sps%norbs
-        oc => sps%GetOrbit(c)
-        if(abs(oc%occ) > 1.d-6) cycle
-        do i = 1, sps%norbs
-          oi => sps%GetOrbit(i)
-          if(abs(oi%occ) < 1.d-6) cycle
-          do j = 1, sps%norbs
-            oj => sps%GetOrbit(j)
-            if(abs(oj%occ) < 1.d-6) cycle
-
-            if((-1)**(oa%l+oc%l+oi%l+oj%l) == -1) cycle
-            if(oa%z+oc%z /= oi%z+oj%z) cycle
-
-            e_acij = denom2b(hamil%one,i,j,a,c)
-            e_bcij = denom2b(hamil%one,i,j,b,c)
-            if(abs(e_acij) < 1.d-8) cycle
-            if(abs(e_bcij) < 1.d-8) cycle
-
-            norm_ac = 1.d0
-            norm_bc = 1.d0
-            norm_ij = 1.d0
-            if(a==c) norm_ac = sqrt(2.d0)
-            if(b==c) norm_bc = sqrt(2.d0)
-            if(i==j) norm_ij = 2.d0
-
-            Jmin = max(abs(oa%j-oc%j), abs(oi%j-oj%j))/2
-            Jmax = min(    oa%j+oc%j ,     oi%j+oj%j )/2
-
-            tbme = 0.d0
-            do JJ = Jmin, Jmax
-              tbme = tbme + dble(2*JJ+1) * &
-                  & hamil%two%GetTwBME(a, c, i, j, JJ) * &
-                  & hamil%two%GetTwBME(i, j, b, c, JJ)
-            end do
-            r = r + tbme * norm_ac * norm_bc * norm_ij / (e_acij * e_bcij)
-          end do
-        end do
-      end do
-      r = 0.5d0 * r / dble(oa%j+1)
-      call this%rho%SetOBME(a,b,r)
-    end do
-    !$omp end do
-    !$omp end parallel
-    deallocate(temp_a, temp_b)
-    call timer%Add("density_matrix_pp",omp_get_wtime()-ti)
-  end subroutine density_matrix_pp
-
-  subroutine density_matrix_hh(this, hamil)
-    use Profiler, only: timer
-    class(MBPTDMat), intent(inout) :: this
-    type(Ops), intent(in) :: hamil
-    type(MSPace), pointer :: ms
-    type(Orbits), pointer :: sps
-    integer :: a, b, i, j, k
-    integer :: cnt, Nij, Jmin, Jmax, JJ
-    type(SingleParticleOrbit), pointer :: oa, ob, oi, oj, ok
-    real(8) :: r, e_abik, e_abjk, tbme, norm_ik, norm_jk, norm_ab
-    integer, allocatable :: temp_i(:), temp_j(:)
-    real(8) :: ti
-
-    ti = omp_get_wtime()
-    ms => hamil%ms
-    sps => ms%sps
-
-    cnt = 0
-    do i = 1, sps%norbs
-      oi => sps%GetOrbit(i)
-      if(abs(oi%occ) < 1.d-6) cycle
-      do j = i, sps%norbs
-        oj => sps%GetOrbit(j)
-        if(abs(oj%occ) < 1.d-6) cycle
-        if(oi%l /= oj%l) cycle
-        if(oi%j /= oj%j) cycle
-        if(oi%z /= oj%z) cycle
-        cnt = cnt + 1
-      end do
-    end do
-    Nij = cnt
-    if(Nij == 0) return
-    allocate(temp_i(Nij), temp_j(Nij))
-
-    cnt = 0
-    do i = 1, sps%norbs
-      oi => sps%GetOrbit(i)
-      if(abs(oi%occ) < 1.d-6) cycle
-      do j = i, sps%norbs
-        oj => sps%GetOrbit(j)
-        if(abs(oj%occ) < 1.d-6) cycle
-        if(oi%l /= oj%l) cycle
-        if(oi%j /= oj%j) cycle
-        if(oi%z /= oj%z) cycle
-        cnt = cnt + 1
-        temp_i(cnt) = i
-        temp_j(cnt) = j
-      end do
-    end do
-
-
-    !$omp parallel
-    !$omp do private(cnt, i, j, oi, oj, r, a, oa, b, ob, k, ok, &
-    !$omp &          e_abik, e_abjk, Jmin, Jmax, tbme, JJ, norm_ab, norm_ik, norm_jk)
-    do cnt = 1, Nij
-      i = temp_i(cnt)
-      j = temp_j(cnt)
-      oi => sps%GetOrbit(i)
-      oj => sps%GetOrbit(j)
-
-      r = 0.d0
-      do a = 1, sps%norbs
-        oa => sps%GetOrbit(a)
-        if(abs(oa%occ) > 1.d-6) cycle
-
-        do b = 1, sps%norbs
-          ob => sps%GetOrbit(b)
-          if(abs(ob%occ) > 1.d-6) cycle
-
-          do k = 1, sps%norbs
-            ok => sps%GetOrbit(k)
-            if(abs(ok%occ) < 1.d-6) cycle
-
-            if((-1)**(oa%l+ob%l+oi%l+ok%l) == -1) cycle
-            if(oa%z + ob%z /= oi%z + ok%z) cycle
-
-            e_abik = denom2b(hamil%one,i,k,a,b)
-            e_abjk = denom2b(hamil%one,j,k,a,b)
-            if(abs(e_abik) < 1.d-8) cycle
-            if(abs(e_abjk) < 1.d-8) cycle
-
-            Jmin = max(abs(oa%j-ob%j), abs(oi%j-ok%j))/2
-            Jmax = min(    oa%j+ob%j ,     oi%j+ok%j )/2
-
-            norm_ab = 1.d0
-            norm_ik = 1.d0
-            norm_jk = 1.d0
-            if(a==b) norm_ab = 2.d0
-            if(i==k) norm_ik = sqrt(2.d0)
-            if(j==k) norm_jk = sqrt(2.d0)
-
-            tbme = 0.d0
-            do JJ = Jmin, Jmax
-              tbme = tbme + dble(2*JJ+1) * &
-                  & hamil%two%GetTwBME(i, k, a, b, JJ) * &
-                  & hamil%two%GetTwBME(j, k, a, b, JJ)
-            end do
-            r = r + tbme * norm_ab * norm_ik * norm_jk / (e_abik * e_abjk)
-          end do
-        end do
-      end do
-      r = - 0.5d0 * r / dble(oi%j+1)
-      if(i == j) r = r + oi%occ
-      call this%rho%SetOBME(i,j,r)
-    end do
-    !$omp end do
-    !$omp end parallel
-    deallocate(temp_i, temp_j)
-    call timer%Add("density_matrix_hh",omp_get_wtime()-ti)
-  end subroutine density_matrix_hh
-
-  subroutine density_matrix_ph(this, hamil)
-    use Profiler, only: timer
-    class(MBPTDMat), intent(inout) :: this
-    type(Ops), intent(in) :: hamil
-    type(MSPace), pointer :: ms
-    type(Orbits), pointer :: sps
-    integer :: a, b, c, i, j, k
-    integer :: cnt, Nai, Jmin, Jmax, JJ
-    type(SingleParticleOrbit), pointer :: oa, ob, oc, oi, oj, ok
-    real(8) :: r, e_ai, e_bcij, e_abjk, tbme, norm_ab, norm_bc, norm_ij, norm_jk
-    integer, allocatable :: temp_a(:), temp_i(:)
-    real(8) :: ti
-
-    ti = omp_get_wtime()
-    ms => hamil%ms
-    sps => ms%sps
-
-    cnt = 0
-    do a = 1, sps%norbs
-      oa => sps%GetOrbit(a)
-      if(abs(oa%occ) > 1.d-6) cycle
+    oa => sps%GetOrbit(a)
+    ob => sps%GetOrbit(b)
+    r = 0.d0
+    do c = 1, sps%norbs
+      oc => sps%GetOrbit(c)
+      if(abs(oc%occ) > 1.d-6) cycle
       do i = 1, sps%norbs
         oi => sps%GetOrbit(i)
         if(abs(oi%occ) < 1.d-6) cycle
-        if(oa%l /= oi%l) cycle
-        if(oa%j /= oi%j) cycle
-        if(oa%z /= oi%z) cycle
-        cnt = cnt + 1
-      end do
-    end do
-    Nai = cnt
-    if(Nai == 0) return
-    allocate(temp_a(Nai), temp_i(Nai))
-
-    cnt = 0
-    do a = 1, sps%norbs
-      oa => sps%GetOrbit(a)
-      if(abs(oa%occ) > 1.d-6) cycle
-      do i = 1, sps%norbs
-        oi => sps%GetOrbit(i)
-        if(abs(oi%occ) < 1.d-6) cycle
-        if(oa%l /= oi%l) cycle
-        if(oa%j /= oi%j) cycle
-        if(oa%z /= oi%z) cycle
-        cnt = cnt + 1
-        temp_a(cnt) = a
-        temp_i(cnt) = i
-      end do
-    end do
-
-    !$omp parallel
-    !$omp do private(cnt, a, i, oa, oi, r, b, ob, c, oc, j, oj, &
-    !$omp &          e_ai, e_bcij, Jmin, Jmax, tbme, JJ, k, ok, &
-    !$omp &          e_abjk, norm_bc, norm_ij, norm_ab, norm_jk)
-    do cnt = 1, Nai
-      a = temp_a(cnt)
-      i = temp_i(cnt)
-      oa => sps%GetOrbit(a)
-      oi => sps%GetOrbit(i)
-
-      r = 0.d0
-      do b = 1, sps%norbs
-        ob => sps%GetOrbit(b)
-        if(abs(ob%occ) > 1.d-6) cycle
-        do c = 1, sps%norbs
-          oc => sps%GetOrbit(c)
-          if(abs(oc%occ) > 1.d-6) cycle
-          do j = 1, sps%norbs
-            oj => sps%GetOrbit(j)
-            if(abs(oj%occ) < 1.d-6) cycle
-            if((-1)**(oa%l+oj%l+ob%l+oc%l) == -1) cycle
-            if(oa%z+oj%z /= ob%z+oc%z) cycle
-            e_ai = denom1b(hamil%one, i, a)
-            e_bcij = denom2b(hamil%one, i, j, b, c)
-            if(abs(e_ai) < 1.d-8) cycle
-            if(abs(e_bcij) < 1.d-8) cycle
-
-            Jmin = max(abs(oa%j-oj%j), abs(ob%j-oc%j))/2
-            Jmax = min(    oa%j+oj%j ,     ob%j+oc%j )/2
-
-            norm_bc = 1.d0
-            norm_ij = 1.d0
-            if(b==c) norm_bc = 2.d0
-            if(i==j) norm_ij = sqrt(2.d0)
-            tbme = 0.d0
-            do JJ = Jmin, Jmax
-              tbme = tbme + dble(2*JJ+1) * &
-                  &  hamil%two%GetTwBME(a, j, b, c, JJ) * &
-                  &  hamil%two%GetTwBME(b, c, i, j, JJ)
-            end do
-            r = r + tbme / (e_ai * e_bcij) * norm_bc * norm_ij
-          end do
-        end do
-      end do
-
-      do b = 1, sps%norbs
-        ob => sps%GetOrbit(b)
-        if(abs(ob%occ) > 1.d-6) cycle
         do j = 1, sps%norbs
           oj => sps%GetOrbit(j)
           if(abs(oj%occ) < 1.d-6) cycle
-          do k = 1, sps%norbs
-            ok => sps%GetOrbit(k)
-            if(abs(ok%occ) < 1.d-6) cycle
 
-            if((-1)**(oa%l+ob%l+oj%l+ok%l) == -1) cycle
-            if(oa%z + ob%z /= oj%z + ok%z) cycle
+          if((-1)**(oa%l+oc%l+oi%l+oj%l) == -1) cycle
+          if(oa%z+oc%z /= oi%z+oj%z) cycle
 
-            e_ai = denom1b(hamil%one, i, a)
-            e_abjk = denom2b(hamil%one, j, k, a, b)
-            if(abs(e_ai) < 1.d-8) cycle
-            if(abs(e_abjk) < 1.d-8) cycle
-            norm_ab = 1.d0
-            norm_jk = 1.d0
-            if(a==b) norm_ab = sqrt(2.d0)
-            if(j==k) norm_jk = 2.d0
-            Jmin = max(abs(oa%j-ob%j), abs(oj%j-ok%j))/2
-            Jmax = min(    oa%j+ob%j ,     oj%j+ok%j )/2
-            tbme = 0.d0
-            do JJ = Jmin, Jmax
-              tbme = tbme + dble(2*JJ+1) * &
-                  &  hamil%two%GetTwBME(k, j, i, b, JJ) * &
-                  &  hamil%two%GetTwBME(a, b, k, j, JJ)
-            end do
-            r = r - tbme / (e_ai * e_abjk) * norm_jk * norm_ab
+          e_acij = denom2b(hamil%one,i,j,a,c)
+          e_bcij = denom2b(hamil%one,i,j,b,c)
+          if(abs(e_acij) < 1.d-8) cycle
+          if(abs(e_bcij) < 1.d-8) cycle
+
+          norm_ac = 1.d0
+          norm_bc = 1.d0
+          norm_ij = 1.d0
+          if(a==c) norm_ac = sqrt(2.d0)
+          if(b==c) norm_bc = sqrt(2.d0)
+          if(i==j) norm_ij = 2.d0
+
+          Jmin = max(abs(oa%j-oc%j), abs(oi%j-oj%j))/2
+          Jmax = min(    oa%j+oc%j ,     oi%j+oj%j )/2
+
+          tbme = 0.d0
+          do JJ = Jmin, Jmax
+            tbme = tbme + dble(2*JJ+1) * &
+                & hamil%two%GetTwBME(a, c, i, j, JJ) * &
+                & hamil%two%GetTwBME(i, j, b, c, JJ)
           end do
+          r = r + tbme * norm_ac * norm_bc * norm_ij / (e_acij * e_bcij)
         end do
       end do
-      r = 0.5d0 * r / dble(oa%j+1)
-      call this%rho%SetOBME(a,i,r)
     end do
-    !$omp end do
-    !$omp end parallel
-    deallocate(temp_a, temp_i)
-    call timer%Add("density_matrix_ph",omp_get_wtime()-ti)
-  end subroutine density_matrix_ph
+    r = 0.5d0 * r / dble(oa%j+1)
+  end function density_matrix_element_pp
+
+  function density_matrix_element_hh(i, j, hamil) result(r)
+    integer, intent(in) :: i, j
+    type(Ops), intent(in) :: hamil
+    type(MSPace), pointer :: ms
+    type(Orbits), pointer :: sps
+    real(8) :: r
+    integer :: a, b, k, JJ, Jmin, Jmax
+    real(8) :: e_abik, e_abjk
+    real(8) :: norm_ab, norm_ik, norm_jk, tbme
+    type(SingleParticleOrbit), pointer :: oa, ob, oi, oj, ok
+    ms => hamil%ms
+    sps => ms%sps
+    oi => sps%GetOrbit(i)
+    oj => sps%GetOrbit(j)
+    r = 0.d0
+    do a = 1, sps%norbs
+      oa => sps%GetOrbit(a)
+      if(abs(oa%occ) > 1.d-6) cycle
+
+      do b = 1, sps%norbs
+        ob => sps%GetOrbit(b)
+        if(abs(ob%occ) > 1.d-6) cycle
+
+        do k = 1, sps%norbs
+          ok => sps%GetOrbit(k)
+          if(abs(ok%occ) < 1.d-6) cycle
+
+          if((-1)**(oa%l+ob%l+oi%l+ok%l) == -1) cycle
+          if(oa%z + ob%z /= oi%z + ok%z) cycle
+
+          e_abik = denom2b(hamil%one,i,k,a,b)
+          e_abjk = denom2b(hamil%one,j,k,a,b)
+          if(abs(e_abik) < 1.d-8) cycle
+          if(abs(e_abjk) < 1.d-8) cycle
+
+          Jmin = max(abs(oa%j-ob%j), abs(oi%j-ok%j))/2
+          Jmax = min(    oa%j+ob%j ,     oi%j+ok%j )/2
+
+          norm_ab = 1.d0
+          norm_ik = 1.d0
+          norm_jk = 1.d0
+          if(a==b) norm_ab = 2.d0
+          if(i==k) norm_ik = sqrt(2.d0)
+          if(j==k) norm_jk = sqrt(2.d0)
+
+          tbme = 0.d0
+          do JJ = Jmin, Jmax
+            tbme = tbme + dble(2*JJ+1) * &
+                & hamil%two%GetTwBME(i, k, a, b, JJ) * &
+                & hamil%two%GetTwBME(j, k, a, b, JJ)
+          end do
+          r = r + tbme * norm_ab * norm_ik * norm_jk / (e_abik * e_abjk)
+        end do
+      end do
+    end do
+    r = - 0.5d0 * r / dble(oi%j+1)
+    if(i == j) r = r + oi%occ
+  end function density_matrix_element_hh
+
+  function density_matrix_element_ph(a, i, hamil) result(r)
+    integer, intent(in) :: a, i
+    type(Ops), intent(in) :: hamil
+    type(MSPace), pointer :: ms
+    type(Orbits), pointer :: sps
+    real(8) :: r
+    integer :: b, c, j, k, JJ, Jmin, Jmax
+    real(8) :: e_ai, e_bcij, e_abjk
+    real(8) :: norm_bc, norm_ij, norm_ab, norm_jk, tbme
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, oi, oj, ok
+    ms => hamil%ms
+    sps => ms%sps
+    oa => sps%GetOrbit(a)
+    oi => sps%GetOrbit(i)
+    r = 0.d0
+    do b = 1, sps%norbs
+      ob => sps%GetOrbit(b)
+      if(abs(ob%occ) > 1.d-6) cycle
+      do c = 1, sps%norbs
+        oc => sps%GetOrbit(c)
+        if(abs(oc%occ) > 1.d-6) cycle
+        do j = 1, sps%norbs
+          oj => sps%GetOrbit(j)
+          if(abs(oj%occ) < 1.d-6) cycle
+          if((-1)**(oa%l+oj%l+ob%l+oc%l) == -1) cycle
+          if(oa%z+oj%z /= ob%z+oc%z) cycle
+          e_ai = denom1b(hamil%one, i, a)
+          e_bcij = denom2b(hamil%one, i, j, b, c)
+          if(abs(e_ai) < 1.d-8) cycle
+          if(abs(e_bcij) < 1.d-8) cycle
+
+          Jmin = max(abs(oa%j-oj%j), abs(ob%j-oc%j))/2
+          Jmax = min(    oa%j+oj%j ,     ob%j+oc%j )/2
+
+          norm_bc = 1.d0
+          norm_ij = 1.d0
+          if(b==c) norm_bc = 2.d0
+          if(i==j) norm_ij = sqrt(2.d0)
+          tbme = 0.d0
+          do JJ = Jmin, Jmax
+            tbme = tbme + dble(2*JJ+1) * &
+                &  hamil%two%GetTwBME(a, j, b, c, JJ) * &
+                &  hamil%two%GetTwBME(b, c, i, j, JJ)
+          end do
+          r = r + tbme / (e_ai * e_bcij) * norm_bc * norm_ij
+        end do
+      end do
+    end do
+
+    do b = 1, sps%norbs
+      ob => sps%GetOrbit(b)
+      if(abs(ob%occ) > 1.d-6) cycle
+      do j = 1, sps%norbs
+        oj => sps%GetOrbit(j)
+        if(abs(oj%occ) < 1.d-6) cycle
+        do k = 1, sps%norbs
+          ok => sps%GetOrbit(k)
+          if(abs(ok%occ) < 1.d-6) cycle
+
+          if((-1)**(oa%l+ob%l+oj%l+ok%l) == -1) cycle
+          if(oa%z + ob%z /= oj%z + ok%z) cycle
+
+          e_ai = denom1b(hamil%one, i, a)
+          e_abjk = denom2b(hamil%one, j, k, a, b)
+          if(abs(e_ai) < 1.d-8) cycle
+          if(abs(e_abjk) < 1.d-8) cycle
+          norm_ab = 1.d0
+          norm_jk = 1.d0
+          if(a==b) norm_ab = sqrt(2.d0)
+          if(j==k) norm_jk = 2.d0
+          Jmin = max(abs(oa%j-ob%j), abs(oj%j-ok%j))/2
+          Jmax = min(    oa%j+ob%j ,     oj%j+ok%j )/2
+          tbme = 0.d0
+          do JJ = Jmin, Jmax
+            tbme = tbme + dble(2*JJ+1) * &
+                &  hamil%two%GetTwBME(k, j, i, b, JJ) * &
+                &  hamil%two%GetTwBME(a, b, k, j, JJ)
+          end do
+          r = r - tbme / (e_ai * e_abjk) * norm_jk * norm_ab
+        end do
+      end do
+    end do
+    r = 0.5d0 * r / dble(oa%j+1)
+  end function density_matrix_element_ph
 
   subroutine GetCoef(this)
     class(MBPTDMat), intent(inout) :: this
@@ -2431,7 +2311,7 @@ vsum = vsum + dble(2*J2+1) * v
       this%C_HO2NAT%MatCh(ch,ch)%DMat = &
           & this%C_HO2HF%MatCh(ch,ch)%DMat * &
           & this%C_HF2NAT%MatCh(ch,ch)%DMat
-      !call this%rho%MatCh(ch,ch)%DMat%prt("rho")
+      call this%rho%MatCh(ch,ch)%DMat%prt("rho")
       !call this%Occ%MatCh(ch,ch)%prt("Occupation Number")
       if(iz == -1) Z = Z + sum(sol%eig%v) * dble(jj+1)
       if(iz ==  1) N = N + sum(sol%eig%v) * dble(jj+1)
