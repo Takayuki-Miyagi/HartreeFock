@@ -13,6 +13,13 @@ module TwoBodyModelSpace
   private :: InitTwoBodyChannel
   private :: FinTwoBodyChannel
 
+  private :: InitCrossCoupledTwoBodyChannel
+  private :: FinCrossCoupledTwoBodyChannel
+  private :: InitCrossCoupledTwoBodySpace
+  private :: FinCrossCoupledTwoBodySpace
+  private :: GetCrossCoupledTwoBodyChannelFromJPZ
+  private :: GetCrossCoupledTwoBodyChannelFromCh
+
   type :: TwoBodyChannel
     integer :: j = -1
     integer :: p = 0
@@ -59,6 +66,50 @@ module TwoBodyModelSpace
         & GetTwoBodyChannelFromJPZ, &
         & GetTwoBodyChannelFromCh
   end type TwoBodySpace
+
+  type :: CrossCoupledTwoBodyChannel
+    ! This is for
+    ! < ab:J | V | cd:J > -> < a\bar{c}: J' | V | b\bar{d}: J'>
+    !                     or < a\bar{d}: J' | V | b\bar{c}: J' >
+    ! Storing |ac: J'>, not actual two-body state (no Pauli principle)
+    ! < pp | V | pp > -> < pp | V | pp >
+    ! < nn | V | nn > -> < nn | V | nn >
+    ! < pn | V | pn > -> < pn | V | pn > or < pp | V | nn >
+    ! So, Tz is not good number any more, but |Tz| is still good.
+    !
+    integer :: j = -1
+    integer :: p = 0
+    integer :: z_abs = 100
+    integer :: n_state = 0
+    integer, allocatable :: n2spi1(:)
+    integer, allocatable :: n2spi2(:)
+    integer, allocatable :: spis2n(:,:)
+    integer, allocatable :: iphase(:,:)
+  contains
+    procedure :: InitCrossCoupledTwoBodyChannel
+    procedure :: FinCrossCoupledTwoBodyChannel
+    generic :: init => InitCrossCoupledTwoBodyChannel
+    generic :: fin => FinCrossCoupledTwoBodyChannel
+  end type CrossCoupledTwoBodyChannel
+
+  type :: CrossCoupledTwoBodySpace
+    type(CrossCoupledTwoBodyChannel), allocatable :: jpz(:)
+    type(Orbits), pointer :: sps
+    integer, allocatable :: jpz2ch(:,:,:)
+    integer :: emax, e2max
+    integer :: NChan
+  contains
+    procedure :: InitCrossCoupledTwoBodySpace
+    procedure :: FinCrossCoupledTwoBodySpace
+    procedure :: GetCrossCoupledTwoBodyChannelFromJPZ
+    procedure :: GetCrossCoupledTwoBodyChannelFromCh
+
+    generic :: init => InitCrossCoupledTwoBodySpace
+    generic :: fin => FinCrossCoupledTwoBodySpace
+    generic :: GetCrossCoupledTwoBodyChannel => &
+        & GetCrossCoupledTwoBodyChannelFromJPZ, &
+        & GetCrossCoupledTwoBodyChannelFromCh
+  end type CrossCoupledTwoBodySpace
 contains
   subroutine FinTwoBodySpace(this)
     class(TwoBodySpace), intent(inout) :: this
@@ -223,13 +274,10 @@ contains
           if((-1) ** (o1%l+o2%l) /= p) cycle
           if(o1%z + o2%z /= 2*z) cycle
           if(i1 == i2 .and. mod(j,2) == 1) cycle
-
           a = i1; b = i2
           if( o1%occ > o2%occ ) then
-            ! hp -> ph
-            a = i2; b = i1
+            a = i2; b = i1 ! hp -> ph
           end if
-
           cnt = cnt + 1
           cnt_sub = cnt_sub + 1
           this%n2spi1(cnt) = a
@@ -295,4 +343,173 @@ contains
     write(*,'(a,i3,a,i3,a,i3,a,i5)') "Two-body channel: J=", j, ", P=", p, ", Tz=", z, ", # of states=", this%n_state
 #endif
   end subroutine InitTwoBodyChannel
+
+  subroutine FinCrossCoupledTwoBodySpace(this)
+    class(CrossCoupledTwoBodySpace), intent(inout) :: this
+    integer :: ch
+    do ch = 1, this%NChan
+      call this%jpz(ch)%fin()
+    end do
+    deallocate(this%jpz)
+    deallocate(this%jpz2ch)
+  end subroutine FinCrossCoupledTwoBodySpace
+
+  subroutine InitCrossCoupledTwoBodySpace(this, sps, e2max)
+    use MyLibrary, only: triag
+    class(CrossCoupledTwoBodySpace), intent(inout) :: this
+    type(Orbits), target, intent(in) :: sps
+    integer, intent(in) :: e2max
+    integer :: j, p, z, n, ich
+    integer :: i1, i2
+    type(SingleParticleOrbit), pointer :: o1, o2
+    integer, allocatable :: jj(:), pp(:), zz(:), nn(:)
+
+    this%sps => sps
+    allocate(this%jpz2ch(0:min(2*sps%lmax,e2max)+1,-1:1,0:1))
+    this%jpz2ch(:,:,:) = 0
+    ich = 0
+    do j = 0, min(2*sps%lmax,e2max)+1
+      do p = 1, -1, -2
+        do z = 0, 1
+          n = 0
+
+          do i1 = 1, sps%norbs
+            o1 => sps%GetOrbit(i1)
+            do i2 = 1, i1
+              o2 => sps%GetOrbit(i2)
+
+              if(o1%e + o2%e > e2max) cycle
+              if(triag(o1%j, o2%j, 2*j)) cycle
+              if((-1) ** (o1%l+o2%l) /= p) cycle
+              if(abs(o1%z + o2%z) /= 2*z) cycle
+              n = n + 1
+
+            end do
+          end do
+          if(n /= 0) then
+            ich = ich + 1
+            this%jpz2ch(j,p,z) = ich
+          end if
+        end do
+      end do
+    end do
+
+    this%NChan = ich
+    this%emax = sps%emax
+    this%e2max = e2max
+    allocate(this%jpz(this%NChan))
+    allocate(jj(this%NChan))
+    allocate(pp(this%NChan))
+    allocate(zz(this%NChan))
+    allocate(nn(this%NChan))
+
+    ich = 0
+    do j = 0, min(2*sps%lmax,e2max)+1
+      do p = 1, -1, -2
+        do z = 0, 1
+          n = 0
+
+          do i1 = 1, sps%norbs
+            o1 => sps%GetOrbit(i1)
+            do i2 = 1, i1
+              o2 => sps%GetOrbit(i2)
+
+              if(o1%e + o2%e > e2max) cycle
+              if(triag(o1%j, o2%j, 2*j)) cycle
+              if((-1) ** (o1%l+o2%l) /= p) cycle
+              if(abs(o1%z + o2%z) /= 2*z) cycle
+              n = n + 1
+
+            end do
+          end do
+          if(n /= 0) then
+            ich = ich + 1
+            jj(ich) = j
+            pp(ich) = p
+            zz(ich) = z
+            nn(ich) = n
+          end if
+        end do
+      end do
+    end do
+
+    do ich = 1, this%NChan
+      call this%jpz(ich)%init(jj(ich),pp(ich),zz(ich),nn(ich),sps,e2max)
+    end do
+    deallocate(jj,pp,zz,nn)
+  end subroutine InitCrossCoupledTwoBodySpace
+
+  function GetCrossCoupledTwoBodyChannelFromJPZ(this, j, p, z) result(ptr)
+    class(CrossCoupledTwoBodySpace), intent(in) :: this
+    type(CrossCoupledTwoBodyChannel), pointer :: ptr
+    integer, intent(in) :: j, p, z
+    integer :: ch
+    ptr => null()
+    ch = this%jpz2ch(j,p,z)
+    if(ch == 0) return
+    ptr => this%GetCrossCoupledTwoBodyChannel(ch)
+  end function GetCrossCoupledTwoBodyChannelFromJPZ
+
+  function GetCrossCoupledTwoBodyChannelFromCh(this, ch) result(ptr)
+    class(CrossCoupledTwoBodySpace), target, intent(in) :: this
+    type(CrossCoupledTwoBodyChannel), pointer :: ptr
+    integer, intent(in) :: ch
+    ptr => this%jpz(ch)
+  end function GetCrossCoupledTwoBodyChannelFromCh
+
+  subroutine FinCrossCoupledTwoBodyChannel(this)
+    class(CrossCoupledTwoBodyChannel), intent(inout) :: this
+    deallocate(this%n2spi1)
+    deallocate(this%n2spi2)
+    deallocate(this%spis2n)
+    deallocate(this%iphase)
+  end subroutine FinCrossCoupledTwoBodyChannel
+
+  subroutine InitCrossCoupledTwoBodyChannel(this, j, p, z, n, sps, e2max)
+    use MyLibrary, only: triag
+    class(CrossCoupledTwoBodyChannel), intent(inout) :: this
+    integer, intent(in) :: j, p, z, n, e2max
+    type(Orbits), intent(in), target :: sps
+    integer :: i1, i2
+    type(SingleParticleOrbit), pointer :: o1, o2
+    integer :: a, b, cnt
+
+    this%j = j
+    this%p = p
+    this%z_abs = z
+    this%n_state = n
+    allocate(this%n2spi1(n))
+    allocate(this%n2spi2(n))
+    allocate(this%spis2n(sps%norbs,sps%norbs))
+    allocate(this%iphase(sps%norbs,sps%norbs))
+    cnt = 0
+    do i1 = 1, sps%norbs
+      o1 => sps%GetOrbit(i1)
+      do i2 = 1, i1
+        o2 => sps%GetOrbit(i2)
+
+        if(o1%e + o2%e > e2max) cycle
+        if(triag(o1%j, o2%j, 2*j)) cycle
+        if((-1) ** (o1%l+o2%l) /= p) cycle
+        if(abs(o1%z + o2%z) /= 2*z) cycle
+
+        a = i1; b = i2
+        if( o1%occ > o2%occ ) then
+          a = i2; b = i1 ! hp -> ph
+        end if
+        cnt = cnt + 1
+        this%n2spi1(cnt) = a
+        this%n2spi2(cnt) = b
+        this%spis2n(a,b) = cnt
+        this%spis2n(b,a) = cnt
+        this%iphase(a,b) = 1
+        this%iphase(b,a) = -(-1) ** ((o1%j+o2%j)/2 - j)
+      end do
+    end do
+#ifdef ModelSpaceDebug
+    write(*,'(a,i3,a,i3,a,i3,a,i5)') "Cross coupled two-body channel: J=", &
+        & j, ", P=", p, ", |Tz|=", z, ", # of states=", this%n_state
+#endif
+  end subroutine InitCrossCoupledTwoBodyChannel
+
 end module TwoBodyModelSpace

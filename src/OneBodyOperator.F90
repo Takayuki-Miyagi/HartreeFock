@@ -23,6 +23,11 @@ module OneBodyOperator
   private :: PrintOneBodyPart
   private :: NormalOrderingFrom1To0
 
+  private :: GetDenominator1
+  private :: GetDenominator2
+  private :: GetDenominator3
+  private :: GetDenominator4
+
   type, extends(DMat) :: OneBodyPartChannel
     type(OneBodyChannel), pointer :: ch_bra, ch_ket
     logical :: is = .false.
@@ -54,6 +59,10 @@ module OneBodyOperator
     procedure :: ScaleOneBodyPart
     procedure :: PrintOneBodyPart
     procedure :: NormalOrderingFrom1To0
+    procedure :: GetDenominator1
+    procedure :: GetDenominator2
+    procedure :: GetDenominator3
+    procedure :: GetDenominator4
 
     generic :: init => InitOneBodyPart
     generic :: fin => FinOneBodyPart
@@ -357,4 +366,41 @@ contains
       end do
     end do
   end function NormalOrderingFrom1To0
+
+  function GetDenominator1(f,h1,p1) result(r)
+    class(OneBodyPart), intent(in) :: f
+    integer, intent(in) :: h1, p1
+    real(8) :: r
+
+    r = f%GetOBME(h1,h1) - f%GetOBME(p1,p1)
+  end function GetDenominator1
+
+  function GetDenominator2(f,h1,h2,p1,p2) result(r)
+    class(OneBodyPart), intent(in) :: f
+    integer, intent(in) :: h1, h2, p1, p2
+    real(8) :: r
+
+    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) - &
+        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2)
+  end function GetDenominator2
+
+  function GetDenominator3(f,h1,h2,h3,p1,p2,p3) result(r)
+    class(OneBodyPart), intent(in) :: f
+    integer, intent(in) :: h1, h2, h3, p1, p2, p3
+    real(8) :: r
+
+    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) + f%GetOBME(h3,h3) - &
+        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - f%GetOBME(p3,p3)
+  end function GetDenominator3
+
+  function GetDenominator4(f,h1,h2,h3,h4,p1,p2,p3,p4) result(r)
+    class(OneBodyPart), intent(in) :: f
+    integer, intent(in) :: h1, h2, h3, h4, p1, p2, p3, p4
+    real(8) :: r
+
+    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) + &
+        & f%GetOBME(h3,h3) + f%GetOBME(h4,h4) - &
+        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - &
+        & f%GetOBME(p3,p3) - f%GetOBME(p4,p4)
+  end function GetDenominator4
 end module OneBodyOperator

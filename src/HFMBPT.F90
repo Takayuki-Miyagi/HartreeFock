@@ -128,6 +128,10 @@ module HFMBPT
     procedure :: scalar_second
   end type MBPTScalar
   type(SixJsStore), private :: sixjs
+
+  interface energy_third_ph
+    procedure :: energy_third_ph_new
+  end interface energy_third_ph
 contains
 
   subroutine CalcEnergyCorr(this,hamil,fourth_order)
@@ -364,44 +368,27 @@ contains
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
-    integer :: ch, J2, n, ab, cd, ij
-    integer :: i, j, a, b, c, d
+    integer :: ch, J2, i
     real(8) :: v, vsum, ti, r
+    type(DMat) :: m1, m2, m3
 
     ms => h%ms
     ti = omp_get_wtime()
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
 
       ch_two => ms%two%jpz(ch)
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
+      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m2 = h%two%MatCh(ch,ch)%get_pppp(ms%sps)
+      m3 = m1%t() * (m2 * m1)
       v = 0.d0
-      !$omp parallel
-      !$omp do private(ab,a,b,cd,c,d,ij,i,j) reduction(+:v)
-      do ab = 1, ch_two%n_pp_state
-        a = ch_two%n2spi1(ch_two%pps(ab))
-        b = ch_two%n2spi2(ch_two%pps(ab))
-        do cd = 1, ch_two%n_pp_state
-          c = ch_two%n2spi1(ch_two%pps(cd))
-          d = ch_two%n2spi2(ch_two%pps(cd))
-          do ij = 1, ch_two%n_hh_state
-            i = ch_two%n2spi1(ch_two%hhs(ij))
-            j = ch_two%n2spi2(ch_two%hhs(ij))
-
-            v = v + h%two%GetTwBME(i,j,a,b,J2) * &
-                & h%two%GetTwBME(a,b,c,d,J2) * &
-                & h%two%GetTwBME(c,d,i,j,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,i,j,c,d) )
-          end do
-        end do
+      do i = 1, size(m3%m,1)
+        v = v + m3%m(i,i)
       end do
-      !$omp end do
-      !$omp end parallel
       vsum = vsum + v * dble(2*J2+1)
     end do
     r = vsum
@@ -426,9 +413,9 @@ contains
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
-    integer :: ch, J2, n, ab, ij, kl
-    integer :: a, b, i, j, k, l
+    integer :: ch, J2, i
     real(8) :: v, vsum, ti, r
+    type(DMat) :: m1, m2, m3
 
     ti = omp_get_wtime()
 
@@ -436,43 +423,111 @@ contains
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       J2 = ms%two%jpz(ch)%j
-      n = ms%two%jpz(ch)%n_state
 
       ch_two => ms%two%jpz(ch)
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
+      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m2 = h%two%MatCh(ch,ch)%get_hhhh(ms%sps)
+      m3 = m1%t() * (m1 * m2)
       v = 0.d0
-      !$omp parallel
-      !$omp do private(ab,a,b,ij,i,j,kl,k,l) reduction(+:v)
-      do ab = 1, ch_two%n_pp_state
-        a = ch_two%n2spi1(ch_two%pps(ab))
-        b = ch_two%n2spi2(ch_two%pps(ab))
-        do ij = 1, ch_two%n_hh_state
-          i = ch_two%n2spi1(ch_two%hhs(ij))
-          j = ch_two%n2spi2(ch_two%hhs(ij))
-          do kl = 1, ch_two%n_hh_state
-            k = ch_two%n2spi1(ch_two%hhs(kl))
-            l = ch_two%n2spi2(ch_two%hhs(kl))
-
-            v = v + h%two%GetTwBME(a,b,i,j,J2) * &
-                & h%two%GetTwBME(i,j,k,l,J2) * &
-                & h%two%GetTwBME(k,l,a,b,J2) / &
-                & ( denom2b(h%one,i,j,a,b) * &
-                &   denom2b(h%one,k,l,a,b) )
-          end do
-        end do
+      do i = 1, size(m3%m,1)
+        v = v + m3%m(i,i)
       end do
-      !$omp end do
-      !$omp end parallel
-vsum = vsum + dble(2*J2+1) * v
+      vsum = vsum + dble(2*J2+1) * v
     end do
-
     r = vsum
     call timer%Add("Third order MBPT hh ladder",omp_get_wtime()-ti)
   end function energy_third_hh
 
-  function energy_third_ph(h) result(r)
+  function energy_third_ph_new(h) result(r)
+    ! a, b, c : particle
+    ! i, j, k : hole
+    !     _____________
+    !    /\           /\
+    !   /  \         /  \
+    !   |  | i     b |  |
+    ! a |  |_________|  | j
+    !   |  |         |  |
+    !   |  | k     c |  |
+    !   \  /         \  /
+    !    \/___________\/
+    !
+    ! - <ij||ab> <kb||ic> <ac||kj> / denominator
+    ! = - \sum_{L} [L] <ij|X|ab>_{L} <kb|X|ic>_{L} <ac|X|kj>_{L} / denominator
+    ! <ij|X|ab>_{L} = \sum_{A} [A] {i j A} <ij:A|X|ab:A>
+    !                              {a b L}
+    use Profiler, only: timer
+    use MyLibrary, only: triag
+    type(Ops), intent(in) :: h
+    type(MSPace), pointer :: ms
+    integer :: ch, J2
+    type(CrossCoupledTwoBodyChannel), pointer :: ch_cc
+    integer :: a, b, c, i, j, k
+    integer :: ia, ib, ic, ii, ij, ik
+    integer :: ja, jb, jc, ji, jj, jk
+    real(8) :: v, vsum, norm, ti, r
+    type(DMat) :: m1, m2, m3
+
+    ti = omp_get_wtime()
+    ms => h%ms
+    vsum = 0.d0
+    do k = 0, 2*ms%sps%lmax+1
+      do ia = 1, size(ms%particles)
+        a = ms%particles(ia)
+        b = ms%particles(ia)
+        if(Eket(ms%sps,a,b) > ms%two%e2max) cycle
+        do ii = 1, size(ms%holes)
+          i = ms%holes(ii)
+          j = ms%holes(ii)
+          if(Eket(ms%sps,i,j) > ms%two%e2max) cycle
+          if(Pari(ms%sps,i,j) /= Pari(ms%sps,a,b)) cycle
+          if(  Tz(ms%sps,i,j) /=   Tz(ms%sps,a,b)) cycle
+
+          ja = ms%sps%orb(a)%j
+          jb = ms%sps%orb(b)%j
+          ji = ms%sps%orb(i)%j
+          jj = ms%sps%orb(j)%j
+
+          v = 0.d0
+          do J2 = max(abs(ja-jj),abs(jb-ji))/2, &
+                & min(   (ja+jj),   (jb+ji))/2
+            if(J2/=K) cycle
+            v = v + dble(2*J2+1) * cross_couple(h%two,i,a,i,a,J2)
+            write(*,*) i, a, i, a, J2, cross_couple(h%two,i,a,i,a,J2)
+          end do
+          vsum = vsum + v
+        end do
+      end do
+    end do
+    write(*,*) vsum
+
+    vsum = 0.d0
+    do ch = 1,ms%cc_two%NChan
+      ch_cc => ms%cc_two%jpz(ch)
+      J2 = ch_cc%j
+      m1 = h%two%get_xc_pphh2phph(ch_cc, h%one)
+      if(m1%n_row<1 .or. m1%n_col<1) cycle
+      m2 = h%two%get_xc_phph2phph(ch_cc)
+      if(m2%n_row<1 .or. m2%n_col<1) cycle
+      !m3 = m1 * (m2 * m1)
+      m3 = m2
+      v = 0.d0
+      do i = 1, m3%n_row
+        v = v + m3%m(i,i)
+      end do
+      vsum = vsum + dble(2*J2+1) * v
+      call m1%fin()
+      call m2%fin()
+      call m3%fin()
+    end do
+    write(*,*) vsum
+    r = - vsum
+    call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
+  end function energy_third_ph_new
+
+  function energy_third_ph_old(h) result(r)
     ! a, b, c : particle
     ! i, j, k : hole
     !     _____________
@@ -575,7 +630,7 @@ vsum = vsum + dble(2*J2+1) * v
 
     r = - vsum
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
-  end function energy_third_ph
+  end function energy_third_ph_old
 
   function energy_fourth_F1(h) result(r)
     ! p1, p2, p3, p4: particle
@@ -638,24 +693,37 @@ vsum = vsum + dble(2*J2+1) * v
     type(TwoBodyChannel), intent(in) :: tbs
     type(Orbits), intent(in) :: sps
     type(DMat) :: m
-    integer :: bra, ket
+    integer :: bra, ket, ii, jj
     integer :: a, b, c, d
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
-    call m%zeros(tbs%n_state, tbs%n_state)
+    ii = 0
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ii = ii + 1
+    end do
+
+    call m%zeros(ii, jj)
+    ii = 0
     do bra = 1, tbs%n_state
       a = tbs%n2spi1(bra)
       b = tbs%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
       if(abs(oa%occ+ob%occ) > 1.d-6) cycle
+      ii = ii + 1
+      jj = 0
       do ket = 1, tbs%n_state
         c = tbs%n2spi1(ket)
         d = tbs%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
         if(abs(oc%occ+od%occ) > 1.d-6) cycle
-        m%m(bra,ket) = vch%m(bra,ket)
+        jj = jj + 1
+        m%m(ii,jj) = vch%m(bra,ket)
       end do
     end do
   end function interaction_channel_pppp
@@ -665,24 +733,37 @@ vsum = vsum + dble(2*J2+1) * v
     type(TwoBodyChannel), intent(in) :: tbs
     type(Orbits), intent(in) :: sps
     type(DMat) :: m
-    integer :: bra, ket
+    integer :: bra, ket, ii, jj
     integer :: a, b, c, d
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
-    call m%zeros(tbs%n_state, tbs%n_state)
+    ii = 0
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) ii = ii + 1
+    end do
+
+    call m%zeros(ii,ii)
+    ii = 0
     do bra = 1, tbs%n_state
       a = tbs%n2spi1(bra)
       b = tbs%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
       if(abs(oa%occ)*abs(ob%occ) < 1.d-6) cycle
+      ii = ii + 1
+      jj = 0
       do ket = 1, tbs%n_state
         c = tbs%n2spi1(ket)
         d = tbs%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
         if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
-        m%m(bra,ket) = vch%m(bra,ket)
+        jj = jj + 1
+        m%m(ii,jj) = vch%m(bra,ket)
       end do
     end do
   end function interaction_channel_hhhh
@@ -694,28 +775,43 @@ vsum = vsum + dble(2*J2+1) * v
     type(OneBodyPart), intent(in), optional :: f
     logical :: denom = .true.
     type(DMat) :: m
-    integer :: bra, ket
+    integer :: bra, ket, ii, jj
     integer :: a, b, c, d
     real(8) :: eps
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
     if(present(f)) denom = .true.
-    call m%zeros(tbs%n_state, tbs%n_state)
+    ii = 0
+    jj = 0
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ii = ii + 1
+      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) jj = jj + 1
+    end do
+
+    call m%zeros(ii, jj)
+    ii = 0
     do bra = 1, tbs%n_state
       a = tbs%n2spi1(bra)
       b = tbs%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
       if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+      ii = ii + 1
+      jj = 0
       do ket = 1, tbs%n_state
         c = tbs%n2spi1(ket)
         d = tbs%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
         if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        jj = jj + 1
         eps = 1.d0
         if(denom) eps = 1.d0 / denom2b(f,c,d,a,b)
-        m%m(bra,ket) = vch%m(bra,ket) * eps
+        m%m(ii,jj) = vch%m(bra,ket) * eps
       end do
     end do
   end function interaction_channel_pphh
@@ -726,22 +822,37 @@ vsum = vsum + dble(2*J2+1) * v
     type(Orbits), intent(in) :: sps
     type(DMat) :: m
     integer :: bra, ket
-    integer :: a, b, c, d
+    integer :: a, b, c, d, ii, jj
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
-    call m%zeros(tbs%n_state, tbs%n_state)
+    ii = 0
+    jj = 0
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ii = ii + 1
+      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) jj = jj + 1
+    end do
+
+    call m%zeros(ii,jj)
+    ii = 0
     do bra = 1, tbs%n_state
       a = tbs%n2spi1(bra)
       b = tbs%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
       if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      ii = ii + 1
+      jj = 0
       do ket = 1, tbs%n_state
         c = tbs%n2spi1(ket)
         d = tbs%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
         if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        jj = jj + 1
         m%m(bra,ket) = vch%m(bra,ket)
       end do
     end do
@@ -752,23 +863,38 @@ vsum = vsum + dble(2*J2+1) * v
     type(TwoBodyChannel), intent(in) :: tbs
     type(Orbits), intent(in) :: sps
     type(DMat) :: m
-    integer :: bra, ket
+    integer :: bra, ket, ii, jj
     integer :: a, b, c, d
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
-    call m%zeros(tbs%n_state, tbs%n_state)
+    ii = 0
+    jj = 0
+    do bra = 1, tbs%n_state
+      a = tbs%n2spi1(bra)
+      b = tbs%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ii = ii + 1
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) jj = jj + 1
+    end do
+
+    call m%zeros(ii, jj)
+    ii = 0
     do bra = 1, tbs%n_state
       a = tbs%n2spi1(bra)
       b = tbs%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
       if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      ii = ii + 1
+      jj = 0
       do ket = 1, tbs%n_state
         c = tbs%n2spi1(ket)
         d = tbs%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
         if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+        jj = jj + 1
         m%m(bra,ket) = vch%m(bra,ket)
       end do
     end do

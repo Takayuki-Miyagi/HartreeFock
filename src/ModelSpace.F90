@@ -28,6 +28,7 @@ module ModelSpace
     type(OrbitsIsospin) :: isps
     type(OneBodySpace) :: one
     type(TwoBodySpace) :: two
+    type(CrossCoupledTwoBodySpace) :: cc_two
     type(ThreeBodySpace) :: thr
     type(NonOrthIsospinThreeBodySpace) :: thr21
     logical :: is_constructed=.false.
@@ -93,6 +94,7 @@ contains
     call this%sps%fin()
     call this%one%fin()
     call this%two%fin()
+    call this%cc_two%fin()
     if(this%is_three_body_jt) then
       call this%thr21%fin()
     end if
@@ -309,18 +311,20 @@ contains
     class(MSpace), intent(inout) :: this
     call this%one%init(this%sps)
     write(*,'(a)') "  # of J, parity, and tz Channels:"
-    write(*,'(a,i3)') "    OneBody: ", this%one%NChan
+    write(*,'(a,i3)') "              OneBody: ", this%one%NChan
     call this%two%init(this%sps, this%e2max)
-    write(*,'(a,i3)') "    TwoBody: ", this%two%NChan
+    write(*,'(a,i3)') "              TwoBody: ", this%two%NChan
+    call this%cc_two%init(this%sps, this%e2max)
+    write(*,'(a,i3)') "Cross Coupled TwoBody: ", this%two%NChan
 
     if(this%e3max > 0 .and. this%is_three_body_jt) then
       call this%thr21%init(this%sps, this%isps, this%e2max, this%e3max)
-      write(*,'(a,i3)') "  ThreeBody (2+1): ", this%thr21%NChan
+      write(*,'(a,i3)') "    ThreeBody (2+1): ", this%thr21%NChan
     end if
 
     if(this%e3max > 0 .and. this%is_three_body) then
       call this%thr%init(this%sps, this%e2max, this%e3max)
-      write(*,'(a,i3)') "  ThreeBody: ", this%thr%NChan
+      write(*,'(a,i3)') "          ThreeBody: ", this%thr%NChan
     end if
   end subroutine InitSubSpace
 

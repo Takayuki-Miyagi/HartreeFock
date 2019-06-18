@@ -149,7 +149,7 @@ contains
 
     case('Tcm', 'tcm')
       if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
-        write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        write(*,'(a,6i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd, Pab, Pcd, Zab, Zcd
         return
       end if
       r = p_dot_p(ia,ib,ic,id,Jab) * hw / dble(A)
