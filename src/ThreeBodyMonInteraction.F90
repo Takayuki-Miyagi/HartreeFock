@@ -9,9 +9,9 @@ module ThreeBodyMonInteraction
   private :: InitOneBodyChannels
   private :: FinOneBodyChannels
   private :: InitThreeBodyMonChannel
-  private ::  FinThreeBodyMonChannel
+  private :: FinThreeBodyMonChannel
   private :: InitThreeBodyMonSpace
-  private ::  FinThreeBodyMonSpace
+  private :: FinThreeBodyMonSpace
 
   type :: OneBodyChannels
     integer :: emax
@@ -39,11 +39,11 @@ module ThreeBodyMonInteraction
     type(ThreeBodyMonChannel), allocatable :: Chan(:)
     type(OrbitsIsospin), pointer :: sps
     type(OneBodyChannels) :: one
-    integer, allocatable :: JPTMon2Ch(:,:)
-    integer, allocatable :: JPT2Ch(:,:,:)
-    integer, allocatable :: Mon2Ch(:,:,:,:)
+    integer, allocatable :: TMon2Ch(:,:)
+    integer, allocatable :: T2Ch(:)
+    integer, allocatable :: Mon2Ch(:,:,:)
     integer :: emax, e2max, e3max
-    integer :: NChan, NMon, NJPT
+    integer :: NChan, NMon, NT
     logical :: is_Constructed=.false.
   contains
     procedure :: init => InitThreeBodyMonSpace
@@ -73,7 +73,7 @@ module ThreeBodyMonInteraction
 
     generic :: init => InitThreeBodyMonForce
     generic :: fin => FinThreeBodyMonForce
-    generic :: GetThBME => GetThBMEMon_isospin, GetThBMEMon_pn
+    generic :: GetMonThBME => GetThBMEMon_isospin, GetThBMEMon_pn
   end type ThreeBodyMonForce
 
   type :: Read3BodyMonopole
@@ -135,8 +135,8 @@ contains
     do ich = 1, this%NChan
       call this%chan(ich)%fin()
     end do
-    deallocate(this%JPTMon2Ch)
-    deallocate(this%JPT2Ch)
+    deallocate(this%TMon2Ch)
+    deallocate(this%T2Ch)
     deallocate(this%Mon2Ch)
     deallocate(this%Chan)
     call this%one%fin()
@@ -149,174 +149,145 @@ contains
     class(ThreeBodyMonSpace), intent(inout) :: this
     type(OrbitsIsospin), target, intent(in) :: sps
     integer, intent(in) :: e2max, e3max
-    integer :: jtot, ptot, ttot
+    integer :: ttot
     integer :: cnt
     integer :: ch1, ch2, ch3
-    integer :: j1, j2, j3, j12, p1, p2, p3
+    integer :: j1, j2, j3, p1, p2, p3
     integer :: i1, i2, i3, t12
     type(SingleParticleOrbitIsospin), pointer :: o1, o2, o3
-    integer :: ich, ich_JPT, ich_Mon
-    integer, allocatable :: jj(:), pp(:), tt(:)
-    integer, allocatable :: ch1_(:), ch2_(:), ch3_(:), jj12(:)
+    integer :: ich, ich_T, ich_Mon
+    integer, allocatable :: pp(:), tt(:)
+    integer, allocatable :: ch1_(:), ch2_(:), ch3_(:)
     this%sps => sps
     this%emax = sps%emax
     this%e2max = e2max
     this%e3max = e3max
 
     call this%one%init(sps)
-
-    this%NJPT = (2*e3max+3) * 4
-    this%NMon = this%one%NChan**3 * (max(2*sps%emax, e2max)+2)
-    allocate(this%JPTMon2Ch(this%NJPT, this%NMon))
-    allocate(this%JPT2Ch(2*e3max + 3, -1:1, 1:3))
-    allocate(this%Mon2Ch(this%one%NChan, this%one%NChan, this%one%NChan,&
-        & 0:max(2*sps%emax,e2max)+1 ))
-    this%JPTMon2Ch(:,:) = 0
-    this%JPT2Ch(:,:,:) = 0
-    this%Mon2Ch(:,:,:,:) = 0
+    this%NT = 2
+    this%NMon = this%one%NChan**3
+    allocate(this%Mon2Ch(this%one%NChan, this%one%NChan, this%one%NChan))
+    allocate(this%T2Ch(1:3))
+    allocate(this%TMon2Ch(this%NT, this%NMon))
+    this%Mon2Ch(:,:,:) = 0
+    this%T2Ch(:) = 0
+    this%TMon2Ch(:,:) = 0
     ich = 0
     do ttot = 1, 3, 2
-      do jtot = 1, 2 * e3max + 3, 2
-        do ptot = 1, -1, -2
 
-          do ch1 = 1, this%one%NChan
-            j1 = this%one%j(ch1)
-            p1 = this%one%p(ch1)
-            do ch2 = 1, this%one%NChan
-              j2 = this%one%j(ch2)
-              p2 = this%one%p(ch2)
-              do ch3 = 1, this%one%NChan
-                j3 = this%one%j(ch3)
-                p3 = this%one%p(ch3)
-                if( p1*p2*p3 .ne. ptot) cycle
+      do ch1 = 1, this%one%NChan
+        j1 = this%one%j(ch1)
+        p1 = this%one%p(ch1)
+        do ch2 = 1, this%one%NChan
+          j2 = this%one%j(ch2)
+          p2 = this%one%p(ch2)
+          do ch3 = 1, this%one%NChan
+            j3 = this%one%j(ch3)
+            p3 = this%one%p(ch3)
 
-                do j12 = abs(j1 - j2)/2, (j1 + j2)/2
-                  if(triag(2*j12, j3, jtot)) cycle
-                  cnt = 0
-                  do i1 = 1, sps%norbs
-                    o1 => sps%orb(i1)
-                    if(j1 /= o1%j) cycle
-                    if(p1 /= (-1)**o1%l) cycle
-                    do i2 = 1, sps%norbs
-                      o2 => sps%orb(i2)
-                      if(j2 /= o2%j) cycle
-                      if(p2 /= (-1)**o2%l) cycle
-                      if(o1%e + o2%e > e2max) cycle
-                      do i3 = 1, sps%norbs
-                        o3 => sps%orb(i3)
-                        if(j3 /= o3%j) cycle
-                        if(p3 /= (-1)**o3%l) cycle
-                        if(o1%e + o3%e > e2max) cycle
-                        if(o2%e + o3%e > e2max) cycle
-                        if(o1%e + o2%e + o3%e > e3max) cycle
-                        do t12 = 0, 1
-                          if(triag(2*t12, 1, ttot)) cycle
-                          if(i1 == i2 .and. mod(j12 + t12, 2) == 0) cycle
-                          cnt = cnt + 1
-                        end do
-                      end do
-                    end do
+            cnt = 0
+            do i1 = 1, sps%norbs
+              o1 => sps%orb(i1)
+              if(j1 /= o1%j) cycle
+              if(p1 /= (-1)**o1%l) cycle
+              do i2 = 1, sps%norbs
+                o2 => sps%orb(i2)
+                if(j2 /= o2%j) cycle
+                if(p2 /= (-1)**o2%l) cycle
+                if(o1%e + o2%e > e2max) cycle
+                do i3 = 1, sps%norbs
+                  o3 => sps%orb(i3)
+                  if(j3 /= o3%j) cycle
+                  if(p3 /= (-1)**o3%l) cycle
+                  if(o1%e + o3%e > e2max) cycle
+                  if(o2%e + o3%e > e2max) cycle
+                  if(o1%e + o2%e + o3%e > e3max) cycle
+                  do t12 = 0, 1
+                    if(triag(2*t12, 1, ttot)) cycle
+                    cnt = cnt + 1
                   end do
-                  if(cnt /= 0) ich = ich + 1
                 end do
-
               end do
             end do
+
+            if(cnt /= 0) ich = ich + 1
           end do
         end do
       end do
     end do
+
     this%NChan = ich
-    allocate(jj(this%NChan))
     allocate(pp(this%NChan))
     allocate(tt(this%NChan))
     allocate(ch1_(this%NChan))
     allocate(ch2_(this%NChan))
     allocate(ch3_(this%NChan))
-    allocate(jj12(this%NChan))
 
     ich = 0
-    ich_JPT = 0
+    ich_T = 0
     do ttot = 1, 3, 2
-      do jtot = 1, 2 * e3max + 3, 2
-        do ptot = 1, -1, -2
-          ich_JPT = ich_JPT+1
+      ich_T = ich_T+1
 
-          ich_Mon = 0
-          do ch1 = 1, this%one%NChan
-            j1 = this%one%j(ch1)
-            p1 = this%one%p(ch1)
-            do ch2 = 1, this%one%NChan
-              j2 = this%one%j(ch2)
-              p2 = this%one%p(ch2)
-              do ch3 = 1, this%one%NChan
-                j3 = this%one%j(ch3)
-                p3 = this%one%p(ch3)
+      ich_Mon = 0
+      do ch1 = 1, this%one%NChan
+        j1 = this%one%j(ch1)
+        p1 = this%one%p(ch1)
+        do ch2 = 1, this%one%NChan
+          j2 = this%one%j(ch2)
+          p2 = this%one%p(ch2)
+          do ch3 = 1, this%one%NChan
+            j3 = this%one%j(ch3)
+            p3 = this%one%p(ch3)
+            ich_Mon = ich_Mon + 1
 
-                do j12 = 0, max(2*sps%emax, e2max)+1
-                  ich_Mon = ich_Mon + 1
-                  if(triag(j1,j2,2*j12)) cycle
-                  if( p1*p2*p3 .ne. ptot) cycle
-                  if(triag(2*j12, j3, jtot)) cycle
-                  cnt = 0
-                  do i1 = 1, sps%norbs
-                    o1 => sps%orb(i1)
-                    if(j1 /= o1%j) cycle
-                    if(p1 /= (-1)**o1%l) cycle
-                    do i2 = 1, sps%norbs
-                      o2 => sps%orb(i2)
-                      if(j2 /= o2%j) cycle
-                      if(p2 /= (-1)**o2%l) cycle
-                      if(o1%e + o2%e > e2max) cycle
-                      do i3 = 1, sps%norbs
-                        o3 => sps%orb(i3)
-                        if(j3 /= o3%j) cycle
-                        if(p3 /= (-1)**o3%l) cycle
-                        if(o1%e + o3%e > e2max) cycle
-                        if(o2%e + o3%e > e2max) cycle
-                        if(o1%e + o2%e + o3%e > e3max) cycle
-                        do t12 = 0, 1
-                          if(triag(2*t12, 1, ttot)) cycle
-                          if(i1 == i2 .and. mod(j12 + t12, 2) == 0) cycle
-                          cnt = cnt + 1
-                        end do
-                      end do
-                    end do
+            cnt = 0
+            do i1 = 1, sps%norbs
+              o1 => sps%orb(i1)
+              if(j1 /= o1%j) cycle
+              if(p1 /= (-1)**o1%l) cycle
+              do i2 = 1, sps%norbs
+                o2 => sps%orb(i2)
+                if(j2 /= o2%j) cycle
+                if(p2 /= (-1)**o2%l) cycle
+                if(o1%e + o2%e > e2max) cycle
+                do i3 = 1, sps%norbs
+                  o3 => sps%orb(i3)
+                  if(j3 /= o3%j) cycle
+                  if(p3 /= (-1)**o3%l) cycle
+                  if(o1%e + o3%e > e2max) cycle
+                  if(o2%e + o3%e > e2max) cycle
+                  if(o1%e + o2%e + o3%e > e3max) cycle
+                  do t12 = 0, 1
+                    if(triag(2*t12, 1, ttot)) cycle
+                    cnt = cnt + 1
                   end do
-                  if(cnt /= 0) then
-                    ich = ich + 1
-                    this%JPTMon2Ch(ich_JPT, ich_Mon) = ich
-                    this%JPT2Ch(jtot, ptot, ttot) = ich_JPT
-                    this%Mon2Ch(ch1, ch2, ch3, j12) = ich_Mon
-                    jj(ich) = jtot
-                    pp(ich) = ptot
-                    tt(ich) = ttot
-                    ch1_(ich) = ch1
-                    ch2_(ich) = ch2
-                    ch3_(ich) = ch3
-                    jj12(ich) = j12
-                  end if
                 end do
               end do
             end do
+            if(cnt /= 0) then
+              ich = ich + 1
+              this%TMon2Ch(ich_T, ich_Mon) = ich
+              this%T2Ch(ttot) = ich_T
+              this%Mon2Ch(ch1, ch2, ch3) = ich_Mon
+              tt(ich) = ttot
+              ch1_(ich) = ch1
+              ch2_(ich) = ch2
+              ch3_(ich) = ch3
+            end if
           end do
-
         end do
       end do
     end do
 
     allocate(this%chan(this%NChan))
     do ich = 1, this%NChan
-      call this%chan(ich)%init(sps, this%one, jj(ich), pp(ich), tt(ich), &
-          & ch1_(ich), ch2_(ich), ch3_(ich), jj12(ich), e2max, e3max)
+      call this%chan(ich)%init(sps, this%one, tt(ich), &
+          & ch1_(ich), ch2_(ich), ch3_(ich), e2max, e3max)
     end do
-    deallocate(jj)
-    deallocate(pp)
     deallocate(tt)
     deallocate(ch1_)
     deallocate(ch2_)
     deallocate(ch3_)
-    deallocate(jj12)
     this%is_Constructed=.true.
   end subroutine InitThreeBodyMonSpace
 
@@ -326,23 +297,20 @@ contains
     deallocate(this%nst2n)
   end subroutine FinThreeBodyMonChannel
 
-  subroutine InitThreeBodyMonChannel(this, sps, one, j, p, t, ch1, ch2, ch3, j12, e2max, e3max)
+  subroutine InitThreeBodyMonChannel(this, sps, one, t, ch1, ch2, ch3, e2max, e3max)
     use MyLibrary, only: triag
     class(ThreeBodyMonChannel), intent(inout) :: this
     type(OrbitsIsospin), target, intent(in) :: sps
     type(OneBodyChannels), intent(in) :: one
-    integer, intent(in) :: j, p, t, ch1, ch2, ch3, e2max, e3max, j12
+    integer, intent(in) :: t, ch1, ch2, ch3, e2max, e3max
     type(SingleParticleOrbitIsospin), pointer :: o1, o2, o3
     integer :: i1, i2, i3, cnt
     integer :: j1, j2, j3, t12, p1, p2, p3
 
-    this%j = j
-    this%p = p
     this%t = t
     this%ch1 = ch1
     this%ch2 = ch2
     this%ch3 = ch3
-    this%j12 = j12
 
     j1 = one%j(ch1)
     p1 = one%p(ch1)
@@ -372,7 +340,6 @@ contains
           if(o1%e + o2%e + o3%e > e3max) cycle
           do t12 = 0, 1
             if(triag(2*t12, 1, t)) cycle
-            if(i1 == i2 .and. mod(j12 + t12, 2) == 0) cycle
             cnt = cnt + 1
           end do
         end do
@@ -400,7 +367,6 @@ contains
           if(o1%e + o2%e + o3%e > e3max) cycle
           do t12 = 0, 1
             if(triag(2*t12, 1, t)) cycle
-            if(i1 == i2 .and. mod(j12 + t12, 2) == 0) cycle
             cnt = cnt + 1
             this%n2abct(:,cnt) = [i1,i2,i3,t12]
             this%nst2n(o1%n, o2%n, o3%n, t12) = cnt
@@ -471,11 +437,10 @@ contains
     call this%thr%fin()
   end subroutine FinThreeBodyMonForce
 
-  function GetThBMEMon_pn(this,i1,i2,i3,J12,i4,i5,i6,J45,J) result(r)
+  function GetThBMEMon_pn(this,i1,i2,i3,i4,i5,i6) result(r)
     use MyLibrary, only: dcg
     class(ThreeBodyMonForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
-    integer, intent(in) :: J12,J45,J
     type(Orbits), pointer :: sps
     type(OrbitsIsospin), pointer :: isps
     type(SingleParticleOrbit), pointer :: o1,o2,o3,o4,o5,o6
@@ -488,8 +453,6 @@ contains
     sps => this%sps
     isps => this%isps
     r = 0.d0
-    if(i1 == i2 .and. mod(J12, 2) == 1) return
-    if(i4 == i5 .and. mod(J45, 2) == 1) return
     o1 => sps%GetOrbit(i1)
     o2 => sps%GetOrbit(i2)
     o3 => sps%GetOrbit(i3)
@@ -499,7 +462,6 @@ contains
     if(o1%j /= o4%j) return
     if(o2%j /= o5%j) return
     if(o3%j /= o6%j) return
-    if(j12 /= J45) return
     !if(o1%e + o2%e > this%thr%e2max) return
     !if(o4%e + o5%e > this%thr%e2max) return
     !if(o1%e + o3%e > this%thr%e2max) return
@@ -526,7 +488,7 @@ contains
         do T = max(abs(2*T12-1),abs(2*T45-1)), min(2*T12+1,2*T45+1), 2
           if(abs(Z) > T) cycle
           r = r + &
-              & this%GetThBME(a,b,c,J12,T12,d,e,f,J45,T45,J,T) * &
+              & this%GetMonThBME(a,b,c,T12,d,e,f,T45,T) * &
               & this%CGs(1,z1,1,z2,2*T12,z1+z2) * this%CGs(2*T12,z1+z2,1,z3,T,Z) * &
               & this%CGs(1,z4,1,z5,2*T45,z4+z5) * this%CGs(2*T45,z4+z5,1,z6,T,Z)
         end do
@@ -535,13 +497,13 @@ contains
     !call timer%add("GetThBME_pn", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBMEMon_pn
 
-  function GetThBMEMon_Isospin(this,i1,i2,i3,J12,T12,i4,i5,i6,J45,T45,J,T) result(r)
+  function GetThBMEMon_Isospin(this,i1,i2,i3,T12,i4,i5,i6,T45,T) result(r)
     class(ThreeBodyMonForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
-    integer, intent(in) :: J12,T12,J45,T45,J,T
+    integer, intent(in) :: T12,T45,T
     type(OrbitsIsospin), pointer :: isps
     type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
-    integer :: ch, bra, ket, ch_jpt, ch_mon
+    integer :: ch, bra, ket, ch_t, ch_mon
     integer :: ch1, ch2, ch3
     integer :: P123, P456
     real(8) :: r
@@ -549,8 +511,6 @@ contains
 
     r = 0.d0
     !ti = omp_get_wtime() ! --- test (conflict with omp)
-    if(i1 == i2 .and. mod(J12+T12,2) == 0) return
-    if(i4 == i5 .and. mod(J45+T45,2) == 0) return
     isps => this%isps
     o1 => isps%GetOrbit(i1)
     o2 => isps%GetOrbit(i2)
@@ -564,7 +524,6 @@ contains
     if(o1%l /= o4%l) return
     if(o2%l /= o5%l) return
     if(o3%l /= o6%l) return
-    if(j12 /= J45) return
 
     P123 = (-1) ** (o1%l+o2%l+o3%l)
     P456 = (-1) ** (o4%l+o5%l+o6%l)
@@ -577,10 +536,10 @@ contains
     ch2 = this%thr%one%jp2ch(o2%j, (-1)**o2%l)
     ch3 = this%thr%one%jp2ch(o3%j, (-1)**o3%l)
 
-    ch_jpt = this%thr%jpt2ch(J,P123,T)
-    ch_mon = this%thr%mon2ch(ch1,ch2,ch3,J12)
-    if(ch_jpt * ch_mon == 0) return
-    ch = this%thr%jptmon2ch(ch_jpt,ch_mon)
+    ch_t = this%thr%t2ch(T)
+    ch_mon = this%thr%mon2ch(ch1,ch2,ch3)
+    if(ch_t * ch_mon == 0) return
+    ch = this%thr%tmon2ch(ch_t,ch_mon)
     if(ch == 0) return
 
     bra = this%thr%chan(ch)%nst2n(o1%n,o2%n,o3%n,t12)
@@ -802,7 +761,7 @@ contains
     integer :: i4, l4, j4, e4
     integer :: i5, l5, j5, e5, i5max
     integer :: i6, l6, j6, e6, i6max
-    integer :: J12, T12, J45, T45, J, T, P123, P456
+    integer :: T12, T45, T, P123, P456
 
     r = 0
     do i1 = 1, spsf%norbs
@@ -859,28 +818,18 @@ contains
                 P456 = (-1) ** (l4+l5+l6)
 
                 if(P123 /= P456) cycle
-                do J12 = abs(j1-j2)/2, (j1+j2)/2
-                  do J45 = abs(j4-j5)/2, (j4+j5)/2
-                    if(j12 /= j45) cycle
-                    do J = max(abs(2*J12-j3),abs(2*J45-j6)),&
-                          &min(   (2*J12+j3),   (2*J45+j6)), 2
 
-                      do T12 = 0, 1
-                        do T45 = 0, 1
-                          do T = max(abs(2*T12-1),abs(2*T45-1)),&
-                                &min(   (2*T12+1),   (2*T45+1)), 2
+                do T12 = 0, 1
+                  do T45 = 0, 1
+                    do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                          &min(   (2*T12+1),   (2*T45+1)), 2
 
-                            r = r + 1
+                      r = r + 1
 
-                          end do
-
-                        end do
-                      end do
                     end do
+
                   end do
                 end do
-
-
               end do
             end do
           end do
@@ -909,8 +858,8 @@ contains
     integer :: i4, n4, l4, j4, e4
     integer :: i5, n5, l5, j5, e5, i5max
     integer :: i6, n6, l6, j6, e6, i6max
-    integer :: J12, T12, J45, T45, J, T, P123, P456
-    integer :: ch, ch_jpt, ch_mon, bra, ket
+    integer :: T12, T45, T, P123, P456
+    integer :: ch, ch_t, ch_mon, bra, ket
 
     ms => thr%thr
     sps => ms%sps
@@ -975,70 +924,48 @@ contains
                 P456 = (-1) ** (l4+l5+l6)
 
                 if(P123 /= P456) cycle
-                do J12 = abs(j1-j2)/2, (j1+j2)/2
-                  do J45 = abs(j4-j5)/2, (j4+j5)/2
-                    if(J12 /= J45)  cycle
-                    do J = max(abs(2*J12-j3),abs(2*J45-j6)),&
-                          &min(   (2*J12+j3),   (2*J45+j6)), 2
 
-                      do T12 = 0, 1
-                        do T45 = 0, 1
-                          do T = max(abs(2*T12-1),abs(2*T45-1)),&
-                                &min(   (2*T12+1),   (2*T45+1)), 2
-                            cnt = cnt + 1
+                do T12 = 0, 1
+                  do T45 = 0, 1
+                    do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                          &min(   (2*T12+1),   (2*T45+1)), 2
+                      cnt = cnt + 1
 
-                            if(e1 > ms%emax) cycle
-                            if(e2 > ms%emax) cycle
-                            if(e3 > ms%emax) cycle
+                      if(e1 > ms%emax) cycle
+                      if(e2 > ms%emax) cycle
+                      if(e3 > ms%emax) cycle
 
-                            if(e4 > ms%emax) cycle
-                            if(e5 > ms%emax) cycle
-                            if(e6 > ms%emax) cycle
+                      if(e4 > ms%emax) cycle
+                      if(e5 > ms%emax) cycle
+                      if(e6 > ms%emax) cycle
 
-                            if(e1 + e2 > ms%e2max) cycle
-                            if(e2 + e3 > ms%e2max) cycle
-                            if(e3 + e1 > ms%e2max) cycle
+                      if(e1 + e2 > ms%e2max) cycle
+                      if(e2 + e3 > ms%e2max) cycle
+                      if(e3 + e1 > ms%e2max) cycle
 
-                            if(e4 + e5 > ms%e2max) cycle
-                            if(e5 + e6 > ms%e2max) cycle
-                            if(e6 + e4 > ms%e2max) cycle
+                      if(e4 + e5 > ms%e2max) cycle
+                      if(e5 + e6 > ms%e2max) cycle
+                      if(e6 + e4 > ms%e2max) cycle
 
-                            if(e1 + e2 + e3 > ms%e3max) cycle
-                            if(e4 + e5 + e6 > ms%e3max) cycle
+                      if(e1 + e2 + e3 > ms%e3max) cycle
+                      if(e4 + e5 + e6 > ms%e3max) cycle
 
-                            if(i1==i2 .and. mod(J12+T12,2)==0) then
-                              if(abs(v(cnt)) > 1.d-6) then
-                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
-                              end if
-                              cycle
-                            end if
+                      ch1 = ms%one%jp2ch(j1,(-1)**l1)
+                      ch2 = ms%one%jp2ch(j2,(-1)**l2)
+                      ch3 = ms%one%jp2ch(j3,(-1)**l3)
+                      ch_t = ms%t2ch(T)
+                      ch_mon = ms%mon2ch(ch1,ch2,ch3)
+                      if(ch_t * ch_mon == 0) cycle
+                      ch = ms%tmon2ch(ch_t,ch_mon)
+                      if(ch == 0) cycle
 
-                            if(i4==i5 .and. mod(J45+T45,2)==0) then
-                              if(abs(v(cnt)) > 1.d-6) then
-                                write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
-                              end if
-                              cycle
-                            end if
-
-                            ch1 = ms%one%jp2ch(j1,(-1)**l1)
-                            ch2 = ms%one%jp2ch(j2,(-1)**l2)
-                            ch3 = ms%one%jp2ch(j3,(-1)**l3)
-                            ch_jpt = ms%jpt2ch(J,P123,T)
-                            ch_mon = ms%mon2ch(ch1,ch2,ch3,j12)
-                            if(ch_jpt * ch_mon == 0) cycle
-                            ch = ms%jptmon2ch(ch_jpt,ch_mon)
-                            if(ch == 0) cycle
-
-                            bra = ms%chan(ch)%nst2n(n1,n2,n3,t12)
-                            ket = ms%chan(ch)%nst2n(n4,n5,n6,t45)
-                            if(bra * ket == 0) cycle
-                            thr%MatCh(ch)%v(bra,ket) = v(cnt)
-                            thr%MatCh(ch)%v(ket,bra) = v(cnt)
-                          end do
-
-                        end do
-                      end do
+                      bra = ms%chan(ch)%nst2n(n1,n2,n3,t12)
+                      ket = ms%chan(ch)%nst2n(n4,n5,n6,t45)
+                      if(bra * ket == 0) cycle
+                      thr%MatCh(ch)%v(bra,ket) = v(cnt)
+                      thr%MatCh(ch)%v(ket,bra) = v(cnt)
                     end do
+
                   end do
                 end do
 

@@ -1528,7 +1528,7 @@ contains
     type(ThreeBodyMonForce), intent(in), target :: v3n
     type(ThreeBodyMonSpace), pointer :: ms
     type(Orbits), pointer :: sps
-    integer :: n, idx, JJ, JJJ
+    integer :: n, idx
     integer(8) :: i1, i2, i3, i4, i5, i6, num
     integer :: l1, j1, z1, e1
     integer :: l2, j2, z2, e2
@@ -1680,29 +1680,14 @@ contains
     end do
 
     !$omp parallel
-    !$omp do private(idx,num,i1,i2,i3,i4,i5,i6,j1,j2,j3,v,JJ,JJJ)
+    !$omp do private(idx,num,i1,i2,i3,i4,i5,i6,v)
     do idx = 1, this%nidx
       num = this%idx(idx)
       call GetSpLabels3(num,i1,i2,i3,i4,i5,i6)
-      j1 = sps%orb(i1)%j
-      j2 = sps%orb(i2)%j
-      j3 = sps%orb(i3)%j
-      v = 0.d0
-      do JJ = abs(j1-j2)/2, (j1+j2)/2
-        if(i1 == i2 .and. mod(JJ,2) == 1) cycle
-        if(i4 == i5 .and. mod(JJ,2) == 1) cycle
-        do JJJ = abs(2*JJ-j3), (2*JJ+j3), 2
-          v = v + dble(JJJ+1) * &
-              & v3n%GetThBME(&
-              & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
-              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
-          ! need to convert integer(8) -> integer(4)
-          !write(*,'(8i4,f12.6)') i1,i2,i3,i4,i5,i6,JJ,JJJ,v3n%GetThBME(&
-          !    & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
-          !    & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
-        end do
-      end do
-      this%v(idx) = v / dble(j1+1)
+      v = v3n%GetMonThBME(&
+          & int(i1,kind(idx)),int(i2,kind(idx)),int(i3,kind(idx)), &
+          & int(i4,kind(idx)),int(i5,kind(idx)),int(i6,kind(idx)))
+      this%v(idx) = v / dble(sps%orb(i1)%j+1)
     end do
     !$omp end do
     !$omp end parallel
