@@ -15,7 +15,8 @@ obj/TwoBodyOperator.o : src/TwoBodyOperator.F90 obj/Profiler.o obj/ClassSys.o ob
 obj/OneBodyModelSpace.o : src/OneBodyModelSpace.F90 obj/SingleParticleState.o 
 obj/DefineOperators.o : src/DefineOperators.F90 obj/MyLibrary.o 
 obj/TwoBodyModelSpace.o : src/TwoBodyModelSpace.F90 obj/MyLibrary.o obj/SingleParticleState.o 
-obj/HartreeFock.o : src/HartreeFock.F90 obj/MyLibrary.o obj/Profiler.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/LinAlgLib.o 
+obj/HartreeFock.o : src/HartreeFock.F90 obj/MyLibrary.o obj/Profiler.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/LinAlgLib.o 
+obj/ThreeBodyNO2BInteraction.o : src/ThreeBodyNO2BInteraction.F90 obj/ClassSys.o obj/MyLibrary.o obj/SingleParticleState.o obj/Profiler.o 
 obj/ThreeBodyOperator.o : src/ThreeBodyOperator.F90 obj/ClassSys.o obj/ThreeBodyInteraction.o obj/MyLibrary.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ThreeBodyModelSpace.o obj/LinAlgLib.o 
 obj/LinAlgLib.o : submodule/LinAlgf90/src/LinAlgLib.f90 obj/MatVecComplex.o obj/MatVecDouble.o obj/MatVecSingle.o obj/MatrixComplex.o obj/MatrixDouble.o obj/MatrixSingle.o obj/VectorComplex.o obj/VectorDouble.o obj/VectorSingle.o obj/SingleDoubleComplex.o obj/LinAlgParameters.o 
 obj/MatVecDouble.o : submodule/LinAlgf90/src/MatVecDouble.f90 obj/MatrixDouble.o obj/VectorDouble.o obj/LinAlgParameters.o 

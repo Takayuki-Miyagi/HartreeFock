@@ -3,6 +3,7 @@ module HartreeFock
   use LinAlgLib
   use Operators
   use ThreeBodyMonInteraction
+  use ThreeBodyNO2BInteraction
   implicit none
 
   public :: HFSolver
@@ -43,6 +44,7 @@ module HartreeFock
     procedure :: InitMonopole3
     procedure :: InitMonopole3_i
     procedure :: InitMonopole3FromMon
+    procedure :: InitMonopole3FromNO2B
     procedure :: FinMonopole
   end type Monopole
 
@@ -1693,6 +1695,185 @@ contains
     !$omp end parallel
     this%constructed = .true.
   end subroutine InitMonopole3FromMon
+
+  subroutine InitMonopole3FromNO2B(this, v3n)
+    use MyLibrary, only: triag
+    class(Monopole), intent(inout) :: this
+    type(ThreeBodyNO2BForce), intent(in), target :: v3n
+    type(ThreeBodyNO2BSpace), pointer :: ms
+    type(Orbits), pointer :: sps
+    integer :: n, idx
+    integer(8) :: i1, i2, i3, i4, i5, i6, num
+    integer :: l1, j1, z1, e1
+    integer :: l2, j2, z2, e2
+    integer :: l3, j3, z3, e3
+    integer :: l4, j4, z4, e4
+    integer :: l5, j5, z5, e5
+    integer :: l6, j6, z6, e6, J
+    real(8) :: v
+
+    if(this%constructed) return
+    write(*,"(a)") " From NO2B file"
+    ms => v3n%thr
+    sps => v3n%sps
+    n = 0
+    do i1 = 1, sps%norbs
+      l1 = sps%orb(i1)%l
+      j1 = sps%orb(i1)%j
+      z1 = sps%orb(i1)%z
+      e1 = sps%orb(i1)%e
+
+      do i4 = 1, i1
+        l4 = sps%orb(i4)%l
+        j4 = sps%orb(i4)%j
+        z4 = sps%orb(i4)%z
+        e4 = sps%orb(i4)%e
+
+        if(j1 /= j4) cycle
+        if((-1)**l1 /= (-1)**l4) cycle
+        if(z1 /= z4) cycle
+
+        do i2 = 1, sps%norbs
+          l2 = sps%orb(i2)%l
+          j2 = sps%orb(i2)%j
+          z2 = sps%orb(i2)%z
+          e2 = sps%orb(i2)%e
+
+          do i5 = 1, sps%norbs
+            l5 = sps%orb(i5)%l
+            j5 = sps%orb(i5)%j
+            z5 = sps%orb(i5)%z
+            e5 = sps%orb(i5)%e
+            if(j2 /= j5) cycle
+            if((-1)**l2 /= (-1)**l5) cycle
+            if(z2 /= z5) cycle
+
+            if(e1 + e2 > ms%e2max) cycle
+            if(e4 + e5 > ms%e2max) cycle
+
+            do i3 = 1, sps%norbs
+              l3 = sps%orb(i3)%l
+              j3 = sps%orb(i3)%j
+              z3 = sps%orb(i3)%z
+              e3 = sps%orb(i3)%e
+              do i6 = 1, sps%norbs
+                l6 = sps%orb(i6)%l
+                j6 = sps%orb(i6)%j
+                z6 = sps%orb(i6)%z
+                e6 = sps%orb(i6)%e
+                if(j3 /= j6) cycle
+                if((-1)**l3 /= (-1)**l6) cycle
+                if(z3 /= z6) cycle
+
+                if(e1+e3 > ms%e2max) cycle
+                if(e2+e3 > ms%e2max) cycle
+                if(e4+e6 > ms%e2max) cycle
+                if(e5+e6 > ms%e2max) cycle
+                if(e1+e2+e3 > ms%e3max) cycle
+                if(e4+e5+e6 > ms%e3max) cycle
+
+                n = n + 1
+              end do
+            end do
+
+          end do
+        end do
+      end do
+    end do
+
+    this%nidx = n
+    allocate(this%idx(n))
+    allocate(this%v(n))
+
+
+    n = 0
+    do i1 = 1, sps%norbs
+      l1 = sps%orb(i1)%l
+      j1 = sps%orb(i1)%j
+      z1 = sps%orb(i1)%z
+      e1 = sps%orb(i1)%e
+
+      do i4 = 1, i1
+        l4 = sps%orb(i4)%l
+        j4 = sps%orb(i4)%j
+        z4 = sps%orb(i4)%z
+        e4 = sps%orb(i4)%e
+
+        if(j1 /= j4) cycle
+        if((-1)**l1 /= (-1)**l4) cycle
+        if(z1 /= z4) cycle
+
+        do i2 = 1, sps%norbs
+          l2 = sps%orb(i2)%l
+          j2 = sps%orb(i2)%j
+          z2 = sps%orb(i2)%z
+          e2 = sps%orb(i2)%e
+
+          do i5 = 1, sps%norbs
+            l5 = sps%orb(i5)%l
+            j5 = sps%orb(i5)%j
+            z5 = sps%orb(i5)%z
+            e5 = sps%orb(i5)%e
+            if(j2 /= j5) cycle
+            if((-1)**l2 /= (-1)**l5) cycle
+            if(z2 /= z5) cycle
+
+            if(e1 + e2 > ms%e2max) cycle
+            if(e4 + e5 > ms%e2max) cycle
+
+            do i3 = 1, sps%norbs
+              l3 = sps%orb(i3)%l
+              j3 = sps%orb(i3)%j
+              z3 = sps%orb(i3)%z
+              e3 = sps%orb(i3)%e
+              do i6 = 1, sps%norbs
+                l6 = sps%orb(i6)%l
+                j6 = sps%orb(i6)%j
+                z6 = sps%orb(i6)%z
+                e6 = sps%orb(i6)%e
+                if(j3 /= j6) cycle
+                if((-1)**l3 /= (-1)**l6) cycle
+                if(z3 /= z6) cycle
+
+                if(e1+e3 > ms%e2max) cycle
+                if(e2+e3 > ms%e2max) cycle
+                if(e4+e6 > ms%e2max) cycle
+                if(e5+e6 > ms%e2max) cycle
+                if(e1+e2+e3 > ms%e3max) cycle
+                if(e4+e5+e6 > ms%e3max) cycle
+
+                n = n + 1
+                this%idx(n) = GetIndex3(i1,i2,i3,i4,i5,i6)
+              end do
+            end do
+
+          end do
+        end do
+
+      end do
+    end do
+
+    !$omp parallel
+    !$omp do private(idx,num,i1,i2,i3,i4,i5,i6,j1,j2,J,v)
+    do idx = 1, this%nidx
+      num = this%idx(idx)
+      call GetSpLabels3(num,i1,i2,i3,i4,i5,i6)
+      j1 = ms%sps%orb(i1)%j
+      j2 = ms%sps%orb(i2)%j
+      v = 0.d0
+      do J = abs(j1-j2)/2, (j1+j2)/2
+        if(i1 == i2 .and. mod(J,2) == 1) cycle
+        if(i4 == i5 .and. mod(J,2) == 1) cycle
+        v = v + v3n%GetNO2BThBME(&
+            & int(i1,kind(idx)),int(i2,kind(idx)),int(i3,kind(idx)), &
+            & int(i4,kind(idx)),int(i5,kind(idx)),int(i6,kind(idx)),J)
+      end do
+      this%v(idx) = v / dble(sps%orb(i1)%j+1)
+    end do
+    !$omp end do
+    !$omp end parallel
+    this%constructed = .true.
+  end subroutine InitMonopole3FromNO2B
 
   function GetIndex2(i1,i2,i3,i4) result(r)
     integer(8), intent(in) :: i1, i2, i3, i4
