@@ -1142,7 +1142,6 @@ contains
               & sjs(oa%j, od%j, 2*J, oc%j, ob%j, 2*K) * &
               & op%GetTwBME(a,d,c,b,J)
         end do
-        if(bra==ket) write(*,*) a,d,c,b,K,v
         Mat%m(ibra,iket) = v
       end do
     end do
@@ -1189,30 +1188,30 @@ contains
       ibra = ibra+1
       iket = 0
       do ket = 1, ch_cc%n_state
-        d = ch_cc%n2spi1(ket) ! p
-        c = ch_cc%n2spi2(ket) ! h
+        c = ch_cc%n2spi1(ket) ! p
+        d = ch_cc%n2spi2(ket) ! h
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
         if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
         iket = iket+1
-        if(oa%z+od%z /= ob%z+oc%z) cycle
-        if(abs(oa%occ)+abs(od%occ) > 1.d-6) cycle
-        if(abs(ob%occ)*abs(oc%occ) < 1.d-6) cycle
-        Jmin = max(abs(oa%j-od%j), abs(ob%j-oc%j))/2
-        Jmax = min(    oa%j+od%j ,     ob%j+oc%j )/2
+        if(oa%z+oc%z /= ob%z+od%z) cycle
+        if(abs(oa%occ)+abs(oc%occ) > 1.d-6) cycle
+        if(abs(ob%occ)*abs(od%occ) < 1.d-6) cycle
+        Jmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
+        Jmax = min(    oa%j+oc%j ,     ob%j+od%j )/2
         norm = 1.d0
-        if(a==d) norm = norm*sqrt(2.d0)
-        if(b==c) norm = norm*sqrt(2.d0)
+        if(a==c) norm = norm*sqrt(2.d0)
+        if(b==d) norm = norm*sqrt(2.d0)
         v = 0.d0
         do J = Jmin, Jmax
-          if(a==d .and. mod(J,2)==1) cycle
-          if(c==b .and. mod(J,2)==1) cycle
+          if(a==c .and. mod(J,2)==1) cycle
+          if(b==d .and. mod(J,2)==1) cycle
           v = v + dble(2*J+1) * &
-              & sjs(oa%j, od%j, 2*J, oc%j, ob%j, 2*K) * &
-              & op%GetTwBME(a,d,c,b,J)
+              & sjs(oa%j, oc%j, 2*J, od%j, ob%j, 2*K) * &
+              & op%GetTwBME(a,c,d,b,J)
         end do
         eps = 1.d0
-        if(denom) eps = 1.d0 / f%GetDenominator2(b,c,a,d)
+        if(denom) eps = 1.d0 / f%GetDenominator2(b,d,a,c)
         Mat%m(ibra,iket) = v * eps * norm
       end do
     end do

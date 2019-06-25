@@ -131,6 +131,7 @@ module HFMBPT
 
   interface energy_third_ph
     procedure :: energy_third_ph_new
+    !procedure :: energy_third_ph_old
   end interface energy_third_ph
 contains
 
@@ -473,37 +474,6 @@ contains
     ti = omp_get_wtime()
     ms => h%ms
     vsum = 0.d0
-    do k = 0, 2*ms%sps%lmax+1
-      do ia = 1, size(ms%particles)
-        a = ms%particles(ia)
-        b = ms%particles(ia)
-        if(Eket(ms%sps,a,b) > ms%two%e2max) cycle
-        do ii = 1, size(ms%holes)
-          i = ms%holes(ii)
-          j = ms%holes(ii)
-          if(Eket(ms%sps,i,j) > ms%two%e2max) cycle
-          if(Pari(ms%sps,i,j) /= Pari(ms%sps,a,b)) cycle
-          if(  Tz(ms%sps,i,j) /=   Tz(ms%sps,a,b)) cycle
-
-          ja = ms%sps%orb(a)%j
-          jb = ms%sps%orb(b)%j
-          ji = ms%sps%orb(i)%j
-          jj = ms%sps%orb(j)%j
-
-          v = 0.d0
-          do J2 = max(abs(ja-jj),abs(jb-ji))/2, &
-                & min(   (ja+jj),   (jb+ji))/2
-            if(J2/=K) cycle
-            v = v + dble(2*J2+1) * cross_couple(h%two,i,a,i,a,J2)
-            write(*,*) i, a, i, a, J2, cross_couple(h%two,i,a,i,a,J2)
-          end do
-          vsum = vsum + v
-        end do
-      end do
-    end do
-    write(*,*) vsum
-
-    vsum = 0.d0
     do ch = 1,ms%cc_two%NChan
       ch_cc => ms%cc_two%jpz(ch)
       J2 = ch_cc%j
@@ -511,8 +481,7 @@ contains
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%get_xc_phph2phph(ch_cc)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
-      !m3 = m1 * (m2 * m1)
-      m3 = m2
+      m3 = m1%t() * (m2 * m1)
       v = 0.d0
       do i = 1, m3%n_row
         v = v + m3%m(i,i)
@@ -522,7 +491,6 @@ contains
       call m2%fin()
       call m3%fin()
     end do
-    write(*,*) vsum
     r = - vsum
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
   end function energy_third_ph_new
