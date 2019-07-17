@@ -20,6 +20,7 @@ module HartreeFock
   private :: CalcEnergy
   private :: BasisTransform
   private :: BasisTransNO2BHamiltonian
+  private :: BasisTransNO2BHamiltonianFromNO2B
   private :: BasisTransNO2BScalar
   private :: BasisTransNO2BTensor
   private :: BasisTransScalar
@@ -88,6 +89,7 @@ module HartreeFock
     procedure :: CalcEnergy
     procedure :: BasisTransform
     procedure :: BasisTransNO2BHamiltonian
+    procedure :: BasisTransNO2BHamiltonianFromNO2B
     procedure :: BasisTransNO2BScalar
     procedure :: BasisTransNO2BTensor
     procedure :: BasisTransScalar
@@ -108,11 +110,10 @@ contains
     call this%V3%FinMonopole()
   end subroutine FinHFSolver
 
-  subroutine InitHFSolver(this,hamil,mon,n_iter_max,tol,alpha,norm_kernel)
+  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,norm_kernel)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
     type(Ops), intent(in) :: hamil
-    type(ThreeBodyMonForce), intent(in), optional :: mon
     integer, intent(in), optional :: n_iter_max
     real(8), intent(in), optional :: tol, alpha
     type(OneBodyPart), intent(in), optional :: norm_kernel
@@ -159,10 +160,10 @@ contains
     if(this%rank == 3 .and. this%is_three_body) then
       ti = omp_get_wtime()
       call timer%cmemory()
-      if(present(mon)) then
-        call this%V3%InitMonopole3FromMon(mon)
-      end if
-      if(.not. present(mon)) then
+
+      if(.not. hamil%thr21_mon%zero) call this%V3%InitMonopole3FromMon(hamil%thr21_mon)
+      if(.not. hamil%thr21_no2b%zero) call this%V3%InitMonopole3FromNO2B(hamil%thr21_no2b)
+      if(.not. hamil%thr21%zero) then
         if(hamil%ms%is_three_body_jt) call this%V3%InitMonopole3(hamil%thr21)
         if(hamil%ms%is_three_body) call this%V3%InitMonopole3_i(hamil%thr)
       end if
@@ -240,7 +241,12 @@ contains
       if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
         call HF%UpdateFockMatrix()
         call HF%CalcEnergy()
-        op = HF%BasisTransNO2BHamiltonian(Optr)
+        if(.not. Optr%thr21%zero) op = HF%BasisTransNO2BHamiltonian(Optr)
+        if(.not. Optr%thr21_no2b%zero) op = HF%BasisTransNO2BHamiltonianFromNO2B(Optr)
+        if(.not. Optr%thr21_mon%zero) then
+          write(*,*) "Wrong option, taking normal ordering"
+          stop
+        end if
         op%is_normal_ordered = .true.
         return
       end if
@@ -368,6 +374,100 @@ contains
     call timer%Add("BasisTransNO2BHamltonian",omp_get_wtime() - ti)
 
   end function BasisTransNO2BHamiltonian
+
+  function BasisTransNO2BHamiltonianFromNO2B(HF,H) result(op)
+    use Profiler, only: timer
+    class(HFSolver), intent(in) :: HF
+    type(Ops), intent(in) :: H
+    type(Ops) :: op
+    type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
+    type(Orbits), pointer :: sps
+    integer :: ch, J, n, bra, ket, a, b, c, d, e, f
+    integer :: ea, eb, ec, ed
+    integer :: je, le, ze, ee
+    integer :: jf, lf, zf, ef
+    real(8) :: ph, ti
+    type(DMat) :: UT, V2, V3
+
+    ti = omp_get_wtime()
+    ms => H%ms
+    sps => ms%sps
+    call op%init(0, 1, 0, "hamil", ms, 2)
+    op%zero = HF%ehf
+    do ch = 1, ms%one%NChan
+      op%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+          &  HF%F%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
+    end do
+
+    do ch = 1, ms%two%NChan
+      ch_two => ms%two%jpz(ch)
+      J = ch_two%j
+      n = ch_two%n_state
+      call UT%zeros(n,n)
+      call V3%zeros(n,n)
+      V2 = H%two%MatCh(ch,ch)%DMat
+
+      !$omp parallel
+      !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
+      !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef)
+      do bra = 1, n
+        a = ch_two%n2spi1(bra)
+        b = ch_two%n2spi2(bra)
+        ea = sps%orb(a)%e
+        eb = sps%orb(b)%e
+        ph = (-1.d0)**((sps%orb(a)%j+sps%orb(b)%j)/2-J)
+        do ket = 1, n
+          c = ch_two%n2spi1(ket)
+          d = ch_two%n2spi2(ket)
+          ec = sps%orb(c)%e
+          ed = sps%orb(d)%e
+
+          UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
+          if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
+              & HF%C%GetOBME(a,d) * HF%C%GetOBME(b,c)
+          if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
+          if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
+
+          if(ket > bra) cycle
+          if(H%rank/=3 .or. .not. H%ms%is_three_body_jt) cycle
+          do e = 1, sps%norbs
+            je = sps%orb(e)%j
+            le = sps%orb(e)%l
+            ze = sps%orb(e)%z
+            ee = sps%orb(e)%e
+            if(ea+eb+ee > ms%e3max) cycle
+            do f = 1, ms%sps%norbs
+              jf = sps%orb(f)%j
+              lf = sps%orb(f)%l
+              zf = sps%orb(f)%z
+              ef = sps%orb(f)%e
+              if(je /= jf) cycle
+              if(le /= lf) cycle
+              if(ze /= zf) cycle
+              if(ec+ed+ef > ms%e3max) cycle
+
+              V3%m(bra,ket) = V3%m(bra,ket) + HF%rho%GetOBME(e,f) * &
+                  & H%thr21_no2b%GetNO2BThBME(a,b,e,c,d,f,J)
+
+            end do
+          end do
+          V3%m(bra,ket) = V3%m(bra,ket) / dble(2*J+1)
+          if(a==b) V3%m(bra,ket) = V3%m(bra,ket) / dsqrt(2.d0)
+          if(c==d) V3%m(bra,ket) = V3%m(bra,ket) / dsqrt(2.d0)
+          V3%m(ket,bra) = V3%m(bra,ket)
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      op%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
+      call UT%fin()
+      call V2%fin()
+      call V3%fin()
+    end do
+    call timer%Add("BasisTransNO2BHamltonianFromNO2B",omp_get_wtime() - ti)
+
+  end function BasisTransNO2BHamiltonianFromNO2B
 
   function BasisTransNO2BScalar(HF,Opr) result(op)
     use Profiler, only: timer

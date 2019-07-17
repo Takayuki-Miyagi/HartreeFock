@@ -82,6 +82,7 @@ module ThreeBodyNO2BInteraction
     type(OrbitsIsospin), pointer :: isps
     real(8), allocatable :: Cgs(:,:,:,:,:,:)
     integer :: emax, e2max, e3max
+    logical :: zero=.true.
   contains
     procedure :: InitThreeBodyNO2BForce
     procedure :: FinThreeBodyNO2BForce
@@ -471,6 +472,7 @@ contains
     deallocate(this%MatCh)
     deallocate(this%CGs)
     call this%thr%fin()
+    this%zero = .true.
   end subroutine FinThreeBodyNO2BForce
 
   function GetThBMENO2B_pn(this,i1,i2,i3,i4,i5,i6,J) result(r)
@@ -632,6 +634,7 @@ contains
       return
     case default
 
+      V%zero = .false.
       call this%ReadFile(V)
     end select
 

@@ -20,6 +20,7 @@ program HFMain
   type(MBPTScalar) :: PTs
   type(MBPTDMat) :: PTd
   type(WriteFiles) :: w
+  logical :: is_full_3bme=.false., is_no2b_3bme=.false., is_mon_3bme=.false.
   character(256) :: inputfile='none', conffile='none'
   integer :: n, istatus, wunit=23
 
@@ -73,29 +74,46 @@ program HFMain
   ! Hamiltonian -----
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
-    call h%init('hamil',ms, 2)
   case default
+    is_full_3bme = .true.
     call h%init('hamil',ms, 3)
   end select
-  call h%set(p%int_nn_file,p%int_3n_file,&
-      & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
-      & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
-  select case(p%int_3n_mon_file)
-  case("none", "None", "NONE")
-    call HF%init(h,alpha=p%alpha)
+  select case(p%int_3n_no2b_file)
+  case('none', 'None', 'NONE')
   case default
-    call mon%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
-    call read3mon%set(p%int_3n_mon_file)
-    call read3mon%set(p%emax_mon, p%e2max_mon, p%e3max_mon, p%lmax_mon)
-    call read3mon%ReadThreeBodyMonopole(mon)
-    call HF%init(h,mon=mon,alpha=p%alpha)
+    is_no2b_3bme = .true.
+    call h%init('hamil',ms, 3, "no2b")
   end select
 
+  select case(p%int_3n_mon_file)
+  case('none', 'None', 'NONE')
+  case default
+    is_mon_3bme = .true.
+    call h%init('hamil',ms, 3, "mon")
+  end select
+  call h%init('hamil',ms, 2)
+
+  if(is_full_3bme) call h%set(p%int_nn_file,p%int_3n_file,&
+        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
+        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
+  if(is_no2b_3bme) call h%set(p%int_nn_file,p%int_3n_no2b_file,&
+        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
+        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
+  if(is_mon_3bme) call h%set(p%int_nn_file,p%int_3n_mon_file,&
+        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
+        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
+  if(.not. (is_full_3bme .or. is_no2b_3bme .or. is_mon_3bme)) then
+    call h%set(p%int_nn_file,p%int_3n_file,&
+        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
+        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
+  end if
+
+  call HF%init(h,alpha=p%alpha)
   call HF%solve()
-  htr = HF%BasisTransform(h)
 
   if(p%is_MBPTEnergy) then
+    htr = HF%BasisTransform(h)
     call PT%calc(htr, p%is_4th_order)
     open(wunit, file = p%summary_file, action='write',status='replace')
     call p%PrintInputParameters(wunit)
@@ -113,6 +131,7 @@ program HFMain
   end if
 
   if(p%is_NAT) then
+    htr = HF%BasisTransform(h)
     call PTd%init(HF, htr)
     HF%C = PTd%C_HO2NAT
     htr = HF%BasisTransform(h)

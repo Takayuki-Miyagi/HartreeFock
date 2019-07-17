@@ -43,6 +43,7 @@ module ThreeBodyInteraction
     type(NonOrthIsospinThreeBodySpace), pointer :: thr
     real(8), allocatable :: Cgs(:,:,:,:,:,:)
     logical :: Scalar
+    logical :: zero = .true.
   contains
     procedure :: InitThreeBodyForce
     procedure :: FinThreeBodyForce
@@ -136,6 +137,7 @@ contains
     deallocate(this%MatCh)
     deallocate(this%CGs)
     this%thr => null()
+    this%zero = .true.
   end subroutine FinThreeBodyForce
 
   subroutine CopyThreeBodyForce(a, b)
@@ -448,6 +450,7 @@ contains
       return
     case default
 
+      V%zero = .false.
       if(V%Scalar) call this%ReadScalar3BFile(V)
       if(.not. V%Scalar) call this%ReadTensor3BFile(V)
     end select

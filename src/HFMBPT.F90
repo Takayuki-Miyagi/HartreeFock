@@ -129,10 +129,6 @@ module HFMBPT
   end type MBPTScalar
   type(SixJsStore), private :: sixjs
 
-  interface energy_third_ph
-    procedure :: energy_third_ph_new
-    !procedure :: energy_third_ph_old
-  end interface energy_third_ph
 contains
 
   subroutine CalcEnergyCorr(this,hamil,fourth_order)
@@ -442,7 +438,7 @@ contains
     call timer%Add("Third order MBPT hh ladder",omp_get_wtime()-ti)
   end function energy_third_hh
 
-  function energy_third_ph_new(h) result(r)
+  function energy_third_ph(h) result(r)
     ! a, b, c : particle
     ! i, j, k : hole
     !     _____________
@@ -481,7 +477,7 @@ contains
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%get_xc_phph2phph(ch_cc)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
-      m3 = m1%t() * (m2 * m1)
+      m3 = m1 * (m2 * m1%t())
       v = 0.d0
       do i = 1, m3%n_row
         v = v + m3%m(i,i)
@@ -493,112 +489,7 @@ contains
     end do
     r = - vsum
     call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
-  end function energy_third_ph_new
-
-  function energy_third_ph_old(h) result(r)
-    ! a, b, c : particle
-    ! i, j, k : hole
-    !     _____________
-    !    /\           /\
-    !   /  \         /  \
-    !   |  | i     b |  |
-    ! a |  |_________|  | j
-    !   |  |         |  |
-    !   |  | k     c |  |
-    !   \  /         \  /
-    !    \/___________\/
-    !
-    ! - <ij||ab> <kb||ic> <ac||kj> / denominator
-    ! = - \sum_{L} [L] <ij|X|ab>_{L} <kb|X|ic>_{L} <ac|X|kj>_{L} / denominator
-    ! <ij|X|ab>_{L} = \sum_{A} [A] {i j A} <ij:A|X|ab:A>
-    !                              {a b L}
-    use Profiler, only: timer
-    use MyLibrary, only: triag
-    type(Ops), intent(in) :: h
-    type(MSPace), pointer :: ms
-    integer :: J2
-    integer :: a, b, c, i, j, k
-    integer :: ia, ib, ic, ii, ij, ik
-    integer :: ja, jb, jc, ji, jj, jk
-    real(8) :: v, vsum, norm, ti, r
-
-    ti = omp_get_wtime()
-    ms => h%ms
-    vsum = 0.d0
-    !$omp parallel
-    !$omp do private(ia,ib,ic,ii,ij,ik, &
-    !$omp &  a,b,c,i,j,k,ja,jb,jc,ji,jj,jk,norm,v) reduction(+:vsum)
-    do ia = 1, size(ms%particles)
-      do ib = 1, size(ms%particles)
-        a = ms%particles(ia)
-        b = ms%particles(ib)
-        if(Eket(ms%sps,a,b) > ms%two%e2max) cycle
-        do ii = 1, size(ms%holes)
-          do ij = 1, size(ms%holes)
-            i = ms%holes(ii)
-            j = ms%holes(ij)
-            if(Eket(ms%sps,i,j) > ms%two%e2max) cycle
-            if(Pari(ms%sps,i,j) /= Pari(ms%sps,a,b)) cycle
-            if(  Tz(ms%sps,i,j) /=   Tz(ms%sps,a,b)) cycle
-
-            do ic = 1, size(ms%particles)
-              do ik = 1, size(ms%holes)
-                c = ms%particles(ic)
-                k = ms%holes(ik)
-
-
-                if(Eket(ms%sps,k,b) > ms%two%e2max) cycle
-                if(Eket(ms%sps,i,c) > ms%two%e2max) cycle
-                if(Eket(ms%sps,a,c) > ms%two%e2max) cycle
-                if(Eket(ms%sps,k,j) > ms%two%e2max) cycle
-
-                if(Pari(ms%sps,k,b) /= Pari(ms%sps,i,c)) cycle
-                if(Pari(ms%sps,a,c) /= Pari(ms%sps,k,j)) cycle
-
-                if(  Tz(ms%sps,k,b) /=   Tz(ms%sps,i,c)) cycle
-                if(  Tz(ms%sps,a,c) /=   Tz(ms%sps,k,j)) cycle
-
-
-                norm = 1.d0
-                if(i==j) norm = norm * sqrt(2.d0)
-                if(j==k) norm = norm * sqrt(2.d0)
-                if(a==b) norm = norm * sqrt(2.d0)
-                if(a==c) norm = norm * sqrt(2.d0)
-
-                ja = ms%sps%orb(a)%j
-                jb = ms%sps%orb(b)%j
-                jc = ms%sps%orb(c)%j
-                ji = ms%sps%orb(i)%j
-                jj = ms%sps%orb(j)%j
-                jk = ms%sps%orb(k)%j
-
-                v = 0.d0
-                do J2 = max(abs(ja-jj),abs(jb-ji),abs(jc-jk))/2, &
-                      & min(   (ja+jj),   (jb+ji),   (jc+jk))/2
-                  v = v + dble(2*J2+1) * &
-                    & cross_couple(h%two,i,j,a,b,J2) * &
-                    & cross_couple(h%two,k,b,i,c,J2) * &
-                    & cross_couple(h%two,a,c,k,j,J2)
-
-                end do
-
-                vsum = vsum + norm * v / &
-                    & ( denom2b(h%one,k,j,a,c) * &
-                    &   denom2b(h%one,i,j,a,b) )
-
-              end do
-            end do
-          end do
-
-        end do
-      end do
-    end do
-    !$omp end do
-    !$omp end parallel
-
-    r = - vsum
-    call timer%Add("Third order MBPT ph ladder",omp_get_wtime()-ti)
-  end function energy_third_ph_old
+  end function energy_third_ph
 
   function energy_fourth_F1(h) result(r)
     ! p1, p2, p3, p4: particle
@@ -630,23 +521,62 @@ contains
     type(Ops) :: v_h1h2p3h2, v_h1p4p3p4
     type(DMat) :: m1, m2
     integer :: ch
+    integer :: h1, h2, p3, p4, L, Kmin, Kmax, K
+    type(SingleParticleOrbit), pointer :: oh1, oh2, op3, op4
     real(8) :: r, ti, vsum
 
     ti = omp_get_wtime()
     ms => h%ms
     sps => ms%sps
 
+    ! intermediate stuffs
     call v_h1h2p3h2%init(0,1,0,"v",ms,2)
     call v_h1p4p3p4%init(0,1,0,"v",ms,2)
     do ch = 1, ms%two%NChan
       tbs => ms%two%jpz(ch)
-      m1 = interaction_channel_pphh(h%two%MatCh(ch,ch), tbs, sps, f=h%one)
-      m2 = interaction_channel_phpp(h%two%MatCh(ch,ch), tbs, sps)
-      v_h1h2p3h2%two%MatCh(ch,ch)%DMat = m1%T() * m2%T()
-      m2 = interaction_channel_phhh(h%two%MatCh(ch,ch), tbs, sps)
-      v_h1p4p3p4%two%MatCh(ch,ch)%DMat = m2 * m1%T()
+      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      if(m1%n_row<1 .or. m1%n_col<1) cycle
+      m2 = h%two%MatCh(ch,ch)%get_phpp(ms%sps)
+      if(m2%n_row>1 .and. m2%n_col>1) then
+        call v_h1h2p3h2%two%MatCh(ch,ch)%set_phhh(ms%sps, m2 * m1)
+      end if
+      m2 = h%two%MatCh(ch,ch)%get_phhh(ms%sps)
+      if(m2%n_row>1 .and. m2%n_col>1) then
+        call v_h1p4p3p4%two%MatCh(ch,ch)%set_phpp(ms%sps, m2 * m1%t())
+      end if
       call m1%fin()
       call m2%fin()
+    end do
+
+    do h2 = 1, sps%norbs
+      oh2 => sps%GetOrbit(h2)
+      if(oh2%occ < 1.d-6) cycle
+      do p4 = 1, sps%norbs
+        op4 => sps%GetOrbit(p4)
+        if(op4%occ > 1.d-6) cycle
+
+        do L = abs(oh2%j-op4%j)/2, (oh2%j+op4%j)/2
+
+          do h1 = 1, sps%norbs
+            oh1 => sps%GetOrbit(h1)
+            if(oh1%occ < 1.d-6) cycle
+            do p3 = 1, sps%norbs
+              op3 => sps%GetOrbit(p3)
+              if(op3%occ > 1.d-6) cycle
+
+              Kmin = abs(oh1%j-op3%j)/2
+              Kmax = min(oh1%j+op3%j, 2*oh2%j, 2*op4%j)/2
+              do K = Kmin, Kmax
+                !v_h1h2p3h2%two%get_xc1324(p3,h2,h1,h2)
+                !v_h1p4p3p4%two%get_xc1324(h1,p4,p3,p4)
+              end do
+
+            end do
+          end do
+
+        end do
+
+      end do
     end do
 
 
@@ -656,219 +586,7 @@ contains
     call timer%Add("Fourth order MBPT F1",omp_get_wtime()-ti)
   end function energy_fourth_F1
 
-  function interaction_channel_pppp(vch, tbs, sps) result(m)
-    type(TwoBodyPartChannel), intent(in) :: vch
-    type(TwoBodyChannel), intent(in) :: tbs
-    type(Orbits), intent(in) :: sps
-    type(DMat) :: m
-    integer :: bra, ket, ii, jj
-    integer :: a, b, c, d
-    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ii = ii + 1
-    end do
-
-    call m%zeros(ii, jj)
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ+ob%occ) > 1.d-6) cycle
-      ii = ii + 1
-      jj = 0
-      do ket = 1, tbs%n_state
-        c = tbs%n2spi1(ket)
-        d = tbs%n2spi2(ket)
-        oc => sps%GetOrbit(c)
-        od => sps%GetOrbit(d)
-        if(abs(oc%occ+od%occ) > 1.d-6) cycle
-        jj = jj + 1
-        m%m(ii,jj) = vch%m(bra,ket)
-      end do
-    end do
-  end function interaction_channel_pppp
-
-  function interaction_channel_hhhh(vch, tbs, sps) result(m)
-    type(TwoBodyPartChannel), intent(in) :: vch
-    type(TwoBodyChannel), intent(in) :: tbs
-    type(Orbits), intent(in) :: sps
-    type(DMat) :: m
-    integer :: bra, ket, ii, jj
-    integer :: a, b, c, d
-    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) ii = ii + 1
-    end do
-
-    call m%zeros(ii,ii)
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) < 1.d-6) cycle
-      ii = ii + 1
-      jj = 0
-      do ket = 1, tbs%n_state
-        c = tbs%n2spi1(ket)
-        d = tbs%n2spi2(ket)
-        oc => sps%GetOrbit(c)
-        od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
-        jj = jj + 1
-        m%m(ii,jj) = vch%m(bra,ket)
-      end do
-    end do
-  end function interaction_channel_hhhh
-
-  function interaction_channel_pphh(vch, tbs, sps, f) result(m)
-    type(TwoBodyPartChannel), intent(in) :: vch
-    type(TwoBodyChannel), intent(in) :: tbs
-    type(Orbits), intent(in) :: sps
-    type(OneBodyPart), intent(in), optional :: f
-    logical :: denom = .true.
-    type(DMat) :: m
-    integer :: bra, ket, ii, jj
-    integer :: a, b, c, d
-    real(8) :: eps
-    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-
-    if(present(f)) denom = .true.
-    ii = 0
-    jj = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ii = ii + 1
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) jj = jj + 1
-    end do
-
-    call m%zeros(ii, jj)
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
-      ii = ii + 1
-      jj = 0
-      do ket = 1, tbs%n_state
-        c = tbs%n2spi1(ket)
-        d = tbs%n2spi2(ket)
-        oc => sps%GetOrbit(c)
-        od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
-        jj = jj + 1
-        eps = 1.d0
-        if(denom) eps = 1.d0 / denom2b(f,c,d,a,b)
-        m%m(ii,jj) = vch%m(bra,ket) * eps
-      end do
-    end do
-  end function interaction_channel_pphh
-
-  function interaction_channel_phhh(vch, tbs, sps) result(m)
-    type(TwoBodyPartChannel), intent(in) :: vch
-    type(TwoBodyChannel), intent(in) :: tbs
-    type(Orbits), intent(in) :: sps
-    type(DMat) :: m
-    integer :: bra, ket
-    integer :: a, b, c, d, ii, jj
-    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-
-    ii = 0
-    jj = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ii = ii + 1
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) jj = jj + 1
-    end do
-
-    call m%zeros(ii,jj)
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
-      ii = ii + 1
-      jj = 0
-      do ket = 1, tbs%n_state
-        c = tbs%n2spi1(ket)
-        d = tbs%n2spi2(ket)
-        oc => sps%GetOrbit(c)
-        od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
-        jj = jj + 1
-        m%m(bra,ket) = vch%m(bra,ket)
-      end do
-    end do
-  end function interaction_channel_phhh
-
-  function interaction_channel_phpp(vch, tbs, sps) result(m)
-    type(TwoBodyPartChannel), intent(in) :: vch
-    type(TwoBodyChannel), intent(in) :: tbs
-    type(Orbits), intent(in) :: sps
-    type(DMat) :: m
-    integer :: bra, ket, ii, jj
-    integer :: a, b, c, d
-    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-
-    ii = 0
-    jj = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ii = ii + 1
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) jj = jj + 1
-    end do
-
-    call m%zeros(ii, jj)
-    ii = 0
-    do bra = 1, tbs%n_state
-      a = tbs%n2spi1(bra)
-      b = tbs%n2spi2(bra)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
-      ii = ii + 1
-      jj = 0
-      do ket = 1, tbs%n_state
-        c = tbs%n2spi1(ket)
-        d = tbs%n2spi2(ket)
-        oc => sps%GetOrbit(c)
-        od => sps%GetOrbit(d)
-        if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
-        jj = jj + 1
-        m%m(bra,ket) = vch%m(bra,ket)
-      end do
-    end do
-  end function interaction_channel_phpp
-
-  function energy_fourth_F1_old(h) result(r)
+  function energy_fourth_F1_ugly(h) result(r)
     ! p1, p2, p3, p4: particle
     ! h1, h2, h3, h4: hole
     !     _____________
@@ -1010,7 +728,7 @@ contains
     end do
     r = -0.25d0 * vsum
     call timer%Add("Fourth order MBPT F1",omp_get_wtime()-ti)
-  end function energy_fourth_F1_old
+  end function energy_fourth_F1_ugly
 
 !  function energy_fourth_F4(h) result(r)
 !    ! p1, p2, p3         : particle

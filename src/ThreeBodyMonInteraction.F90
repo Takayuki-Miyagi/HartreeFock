@@ -65,6 +65,7 @@ module ThreeBodyMonInteraction
     type(OrbitsIsospin), pointer :: isps
     real(8), allocatable :: Cgs(:,:,:,:,:,:)
     integer :: emax, e2max, e3max
+    logical :: zero = .true.
   contains
     procedure :: InitThreeBodyMonForce
     procedure :: FinThreeBodyMonForce
@@ -435,6 +436,7 @@ contains
     deallocate(this%MatCh)
     deallocate(this%CGs)
     call this%thr%fin()
+    this%zero = .true.
   end subroutine FinThreeBodyMonForce
 
   function GetThBMEMon_pn(this,i1,i2,i3,i4,i5,i6) result(r)
@@ -595,6 +597,7 @@ contains
       return
     case default
 
+      V%zero = .false.
       call this%ReadFile(V)
     end select
 

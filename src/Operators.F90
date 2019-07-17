@@ -5,6 +5,8 @@ module Operators
   use TwoBodyOperator
   use ThreeBodyOperator
   use ThreeBodyInteraction
+  use ThreeBodyMonInteraction
+  use ThreeBodyNO2BInteraction
   implicit none
 
   public :: Ops
@@ -36,6 +38,8 @@ module Operators
     type(TwoBodyPart) :: two
     type(ThreeBodyPart) :: thr
     type(ThreeBodyForce) :: thr21
+    type(ThreeBodyNO2BForce) :: thr21_no2b
+    type(ThreeBodyMonForce) :: thr21_mon
     logical :: Scalar=.false.
     logical :: is_normal_ordered = .false.
     integer :: jr, pr, zr
@@ -83,28 +87,34 @@ contains
     this%is_normal_ordered = .false.
   end subroutine FinOps
 
-  subroutine InitOpsFromString(this, optr, ms, rank)
+  subroutine InitOpsFromString(this, optr, ms, rank, type_3bme)
     use DefineOperators, only: GetOperatorRank
     class(Ops), intent(inout) :: this
     type(MSpace), intent(in) :: ms
     character(*), intent(in) :: optr
     integer, intent(in) :: rank
+    character(*), intent(in), optional :: type_3bme
     integer :: jr, pr, zr
 
     call GetOperatorRank(optr,jr,pr,zr)
-    call this%init(jr,pr,zr,optr,ms,rank)
+    call this%init(jr,pr,zr,optr,ms,rank, type_3bme)
   end subroutine InitOpsFromString
 
-  subroutine InitOps(this, jr, pr, zr, optr, ms, rank)
+  subroutine InitOps(this, jr, pr, zr, optr, ms, rank, type_3bme)
     use Profiler, only: timer
     class(Ops), intent(inout) :: this
     integer, intent(in) :: jr, pr, zr, rank
     character(*), intent(in) :: optr
     type(MSpace), intent(in), target :: ms
+    character(*), intent(in), optional :: type_3bme
+    character(:), allocatable :: type_thbme
     real(8) :: ti
 
     ti = omp_get_wtime()
     call timer%cmemory()
+
+    type_thbme = 'full'
+    if(present(type_3bme)) type_thbme = type_3bme
 
     this%is_normal_ordered = .false.
     this%ms => ms
@@ -120,13 +130,27 @@ contains
     call this%one%init(ms%one, this%Scalar, optr, jr, pr, zr)
     call this%two%init(ms%two, this%Scalar, optr, jr, pr, zr)
 
-    if(rank == 3 .and. this%ms%is_three_body_jt) then
-      call this%thr21%init(ms%thr21) ! Three-body interaction
-    end if
+    select case(type_thbme)
+    case("monopole", "mon", "Monopole", "Mon")
+      if(rank == 3) then
+        call this%thr21_mon%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
+      end if
+    case("NO2B", "no2b")
+      if(rank == 3) then
+        call this%thr21_no2b%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
+      end if
+    case("full", "FULL", "Full")
+      if(rank == 3 .and. this%ms%is_three_body_jt) then
+        call this%thr21%init(ms%thr21) ! Three-body interaction
+      end if
 
-    if(rank == 3 .and. this%ms%is_three_body) then
-      call this%thr%init(ms%thr, this%Scalar, optr, jr, pr, zr)
-    end if
+      if(rank == 3 .and. this%ms%is_three_body) then
+        call this%thr%init(ms%thr, this%Scalar, optr, jr, pr, zr)
+      end if
+    case default
+      write(*,*) "Unknown three-body matrix treatment"
+      return
+    end select
 
     call timer%countup_memory(trim(optr))
     call timer%Add('Construct '//trim(optr), omp_get_wtime()-ti)
@@ -225,6 +249,8 @@ contains
     type(TwoBodyPart) :: Tcm_two, Hcm_two
     type(Read2BodyFiles) :: rd2
     type(Read3BodyFiles) :: rd3
+    type(Read3BodyMonopole) :: rd3_mon
+    type(Read3BodyNO2B) :: rd3_no2b
     type(MSpace), pointer :: ms
 
     if(file_nn == 'none' .and. file_3n == 'none') return
@@ -237,24 +263,58 @@ contains
       call rd2%set(bound_2b_file(1), bound_2b_file(2), bound_2b_file(3))
     end if
 
-    ! -- boundary for three-body file
-    call rd3%set(file_3n)
-    call rd3%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
-    if(present(bound_3b_file)) then
-      call rd3%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
-    end if
 
     call this%one%set(ms%hw, ms%A, ms%Z, ms%N)
     write(*,'(2a)') "2B file: ", trim(file_nn)
     call rd2%ReadTwoBodyFile(this%two)
-    if(this%rank == 3 .and. this%ms%is_three_body_jt) then
+
+    !------ Three-body file ------
+    ! full case
+    if(this%rank == 3 .and. this%ms%is_three_body_jt .and. .not. this%thr21%zero) then
+      ! -- boundary for three-body file
+      call rd3%set(file_3n)
+      call rd3%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
+      if(present(bound_3b_file)) then
+        call rd3%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
+      end if
       write(*,'(2a)') "3B file: ", trim(file_3n)
       call rd3%ReadIsospinThreeBodyFile(this%thr21)
+      if(this%ms%is_three_body) then
+        call this%thr%set(this%thr21)
+        call this%DiscardThreeBodyForce()
+      end if
     end if
 
-    if(this%rank == 3 .and. this%ms%is_three_body_jt .and. this%ms%is_three_body) then
-      call this%thr%set(this%thr21)
-      call this%DiscardThreeBodyForce()
+    ! NO2B case
+    if(this%rank == 3 .and. .not. this%thr21_no2b%zero) then
+      ! -- boundary for three-body file
+      call rd3_no2b%set(file_3n)
+      call rd3_no2b%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
+      if(present(bound_3b_file)) then
+        call rd3_no2b%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
+      end if
+      write(*,'(2a)') "3B file: ", trim(file_3n)
+      call rd3_no2b%ReadThreeBodyNO2B(this%thr21_no2b)
+      if(this%ms%is_three_body) then
+        write(*,*) "Wrong option in operator from file"
+        stop
+      end if
+    end if
+
+    ! Monopole case
+    if(this%rank == 3 .and. .not. this%thr21_mon%zero) then
+      ! -- boundary for three-body file
+      call rd3_mon%set(file_3n)
+      call rd3_mon%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
+      if(present(bound_3b_file)) then
+        call rd3_mon%set(bound_3b_file(1), bound_3b_file(2), bound_3b_file(3), bound_3b_file(4))
+      end if
+      write(*,'(2a)') "3B file: ", trim(file_3n)
+      call rd3_mon%ReadThreeBodyMonopole(this%thr21_mon)
+      if(this%ms%is_three_body) then
+        write(*,*) "Wrong option in operator from file"
+        stop
+      end if
     end if
 
     select case(this%oprtr)

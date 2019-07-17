@@ -26,6 +26,7 @@ module HFInput
     ! three-body file
     character(:), allocatable :: int_3n_file
     character(:), allocatable :: int_3n_mon_file
+    character(:), allocatable :: int_3n_no2b_file
     character(256), allocatable :: files_3n(:)
     integer :: emax_3n
     integer :: e2max_3n
@@ -73,6 +74,7 @@ contains
     character(256) :: int_nn_file
     character(256) :: int_3n_file
     character(256) :: int_3n_mon_file="none"
+    character(256) :: int_3n_no2b_file="none"
 
     character(1024) :: optrs="none"
     character(1024) :: files_nn="none"
@@ -111,7 +113,7 @@ contains
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
         & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
-        & int_3n_mon_file, is_4th_order, &
+        & int_3n_mon_file, int_3n_no2b_file, is_4th_order, &
         & emax_mon, e2max_mon, e3max_mon, lmax_mon
 
     open(118, file=inputfile, action='read', iostat=io)
@@ -135,6 +137,7 @@ contains
     this%int_nn_file = int_nn_file
     this%int_3n_file = int_3n_file
     this%int_3n_mon_file = int_3n_mon_file
+    this%int_3n_no2b_file = int_3n_no2b_file
 
     this%emax_nn = emax_nn
     this%e2max_nn = e2max_nn
