@@ -2134,6 +2134,7 @@ contains
     nelm_tail = nelm - 10 * lines
     p = gzip_open(f,'r')
     buf = gzip_readline(p, buffer, len(buffer))
+    buffer=""
     cnt = 0
     do line = 1, lines
       buf = gzip_readline(p, buffer, len(buffer))
@@ -2147,7 +2148,7 @@ contains
       buf = gzip_close(p)
       return
     end if
-
+    buffer=""
     buf = gzip_readline(p, buffer, len(buffer))
     read(buffer,*) v(lines*10+1:nelm)
 #ifdef TwoBodyOperatorDebug
@@ -2317,6 +2318,7 @@ contains
     read(buffer,*) nlines, emax_in, e2max_in, hw_in, lambda_in
     if(emax_in /= this%emax2 ) write(*,'(a)') "Warning: file emax doesn't match"
     if(e2max_in/= this%e2max2) write(*,'(a)') "Warning: file e2max doesn't match"
+    buffer=""
     do iline = 1, nlines
       buf = gzip_readline(p, buffer, len(buffer))
       read(buffer,*) a, b, c, d, J, T, trel, horel, vcoul, vpn, vpp, vnn

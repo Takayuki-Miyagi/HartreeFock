@@ -725,7 +725,7 @@ contains
     real(8), allocatable :: v(:)
 #endif
     integer(8) :: nelm, n
-    character(256) :: header, buffer
+    character(256) :: header="", buffer=""
     type(c_ptr) :: fp, err
 
     write(*,'(a)') "Reading three-body scalar line-by-line from gzip file"
