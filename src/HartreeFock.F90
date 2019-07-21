@@ -488,6 +488,7 @@ contains
     ms => Opr%ms
     ti = omp_get_wtime()
     call op%init(0, 1, 0, opr%oprtr, ms, 2)
+    op%zero = Opr%zero
     do ch = 1, ms%one%NChan
       Op%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
           &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
@@ -569,15 +570,15 @@ contains
     end do
 
     o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
-    o1from2 = Opr%two%NormalOrderingFrom2To1(ms%one)
+    o1from2 = Op%two%NormalOrderingFrom2To1(ms%one)
 
     o0from3 = o1from3%NormalOrderingFrom1To0()
     o0from2 = o1from2%NormalOrderingFrom1To0()
-    o0from1 = Opr%one%NormalOrderingFrom1To0()
+    o0from1 = Op%one%NormalOrderingFrom1To0()
 
-    Op%zero = Opr%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
-    Op%one = Opr%one + o1from2 + o1from3 * 0.5d0
-    Op%two = Opr%two + o2from3
+    Op%zero = Op%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+    Op%one = Op%one + o1from2 + o1from3 * 0.5d0
+    Op%two = Op%two + o2from3
 
     call timer%Add("BasisTransNO2BScalar",omp_get_wtime() - ti)
 
@@ -667,15 +668,14 @@ contains
     end do
 
     o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
-    o1from2 = Opr%two%NormalOrderingFrom2To1(ms%one)
+    o1from2 = Op%two%NormalOrderingFrom2To1(ms%one)
 
     o0from3 = o1from3%NormalOrderingFrom1To0()
     o0from2 = o1from2%NormalOrderingFrom1To0()
-    o0from1 = Opr%one%NormalOrderingFrom1To0()
+    o0from1 = Op%one%NormalOrderingFrom1To0()
 
-    Op%zero = o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
-    Op%one = Opr%one + o1from2 + o1from3 * 0.5d0
-    Op%two = Opr%two + o2from3
+    Op%one = Op%one + o1from2 + o1from3 * 0.5d0
+    Op%two = Op%two + o2from3
 
     call timer%Add("BasisTransNO2BTensor",omp_get_wtime() - ti)
   end function BasisTransNO2BTensor

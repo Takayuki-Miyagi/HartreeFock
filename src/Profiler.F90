@@ -42,13 +42,13 @@ contains
     call execute_command_line( 'uname > ' // trim(this%tempfile) )
     open(999,file=this%tempfile,iostat=io)
     if(io /= 0) then
-      write(*,*) "Error opening file in InitProf"
-      stop
+      write(*,*) "Warning opening file in InitProf"
+      return
     end if
     read(999,*,iostat=io) os_str
     if(io /= 0) then
-      write(*,*) "Error reading file in InitProf"
-      stop
+      write(*,*) "Warning reading file in InitProf"
+      return
     end if
     close(999)
     call execute_command_line( 'rm ' // trim(this%tempfile) )
@@ -150,7 +150,7 @@ contains
     open(999,file=this%tempfile,iostat=io)
     if(io /= 0) then
       write(*,*) "File opening error in CurrentMemory"
-      stop
+      return
     end if
 
     read(999,*,iostat=io) tmp1, mem, tmp2
@@ -169,7 +169,7 @@ contains
 
     if(io /= 0) then
       write(*,*) "File reading error in CurrentMemory"
-      stop
+      return
     end if
     close(999)
     cmd = 'rm ' // trim(this%tempfile)

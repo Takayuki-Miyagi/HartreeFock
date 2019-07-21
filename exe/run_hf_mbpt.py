@@ -8,26 +8,32 @@ HOME = os.path.expanduser('~')
 Params=OrderedDict()
 exe = 'HartreeFock.exe'
 inputf='hf_input.txt'
-hwlist=[24]
-elist=[4,6]
-e3list = [6]
+hwlist=[25]
+elist=[8]
+e3list = [8]
 NuclList=['O16']
+Params["Core"]='O16'
 
-emax_nn = 8
-e2max_nn = 16
-emax_3n = 8
+emax_nn = 10
+e2max_nn = 20
+emax_3n =  8
 e2max_3n = 8
 e3max_3n = 8
 
 Params['optrs']='Rm2,Rp2,Rn2'
-Params['optrs']=''
+#Params['optrs']=''
+Params['is_MBPTEnergy']=True
+Params['type_3n_file']="no2b"
 
 def SetHamil(hw, emax_nn, e2max_nn, emax_3n, e2max_3n, e3max_3n):
     path2 = HOME + '/MtxElmnt/2BME'
     path3 = HOME + '/MtxElmnt/3BME'
-    file_nn_int = 'TwBME-HO_NN-only_N3LO_EM500_srg2.00_hw'
-    file_nn_int += str(hw)+'_emax'+str(emax_nn)+'_e2max'+str(e2max_nn)+'.txt.me2j'
-    file_3n_int = 'none'
+    file_nn_int = 'TwBME-HO_NN-only_N4LO_EMN500_srg2.00_hw'
+    file_nn_int += str(hw)+'_emax'+str(emax_nn)+'_e2max'+str(e2max_nn)+'.me2j.gz'
+    #file_3n_int = "ThBME_srg2.00_N4LO_EMN500_ChEFT_N2LO_cD-1.80cE-0.31_LNL2_IS_hw"
+    file_3n_int = "NO2B_ThBME_srg2.00_N4LO_EMN500_ChEFT_N2LO_cD-1.80cE-0.31_LNL2_IS_hw"
+    file_3n_int += str(hw)+"_ms"+str(emax_3n)+"_"+str(e2max_3n)+"_"+str(e3max_3n)+".me3j.gz"
+    #file_3n_int = "none"
     return path2, file_nn_int, path3, file_3n_int
 
 def main():
@@ -47,6 +53,7 @@ def main():
                     Params['e3max'] = e3
                     Params['emax_nn'] = emax_nn
                     Params['e2max_nn'] = e2max_nn
+                    Params['e2max_nn'] = e2max_nn
                     Params['emax_3n'] = emax_3n
                     Params['e2max_3n'] = e2max_3n
                     Params['e3max_3n'] = e3max_3n
@@ -61,7 +68,7 @@ def main():
                             f.write(str(key)+'= '+str(value)+' \n')
                     f.write("&end \n")
                     f.close()
-                    cmd = exe + ' ' + inputf + " > log.out"
+                    cmd = exe + ' ' + inputf
                     subprocess.call(cmd,shell=True)
 
 if(__name__ == '__main__'):
