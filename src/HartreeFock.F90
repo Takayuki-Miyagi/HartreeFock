@@ -241,8 +241,9 @@ contains
       if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
         call HF%UpdateFockMatrix()
         call HF%CalcEnergy()
-        if(.not. Optr%thr21%zero) op = HF%BasisTransNO2BHamiltonian(Optr)
-        if(.not. Optr%thr21_no2b%zero) op = HF%BasisTransNO2BHamiltonianFromNO2B(Optr)
+        if(Optr%rank < 3) op = HF%BasisTransNO2BHamiltonian(Optr) ! w/o three-body force
+        if(.not. Optr%thr21%zero) op = HF%BasisTransNO2BHamiltonian(Optr) ! w/ full three-body force
+        if(.not. Optr%thr21_no2b%zero) op = HF%BasisTransNO2BHamiltonianFromNO2B(Optr) ! w/ no2b relevant three-body force
         if(.not. Optr%thr21_mon%zero) then
           write(*,*) "Wrong option, taking normal ordering"
           stop
@@ -1958,8 +1959,8 @@ contains
     do idx = 1, this%nidx
       num = this%idx(idx)
       call GetSpLabels3(num,i1,i2,i3,i4,i5,i6)
-      j1 = ms%sps%orb(i1)%j
-      j2 = ms%sps%orb(i2)%j
+      j1 = sps%orb(i1)%j
+      j2 = sps%orb(i2)%j
       v = 0.d0
       do J = abs(j1-j2)/2, (j1+j2)/2
         if(i1 == i2 .and. mod(J,2) == 1) cycle

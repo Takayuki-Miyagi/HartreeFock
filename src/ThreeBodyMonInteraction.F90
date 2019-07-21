@@ -424,6 +424,7 @@ contains
         end do
       end do
     end do
+    this%zero = .false.
   end subroutine InitThreeBodyMonForce
 
   subroutine FinThreeBodyMonForce(this)
@@ -597,7 +598,6 @@ contains
       return
     case default
 
-      V%zero = .false.
       call this%ReadFile(V)
     end select
 

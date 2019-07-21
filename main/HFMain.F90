@@ -13,16 +13,14 @@ program HFMain
   type(InputParameters) :: p
   type(MSpace) :: ms
   type(Ops) :: h, opr, htr
-  type(ThreeBodyMonForce) :: mon
-  type(Read3BodyMonopole) :: read3mon
   type(HFSolver) :: HF
   type(MBPTEnergy) :: PT
   type(MBPTScalar) :: PTs
   type(MBPTDMat) :: PTd
   type(WriteFiles) :: w
-  logical :: is_full_3bme=.false., is_no2b_3bme=.false., is_mon_3bme=.false.
   character(256) :: inputfile='none', conffile='none'
   integer :: n, istatus, wunit=23
+  integer :: rank
 
   call timer%init()
 
@@ -56,58 +54,29 @@ program HFMain
     stop
   end if
 
+  call w%init(p%emax, p%e2max)
+
+  ! Model Space & Hamiltonian -----
   select case(p%int_3n_file)
   case('none', 'None', 'NONE')
     if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
         & hw=p%hw, emax=p%emax, e2max=p%e2max, lmax=p%lmax, beta=p%beta_cm)
     if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, lmax=p%lmax, beta=p%beta_cm)
+    rank = 2
   case default
     if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
         & hw=p%hw, emax=p%emax, e2max=p%e2max, e3max=p%e3max, lmax=p%lmax, &
         & beta=p%beta_cm, is_three_body_jt=.true.)
     if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, &
         & e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm, is_three_body_jt=.true.)
-  end select
-  call w%init(p%emax, p%e2max)
-
-
-  ! Hamiltonian -----
-  select case(p%int_3n_file)
-  case('none', 'None', 'NONE')
-  case default
-    is_full_3bme = .true.
-    call h%init('hamil',ms, 3)
+    rank = 3
   end select
 
-  select case(p%int_3n_no2b_file)
-  case('none', 'None', 'NONE')
-  case default
-    is_no2b_3bme = .true.
-    call h%init('hamil',ms, 3, "no2b")
-  end select
+  call h%init('hamil',ms, rank, p%type_3n_file)
 
-  select case(p%int_3n_mon_file)
-  case('none', 'None', 'NONE')
-  case default
-    is_mon_3bme = .true.
-    call h%init('hamil',ms, 3, "mon")
-  end select
-  call h%init('hamil',ms, 2)
-
-  if(is_full_3bme) call h%set(p%int_nn_file,p%int_3n_file,&
+  call h%set(p%int_nn_file,p%int_3n_file,&
         & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-  if(is_no2b_3bme) call h%set(p%int_nn_file,p%int_3n_no2b_file,&
-        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
-        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-  if(is_mon_3bme) call h%set(p%int_nn_file,p%int_3n_mon_file,&
-        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
-        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-  if(.not. (is_full_3bme .or. is_no2b_3bme .or. is_mon_3bme)) then
-    call h%set(p%int_nn_file,p%int_3n_file,&
-        & [p%emax_nn,p%e2max_nn,p%lmax_nn],&
-        & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-  end if
 
   call HF%init(h,alpha=p%alpha)
   call HF%solve()

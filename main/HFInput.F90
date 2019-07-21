@@ -24,18 +24,17 @@ module HFInput
     integer :: e2max_nn
     integer :: lmax_nn
     ! three-body file
+    character(:), allocatable :: type_3n_file
     character(:), allocatable :: int_3n_file
-    character(:), allocatable :: int_3n_mon_file
-    character(:), allocatable :: int_3n_no2b_file
     character(256), allocatable :: files_3n(:)
     integer :: emax_3n
     integer :: e2max_3n
     integer :: e3max_3n
     integer :: lmax_3n
-    integer :: emax_mon
-    integer :: e2max_mon
-    integer :: e3max_mon
-    integer :: lmax_mon
+    !integer :: emax_mon
+    !integer :: e2max_mon
+    !integer :: e3max_mon
+    !integer :: lmax_mon
     ! output files
     character(:), allocatable :: out_dir
     character(:), allocatable :: summary_file
@@ -71,10 +70,9 @@ contains
     character(20) :: Nucl='O16'
     character(20) :: Core=""
     character(512) :: valence_list = ""
-    character(256) :: int_nn_file
-    character(256) :: int_3n_file
-    character(256) :: int_3n_mon_file="none"
-    character(256) :: int_3n_no2b_file="none"
+    character(256) :: int_nn_file="none"
+    character(256) :: int_3n_file="none"
+    character(256) :: type_3n_file="full"
 
     character(1024) :: optrs="none"
     character(1024) :: files_nn="none"
@@ -87,10 +85,6 @@ contains
     integer :: e2max_3n=6
     integer :: e3max_3n=6
     integer :: lmax_3n=-1
-    integer :: emax_mon=6
-    integer :: e2max_mon=6
-    integer :: e3max_mon=6
-    integer :: lmax_mon=-1
 
     character(256) :: out_dir = '.'
     character(256) :: summary_file = 'summary.out'
@@ -113,8 +107,7 @@ contains
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
         & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
-        & int_3n_mon_file, int_3n_no2b_file, is_4th_order, &
-        & emax_mon, e2max_mon, e3max_mon, lmax_mon
+        & type_3n_file, is_4th_order
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -136,8 +129,7 @@ contains
     this%valence_list = valence_list
     this%int_nn_file = int_nn_file
     this%int_3n_file = int_3n_file
-    this%int_3n_mon_file = int_3n_mon_file
-    this%int_3n_no2b_file = int_3n_no2b_file
+    this%type_3n_file = type_3n_file
 
     this%emax_nn = emax_nn
     this%e2max_nn = e2max_nn
@@ -146,14 +138,9 @@ contains
     this%e2max_3n = e2max_3n
     this%e3max_3n = e3max_3n
 
-    this%emax_mon = emax_mon
-    this%e2max_mon = e2max_mon
-    this%e3max_mon = e3max_mon
-
     this%lmax = lmax
     this%lmax_nn = lmax_nn
     this%lmax_3n = lmax_3n
-    this%lmax_mon = lmax_mon
 
     this%out_dir = out_dir
     if(this%out_dir == '') this%out_dir = '.'
@@ -173,7 +160,6 @@ contains
     if(lmax == -1) this%lmax = emax
     if(lmax_nn == -1) this%lmax_nn = emax_nn
     if(lmax_3n == -1) this%lmax_3n = emax_3n
-    if(lmax_mon == -1) this%lmax_mon = emax_mon
 
     call s%split(optrs, ',', this%Ops)
     call s%split(files_nn, ',', this%files_nn)
@@ -215,7 +201,7 @@ contains
 
     write(iut,'(a)') "#"
     write(iut,'(a)') "#  3N files:"
-    write(iut,'(2a)') "#  ", trim(this%int_3n_file)
+    write(iut,'(4a)') "#  ", trim(this%int_3n_file), ", type: ", trim(this%type_3n_file)
     do n = 1, size(this%files_3n)
       if( this%files_3n(n) == 'none' .or. this%files_3n(n) == '') cycle
       write(iut,'(2a)') "#  ", trim(this%files_3n(n))

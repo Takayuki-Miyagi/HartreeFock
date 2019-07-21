@@ -125,6 +125,7 @@ contains
         end do
       end do
     end do
+    this%zero=.false.
   end subroutine InitThreeBodyForce
 
   subroutine FinThreeBodyForce(this)
@@ -450,7 +451,6 @@ contains
       return
     case default
 
-      V%zero = .false.
       if(V%Scalar) call this%ReadScalar3BFile(V)
       if(.not. V%Scalar) call this%ReadTensor3BFile(V)
     end select

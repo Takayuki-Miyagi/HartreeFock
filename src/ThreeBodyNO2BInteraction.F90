@@ -460,6 +460,7 @@ contains
         end do
       end do
     end do
+    this%zero=.false.
   end subroutine InitThreeBodyNO2BForce
 
   subroutine FinThreeBodyNO2BForce(this)
@@ -485,9 +486,7 @@ contains
     integer :: z1, z2, z3, z4, z5, z6, T12, T45, T
     integer :: a, b, c, d, e, f, Z
     real(8) :: r
-    !real(8) :: ti ! --- test
 
-    !ti = omp_get_wtime() ! --- test (conflict with omp)
     sps => this%sps
     isps => this%isps
     r = 0.d0
@@ -497,9 +496,6 @@ contains
     o4 => sps%GetOrbit(i4)
     o5 => sps%GetOrbit(i5)
     o6 => sps%GetOrbit(i6)
-    if(o1%j /= o4%j) return
-    if(o2%j /= o5%j) return
-    if(o3%j /= o6%j) return
     !if(o1%e + o2%e > this%thr%e2max) return
     !if(o4%e + o5%e > this%thr%e2max) return
     !if(o1%e + o3%e > this%thr%e2max) return
@@ -532,7 +528,6 @@ contains
         end do
       end do
     end do
-    !call timer%add("GetThBME_pn", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBMENO2B_pn
 
   function GetThBMENO2B_Isospin(this,i1,i2,i3,T12,i4,i5,i6,T45,J,T) result(r)
@@ -545,10 +540,8 @@ contains
     integer :: ch12, ch3
     integer :: P123, P456
     real(8) :: r
-    !real(8) :: ti ! --- test
 
     r = 0.d0
-    !ti = omp_get_wtime() ! --- test (conflict with omp)
     isps => this%isps
     o1 => isps%GetOrbit(i1)
     o2 => isps%GetOrbit(i2)
@@ -556,11 +549,7 @@ contains
     o4 => isps%GetOrbit(i4)
     o5 => isps%GetOrbit(i5)
     o6 => isps%GetOrbit(i6)
-    if(o1%j /= o4%j) return
-    if(o2%j /= o5%j) return
     if(o3%j /= o6%j) return
-    if(o1%l /= o4%l) return
-    if(o2%l /= o5%l) return
     if(o3%l /= o6%l) return
 
     P123 = (-1) ** (o1%l+o2%l+o3%l)
@@ -585,7 +574,6 @@ contains
         &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
     if(bra * ket == 0) return
     r = dble(this%MatCh(ch)%v(bra,ket)) * dble(iphase)
-    !call timer%add("GetThBME_isospin", omp_get_wtime()-ti) ! --- test (conflict with omp)
   end function GetThBMENO2B_Isospin
 
   !
@@ -634,7 +622,6 @@ contains
       return
     case default
 
-      V%zero = .false.
       call this%ReadFile(V)
     end select
 
@@ -738,7 +725,6 @@ contains
       read(runit,*) v((n-1)*10+1 : n*10)
     end do
 
-    ! basically, this is not needed
     if(nelm - (nelm/10) * 10 > 0) then
       read(runit,*) v((nelm/10)*10+1 : nelm)
     end if
@@ -778,7 +764,6 @@ contains
       read(buffer,*) v((n-1)*10+1 : n*10)
     end do
 
-    ! basically, this is not needed
     if(nelm - (nelm/10) * 10 > 0) then
       err = gzip_readline(fp, buffer, len(buffer))
       read(buffer,*) v((nelm/10)*10+1 : nelm)
@@ -820,7 +805,6 @@ contains
           if(e1 + e3 > e2max) cycle
           if(e2 + e3 > e2max) cycle
           if(e1 + e2 + e3 > e3max) cycle
-
           P123 = (-1) ** (l1+l2+l3)
 
           do i4 = 1, spsf%norbs
@@ -895,14 +879,13 @@ contains
 
     ms => thr%thr
     sps => ms%sps
-
     cnt = 0
     do i1 = 1, spsf%norbs
       n1 = spsf%orb(i1)%n
       l1 = spsf%orb(i1)%l
       j1 = spsf%orb(i1)%j
       e1 = spsf%orb(i1)%e
-      do i2 = 1, spsf%norbs
+      do i2 = 1, i1
         n2 = spsf%orb(i2)%n
         l2 = spsf%orb(i2)%l
         j2 = spsf%orb(i2)%j
@@ -918,7 +901,6 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-
           do i4 = 1, spsf%norbs
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
@@ -972,6 +954,20 @@ contains
 
                         if(e1 + e2 + e3 > ms%e3max) cycle
                         if(e4 + e5 + e6 > ms%e3max) cycle
+
+                        if(i1==i2 .and. mod(J+T12,2)==0) then
+                          if(abs(v(cnt)) > 1.d-6) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                          end if
+                          cycle
+                        end if
+
+                        if(i4==i5 .and. mod(J+T45,2)==0) then
+                          if(abs(v(cnt)) > 1.d-6) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                          end if
+                          cycle
+                        end if
 
                         ch12 = ms%two%jp2ch(J,(-1)**(l1+l2))
                         ch3 = ms%one%jp2ch(j3,(-1)**l3)
