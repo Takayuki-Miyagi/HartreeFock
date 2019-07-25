@@ -16,7 +16,7 @@ Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q cedar; then echo cedar; \
   else echo other; fi)
 HOST=$(strip $(Host))
-DEBUG_MODE=off
+DEBUG_MODE=on
 
 OS = Linux
 ifneq (,$(findstring arwin,$(shell uname)))

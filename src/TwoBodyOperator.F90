@@ -39,7 +39,10 @@ module TwoBodyOperator
   private :: SetTwoBodyChannel_phhh
   private :: SetTwoBodyChannel_phpp
   private :: ExtractCrossCoupledChannel_pphh2phph
+  private :: ExtractCrossCoupledChannel_hphp2phph
   private :: ExtractCrossCoupledChannel_phph2phph
+  !private :: ExtractCrossCoupledChannel_phhh2phhh
+  !private :: ExtractCrossCoupledChannel_ppph2ppph
   private :: GetCrossCoupledME1423
   private :: GetCrossCoupledME1324
 
@@ -115,7 +118,10 @@ module TwoBodyOperator
     procedure :: PrintTwoBodyPart
     procedure :: NormalOrderingFrom2To1
     procedure :: ExtractCrossCoupledChannel_pphh2phph
+    procedure :: ExtractCrossCoupledChannel_hphp2phph
     procedure :: ExtractCrossCoupledChannel_phph2phph
+    !procedure :: ExtractCrossCoupledChannel_phhh2phhh
+    !procedure :: ExtractCrossCoupledChannel_ppph2ppph
     procedure :: GetCrossCoupledME1423
     procedure :: GetCrossCoupledME1324
 
@@ -131,7 +137,10 @@ module TwoBodyOperator
     generic :: operator(-) => SubtractTwoBodyPart
     generic :: operator(*) => ScaleTwoBodyPart
     generic :: get_xc_pphh2phph => ExtractCrossCoupledChannel_pphh2phph
+    generic :: get_xc_hphp2phph => ExtractCrossCoupledChannel_hphp2phph
     generic :: get_xc_phph2phph => ExtractCrossCoupledChannel_phph2phph
+    !generic :: get_xc_phhh2phhh => ExtractCrossCoupledChannel_phhh2phhh
+    !generic :: get_xc_ppph2ppph => ExtractCrossCoupledChannel_ppph2ppph
     generic :: get_xc1423 => GetCrossCoupledME1423
     generic :: get_xc1324 => GetCrossCoupledME1324
   end type TwoBodyPart
@@ -1108,7 +1117,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+        if(abs(oc%occ)+abs(od%occ) > 1.d-6) cycle
         iket = iket + 1
         Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
@@ -1362,7 +1371,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+        if(abs(oc%occ)+abs(od%occ) > 1.d-6) cycle
         iket = iket + 1
         opch%m(bra,ket) = Mat%m(ibra,iket)
         opch%m(ket,bra) = Mat%m(ibra,iket)
@@ -1370,7 +1379,7 @@ contains
     end do
   end subroutine SetTwoBodyChannel_phpp
 
-  function ExtractCrossCoupledChannel_phph2phph(op, ch_cc) result(Mat)
+  function ExtractCrossCoupledChannel_hphp2phph(op, ch_cc) result(Mat)
     !  only for scalar
     !  _________________
     !  <ph:J| V |p'h':J> = \sum_{J'} [J'] {jh  jp' J'} <hp':J'|V|h'p:J'>
@@ -1381,10 +1390,8 @@ contains
     type(Orbits), pointer :: sps
     type(DMat) :: Mat
     integer :: a, b, c, d, K
-    integer :: Jmin, Jmax, J
     integer :: ibra, iket, bra, ket
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-    real(8) :: v
 
     sps => op%two%sps
     K = ch_cc%j
@@ -1421,6 +1428,57 @@ contains
         Mat%m(ibra,iket) = op%get_xc1423(b,c,d,a,K)
       end do
     end do
+  end function ExtractCrossCoupledChannel_hphp2phph
+
+  function ExtractCrossCoupledChannel_phph2phph(op, ch_cc) result(Mat)
+    !  only for scalar
+    !  _________________
+    !  <ph:J| V |p'h':J> = \sum_{J'} [J'] {jp  jh' J'} <ph':J'|V|p'h:J'>
+    !                                     {jp' jh  J }
+    use MyLibrary, only: sjs
+    class(TwoBodyPart), intent(in) :: op
+    type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
+    type(Orbits), pointer :: sps
+    type(DMat) :: Mat
+    integer :: a, b, c, d, K
+    integer :: ibra, iket, bra, ket
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+
+    sps => op%two%sps
+    K = ch_cc%j
+    ibra = 0
+    do bra = 1, ch_cc%n_state
+      a = ch_cc%n2spi1(bra)
+      b = ch_cc%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+    end do
+
+    call Mat%zeros(ibra,ibra)
+    if(ibra < 1) return
+    ibra = 0
+    do bra = 1, ch_cc%n_state
+      a = ch_cc%n2spi1(bra) ! p
+      b = ch_cc%n2spi2(bra) ! h
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(ob%occ) > 1.d-6) cycle
+      ibra = ibra+1
+      iket = 0
+      do ket = 1, ch_cc%n_state
+        c = ch_cc%n2spi1(ket) ! p
+        d = ch_cc%n2spi2(ket) ! h
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+        iket = iket+1
+        if(abs(oa%occ)+abs(od%occ) < 1.d-6 .or. abs(oa%occ)*abs(od%occ) > 1.d-6) cycle
+        if(abs(ob%occ)+abs(oc%occ) < 1.d-6 .or. abs(ob%occ)*abs(oc%occ) > 1.d-6) cycle
+        if(oa%z+od%z /= ob%z+oc%z) cycle
+        Mat%m(ibra,iket) = op%get_xc1423(a,d,c,b,K)
+      end do
+    end do
   end function ExtractCrossCoupledChannel_phph2phph
 
   function ExtractCrossCoupledChannel_pphh2phph(op, ch_cc, f) result(Mat)
@@ -1434,7 +1492,6 @@ contains
     type(Orbits), pointer :: sps
     type(DMat) :: Mat
     integer :: a, b, c, d, K
-    integer :: Jmin, Jmax, J
     integer :: ibra, iket, bra, ket
     logical :: denom = .false.
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
@@ -1483,6 +1540,148 @@ contains
     end do
   end function ExtractCrossCoupledChannel_pphh2phph
 
+!  function ExtractCrossCoupledChannel_phhh2phhh(op, ch_cc, f) result(Mat)
+!    !  only for scalar
+!    !  __________________
+!    !  <ph:J| V |h'h'':J> = \sum_{J'} [J'] {jp   jh'  J'} <ph':J'|V|hh'':J'> / f_h - f_p
+!    !                                      {jh'' jh   J }
+!    use MyLibrary, only: sjs
+!    class(TwoBodyPart), intent(in) :: op
+!    type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
+!    type(OneBodyPart), intent(in), optional :: f
+!    type(Orbits), pointer :: sps
+!    type(DMat) :: Mat
+!    integer :: a, b, c, d, K
+!    integer :: Jmin, Jmax, J
+!    integer :: ibra, iket, bra, ket
+!    logical :: denom = .false.
+!    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+!    real(8) :: v, eps, norm
+!
+!    if(present(f)) denom = .true.
+!    sps => op%two%sps
+!    K = ch_cc%j
+!    ibra = 0
+!    do bra = 1, ch_cc%n_state
+!      a = ch_cc%n2spi1(bra)
+!      b = ch_cc%n2spi2(bra)
+!      oa => sps%GetOrbit(a)
+!      ob => sps%GetOrbit(b)
+!      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+!    end do
+!
+!    iket = 0
+!    do bra = 1, ch_cc%n_state
+!      a = ch_cc%n2spi1(bra)
+!      b = ch_cc%n2spi2(bra)
+!      oa => sps%GetOrbit(a)
+!      ob => sps%GetOrbit(b)
+!      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+!    end do
+!
+!    call Mat%zeros(ibra,iket)
+!    if(ibra < 1 .or. iket < 1) return
+!    ibra = 0
+!    do bra = 1, ch_cc%n_state
+!      a = ch_cc%n2spi1(bra) ! p
+!      b = ch_cc%n2spi2(bra) ! h
+!      oa => sps%GetOrbit(a)
+!      ob => sps%GetOrbit(b)
+!      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(ob%occ) > 1.d-6) cycle
+!      ibra = ibra+1
+!      iket = 0
+!      do ket = 1, ch_cc%n_state
+!        c = ch_cc%n2spi1(ket) ! p
+!        d = ch_cc%n2spi2(ket) ! h
+!        oc => sps%GetOrbit(c)
+!        od => sps%GetOrbit(d)
+!        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+!        iket = iket + 1
+!
+!        if(abs(oa%occ)+abs(oc%occ) < 1.d-6 .or. abs(oa%occ)*abs(oc%occ) > 1.d-6) cycle
+!        if(abs(ob%occ)*abs(od%occ) < 1.d-6) cycle
+!        if(oa%z+oc%z /= ob%z+od%z) cycle
+!        norm = 1.d0
+!        if(b==d) norm = norm*sqrt(2.d0)
+!        v = op%get_xc1324(a,c,b,d,K)
+!        eps = 1.d0
+!        if(denom) eps = 1.d0 / f%GetDenominator1(b,a)
+!        Mat%m(ibra,iket) = v * eps * norm
+!      end do
+!    end do
+!  end function ExtractCrossCoupledChannel_phhh2phhh
+!
+!  function ExtractCrossCoupledChannel_ppph2ppph(op, ch_cc, f) result(Mat)
+!    !  only for scalar
+!    !  __________________
+!    !  <pp':J| V |p''h:J> = \sum_{J'} [J'] {jp   jp''  J'} <pp'':J'|V|p'h:J'> / f_h - f_p''
+!    !                                      {jh   jp'   J }
+!    use MyLibrary, only: sjs
+!    class(TwoBodyPart), intent(in) :: op
+!    type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
+!    type(OneBodyPart), intent(in), optional :: f
+!    type(Orbits), pointer :: sps
+!    type(DMat) :: Mat
+!    integer :: a, b, c, d, K
+!    integer :: Jmin, Jmax, J
+!    integer :: ibra, iket, bra, ket
+!    logical :: denom = .false.
+!    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+!    real(8) :: v, eps, norm
+!
+!    if(present(f)) denom = .true.
+!    sps => op%two%sps
+!    K = ch_cc%j
+!    ibra = 0
+!    do bra = 1, ch_cc%n_state
+!      a = ch_cc%n2spi1(bra)
+!      b = ch_cc%n2spi2(bra)
+!      oa => sps%GetOrbit(a)
+!      ob => sps%GetOrbit(b)
+!      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
+!    end do
+!
+!    iket = 0
+!    do bra = 1, ch_cc%n_state
+!      a = ch_cc%n2spi1(bra)
+!      b = ch_cc%n2spi2(bra)
+!      oa => sps%GetOrbit(a)
+!      ob => sps%GetOrbit(b)
+!      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) iket = iket+1
+!    end do
+!
+!    call Mat%zeros(ibra,iket)
+!    if(ibra < 1 .or. iket < 1) return
+!    ibra = 0
+!    do bra = 1, ch_cc%n_state
+!      a = ch_cc%n2spi1(bra) ! p
+!      b = ch_cc%n2spi2(bra) ! h
+!      oa => sps%GetOrbit(a)
+!      ob => sps%GetOrbit(b)
+!      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+!      ibra = ibra+1
+!      iket = 0
+!      do ket = 1, ch_cc%n_state
+!        c = ch_cc%n2spi1(ket) ! p
+!        d = ch_cc%n2spi2(ket) ! h
+!        oc => sps%GetOrbit(c)
+!        od => sps%GetOrbit(d)
+!        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+!        iket = iket + 1
+!
+!        if(abs(oa%occ)+abs(oc%occ) > 1.d-6) cycle
+!        if(abs(ob%occ)+abs(od%occ) < 1.d-6 .or. abs(ob%occ)*abs(od%occ) > 1.d-6) cycle
+!        if(oa%z+oc%z /= ob%z+od%z) cycle
+!        norm = 1.d0
+!        if(a==c) norm = norm*sqrt(2.d0)
+!        v = op%get_xc1324(a,c,b,d,K)
+!        eps = 1.d0
+!        if(denom) eps = 1.d0 / f%GetDenominator1(d,b)
+!        Mat%m(ibra,iket) = v * eps * norm
+!      end do
+!    end do
+!  end function ExtractCrossCoupledChannel_ppph2ppph
+
   ! Only for Scalar
   function GetCrossCoupledME1423(this, a, b, c, d, J) result(r)
     use MyLibrary, only: sjs
@@ -1498,8 +1697,10 @@ contains
     oc => sps%GetOrbit(c)
     od => sps%GetOrbit(d)
     r = 0.d0
-    Kmin = max(abs(oa%j-od%j), abs(ob%j-oc%j))/2
-    Kmax = max(    oa%j+od%j ,     ob%j+oc%j )/2
+    if((-1)**(oa%l+ob%l+oc%l+od%l) == -1) return
+    if(oa%z+ob%z /= oc%z+od%z) return
+    Kmin = max(abs(oa%j-ob%j), abs(oc%j-od%j))/2
+    Kmax = min(    oa%j+ob%j ,     oc%j+od%j )/2
     do K = Kmin, Kmax
       if(a==b .and. mod(K,2)==1) cycle
       if(c==d .and. mod(K,2)==1) cycle
@@ -1524,8 +1725,10 @@ contains
     oc => sps%GetOrbit(c)
     od => sps%GetOrbit(d)
     r = 0.d0
-    Kmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
-    Kmax = max(    oa%j+oc%j ,     ob%j+od%j )/2
+    if((-1)**(oa%l+ob%l+oc%l+od%l) == -1) return
+    if(oa%z+ob%z /= oc%z+od%z) return
+    Kmin = max(abs(oa%j-ob%j), abs(oc%j-od%j))/2
+    Kmax = min(    oa%j+ob%j ,     oc%j+od%j )/2
     do K = Kmin, Kmax
       if(a==b .and. mod(K,2)==1) cycle
       if(c==d .and. mod(K,2)==1) cycle
@@ -1794,7 +1997,6 @@ contains
     type(TwoBodySpace), pointer :: ms
     type(Orbits), pointer :: sps
     type(OrbitsIsospin) :: sps_me2j
-    integer :: nelm
     integer :: io, runit = 22
     real(8), allocatable :: v(:)
     integer :: a, b, c, d, dmax
@@ -1802,7 +2004,8 @@ contains
     integer :: lb, jb, eb
     integer :: lc, jc, ec
     integer :: ld, jd, ed
-    integer :: J, Jmin, Jmax, icnt
+    integer :: J, Jmin, Jmax
+    integer(8) :: nelm, icnt
     integer :: ap, bp, cp, dp
     integer :: an, bn, cn, dn
     real(8) :: me_00, me_pp, me_10, me_nn, fact
@@ -1929,7 +2132,7 @@ contains
     type(TwoBodySpace), pointer :: ms
     type(Orbits), pointer :: sps
     type(OrbitsIsospin) :: sps_me2j
-    integer :: nelm, io, runit = 22
+    integer :: io, runit = 22
 #ifdef single_precision_two_body_file
     real(4), allocatable :: v(:)
 #else
@@ -1940,7 +2143,8 @@ contains
     integer :: lb, jb, eb
     integer :: lc, jc, ec
     integer :: ld, jd, ed
-    integer :: J, Jmin, Jmax, icnt
+    integer :: J, Jmin, Jmax
+    integer(8) :: nelm, icnt
     integer :: ap, bp, cp, dp
     integer :: an, bn, cn, dn
     real(8) :: me_00, me_pp, me_10, me_nn, fact
@@ -2048,7 +2252,7 @@ contains
   function count_scalar_me2j(sps,e2max) result(r)
     type(OrbitsIsospin), intent(in) :: sps
     integer, intent(in) :: e2max
-    integer :: r
+    integer(8) :: r
     integer :: a, b, c, d, dmax
     integer :: la, ja, ea
     integer :: lb, jb, eb
@@ -2093,7 +2297,8 @@ contains
     use ClassSys, only: sys
     integer, intent(in) :: ut
     real(8), intent(inout) :: v(:)
-    integer :: nelm, lines, i, nelm_tail
+    integer(8) :: nelm, lines, i
+    integer :: nelm_tail
 #ifdef TwoBodyOperatorDebug
     type(sys) :: s
     character(20) :: fm
@@ -2122,7 +2327,8 @@ contains
     use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     character(*), intent(in) :: f
     real(8), intent(inout) :: v(:)
-    integer :: nelm, line, lines, nelm_tail, cnt
+    integer(8) :: nelm, line, lines, cnt
+    integer :: nelm_tail
     character(512) :: buffer = ''
     type(c_ptr) :: p, buf
 #ifdef TwoBodyOperatorDebug
@@ -2164,7 +2370,7 @@ contains
     type(TwoBodySpace), pointer :: ms
     type(Orbits), pointer :: sps
     integer :: runit = 22, io
-    integer :: lines, n
+    integer(8) :: n, lines
     integer :: a, b, c, d, J
     real(8) :: me
 
@@ -2198,7 +2404,7 @@ contains
     type(TwoBodySpace), pointer :: ms
     type(Orbits), pointer :: sps
     integer :: runit = 22, io
-    integer :: lines, n
+    integer(8) :: lines, n
     integer, allocatable :: a(:), b(:), c(:), d(:), J(:)
     real(8), allocatable :: me(:)
 
@@ -2241,10 +2447,11 @@ contains
     type(TwoBodySpace), pointer :: ms
     type(Orbits), pointer :: sps
     type(SingleParticleOrbit), allocatable :: ssnt(:)
-    integer :: a, b, c, d, J, lines, idx, n, l, z
+    integer :: a, b, c, d, J, idx, n, l, z
     integer :: ia, ib, ic, id
     integer :: runit=22, io
-    integer :: porbs, norbs, pc, nc, line
+    integer :: porbs, norbs, pc, nc
+    integer(8) :: lines, line
     real(8) :: me
 
     ms => two%two
@@ -2301,7 +2508,7 @@ contains
     integer :: a, b, c, d, J, T
     integer :: ap, bp, cp, dp
     integer :: an, bn, cn, dn
-    integer :: iline, nlines
+    integer(8) :: iline, nlines
     real(8) :: trel, horel, vcoul, vpn, vpp, vnn, fact
     integer :: emax_in, e2max_in
     real(8) :: hw_in, lambda_in
@@ -2374,7 +2581,7 @@ contains
     integer :: a, b, c, d, J, T
     integer :: ap, bp, cp, dp
     integer :: an, bn, cn, dn
-    integer :: iline, nlines
+    integer(8) :: iline, nlines
     real(8) :: trel, horel, vcoul, vpn, vpp, vnn, fact
     integer :: emax_in, e2max_in
     real(8) :: hw_in, lambda_in
