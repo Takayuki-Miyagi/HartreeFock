@@ -105,6 +105,7 @@ program HFMain
     HF%C = PTd%C_HO2NAT
     htr = HF%BasisTransform(h)
   end if
+  call h%fin()
 
   if(p%is_Op_out) then
     call w%SetFileName(p%out_dir, p%Op_file_format, h)
@@ -191,7 +192,6 @@ program HFMain
   end do
 
   call htr%fin()
-  call h%fin()
   call HF%fin()
   call ms%fin()
 

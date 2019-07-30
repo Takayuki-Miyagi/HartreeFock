@@ -368,6 +368,7 @@ contains
       !$omp end do
       !$omp end parallel
       op%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
+
       call UT%fin()
       call V2%fin()
       call V3%fin()
