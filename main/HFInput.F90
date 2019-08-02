@@ -38,6 +38,9 @@ module HFInput
     ! output files
     character(:), allocatable :: out_dir
     character(:), allocatable :: summary_file
+    integer :: emax_1n
+    integer :: lmax_1n
+    character(:), allocatable :: density_matrix_file
 
     !
     logical :: is_Op_out
@@ -88,6 +91,9 @@ contains
 
     character(256) :: out_dir = '.'
     character(256) :: summary_file = 'summary.out'
+    integer :: emax_1n=6
+    integer :: lmax_1n=-1
+    character(256) :: density_matrix_file = 'none'
     logical :: is_Op_out = .false.
     logical :: is_MBPTscalar_full = .false.
     logical :: is_MBPTScalar = .true.
@@ -107,7 +113,7 @@ contains
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
         & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
-        & type_3n_file, is_4th_order
+        & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -131,6 +137,8 @@ contains
     this%int_3n_file = int_3n_file
     this%type_3n_file = type_3n_file
 
+    this%emax_1n = emax_1n
+
     this%emax_nn = emax_nn
     this%e2max_nn = e2max_nn
 
@@ -146,6 +154,7 @@ contains
     if(this%out_dir == '') this%out_dir = '.'
     call s%mkdir(this%out_dir)
     this%summary_file = trim(this%out_dir) // "/" // trim(summary_file)
+    this%density_matrix_file = trim(density_matrix_file)
 
     this%is_Op_out = is_Op_out
     this%is_MBPTscalar_full = is_MBPTscalar_full
@@ -158,6 +167,7 @@ contains
     this%is_4th_order = is_4th_order
 
     if(lmax == -1) this%lmax = emax
+    if(lmax_1n == -1) this%lmax_1n = emax_1n
     if(lmax_nn == -1) this%lmax_nn = emax_nn
     if(lmax_3n == -1) this%lmax_3n = emax_3n
 

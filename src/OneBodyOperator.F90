@@ -28,6 +28,9 @@ module OneBodyOperator
   private :: GetDenominator3
   private :: GetDenominator4
 
+  private :: ReadOneBodyFile
+  private :: read_one_body_gennari
+
   type, extends(DMat) :: OneBodyPartChannel
     type(OneBodyChannel), pointer :: ch_bra, ch_ket
     logical :: is = .false.
@@ -63,6 +66,7 @@ module OneBodyOperator
     procedure :: GetDenominator2
     procedure :: GetDenominator3
     procedure :: GetDenominator4
+    procedure :: ReadOneBodyFile
 
     generic :: init => InitOneBodyPart
     generic :: fin => FinOneBodyPart
@@ -403,4 +407,49 @@ contains
         & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - &
         & f%GetOBME(p3,p3) - f%GetOBME(p4,p4)
   end function GetDenominator4
+
+  subroutine ReadOneBodyFile(this, filename, emax, lmax)
+    use ClassSys, only: sys
+    class(OneBodyPart), intent(inout) :: this
+    character(*), intent(in) :: filename
+    integer, intent(in) :: emax, lmax
+    type(sys) :: s
+
+    if(s%find(filename, ".gen")) then
+      call read_one_body_gennari(this, filename, emax, lmax)
+      return
+    end if
+
+  end subroutine ReadOneBodyFile
+
+  subroutine read_one_body_gennari(this, filename, emax, lmax)
+    class(OneBodyPart), intent(inout) :: this
+    character(*), intent(in) :: filename
+    integer, intent(in) :: emax, lmax
+    type(OrbitsIsospin) :: isps
+    type(Orbits), pointer :: sps
+    integer :: iunit = 20, io
+    integer :: ia, ib, ap, bp, an, bn
+    real(8) :: me_pp, me_nn
+
+    sps => this%one%sps
+    call isps%init(emax, lmax)
+    open(iunit, file=filename, action='read',iostat=io)
+    read(iunit,*)
+    do
+      read(iunit, *, end=999) ia, ib, me_pp, me_nn
+      me_pp = me_pp / dble(isps%orb(ia)%j+1)
+      me_nn = me_nn / dble(isps%orb(ia)%j+1)
+      ap = isps%iso2pn(sps, ia, -1)
+      an = isps%iso2pn(sps, ia,  1)
+      bp = isps%iso2pn(sps, ib, -1)
+      bn = isps%iso2pn(sps, ib,  1)
+      call this%SetOBME(ap,bp,me_pp)
+      call this%SetOBME(an,bn,me_nn)
+    end do
+999 close(iunit)
+    call isps%fin()
+    return
+  end subroutine read_one_body_gennari
+
 end module OneBodyOperator

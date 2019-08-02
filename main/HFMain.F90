@@ -81,11 +81,17 @@ program HFMain
   call HF%init(h,alpha=p%alpha)
   call HF%solve()
 
+  open(wunit, file = p%summary_file, action='write',status='replace')
+  call p%PrintInputParameters(wunit)
+
+  if(.not. p%is_MBPTEnergy) then
+    write(wunit,'(a,6x,a)') "# Operator", "HF energy"
+    write(wunit,'(a,1f18.8)') 'hamil: ', HF%ehf
+  end if
+
   if(p%is_MBPTEnergy) then
     htr = HF%BasisTransform(h)
     call PT%calc(htr, p%is_4th_order)
-    open(wunit, file = p%summary_file, action='write',status='replace')
-    call p%PrintInputParameters(wunit)
     write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
     write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
     write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
@@ -96,20 +102,26 @@ program HFMain
         & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
     write(wunit,'(a,4f18.8)') 'hamil: ', PT%e_0, PT%e_2, PT%e_3, &
         & PT%e_0+PT%e_2+PT%e_3
-    close(wunit)
   end if
+  close(wunit)
 
   if(p%is_NAT) then
     htr = HF%BasisTransform(h)
     call PTd%init(HF, htr)
+    select case(p%density_matrix_file)
+    case("", "none", "NONE", "None")
+    case default
+      call PTd%rho%ReadOneBodyFile(p%density_matrix_file, p%emax_1n, p%lmax_1n)
+      call PTd%GetCoef()
+    end select
     HF%C = PTd%C_HO2NAT
     htr = HF%BasisTransform(h)
   end if
   call h%fin()
 
   if(p%is_Op_out) then
-    call w%SetFileName(p%out_dir, p%Op_file_format, h)
-    call w%writef(p,h)
+    call w%SetFileName(p%out_dir, p%Op_file_format, htr)
+    call w%writef(p,htr)
   end if
   ! Hamiltonian -----
 

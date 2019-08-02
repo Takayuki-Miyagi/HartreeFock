@@ -1744,6 +1744,7 @@ contains
     integer :: idx, a, b
     integer, allocatable :: aa(:), bb(:)
     type(SingleParticleOrbit), pointer :: oa, ob
+    logical :: is_read = .false.
     real(8) :: me, ti
     ms => hamil%ms
     this%ms => hamil%ms
@@ -1760,30 +1761,30 @@ contains
     allocate(bb(sps%norbs*(sps%norbs+1)/2))
     idx = 0
     do a = 1, sps%norbs
-      do b = 1, a
-        idx = idx + 1
-        aa(idx) = a
-        bb(idx) = b
-      end do
+    do b = 1, a
+    idx = idx + 1
+    aa(idx) = a
+    bb(idx) = b
+    end do
     end do
     ti = omp_get_wtime()
     !$omp parallel
     !$omp do private(idx, a, b, oa, ob, me) schedule(dynamic)
     do idx = 1, sps%norbs*(sps%norbs+1)/2
-      a = aa(idx)
-      b = bb(idx)
-      oa => sps%GetOrbit(a)
-      ob => sps%GetOrbit(b)
-      if(oa%j /= ob%j) cycle
-      if(oa%l /= ob%l) cycle
-      if(oa%z /= ob%z) cycle
-      me = 0.d0
-      if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_hh(a, b, hamil)
-      if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_ph(a, b, hamil)
-      if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_ph(b, a, hamil)
-      if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_pp(a, b, hamil)
-      call this%rho%SetOBME(a,b,me)
-      call this%rho%SetOBME(b,a,me)
+    a = aa(idx)
+    b = bb(idx)
+    oa => sps%GetOrbit(a)
+    ob => sps%GetOrbit(b)
+    if(oa%j /= ob%j) cycle
+    if(oa%l /= ob%l) cycle
+    if(oa%z /= ob%z) cycle
+    me = 0.d0
+    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_hh(a, b, hamil)
+    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_ph(a, b, hamil)
+    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_ph(b, a, hamil)
+    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_pp(a, b, hamil)
+    call this%rho%SetOBME(a,b,me)
+    call this%rho%SetOBME(b,a,me)
     end do
     !$omp end do
     !$omp end parallel
@@ -2014,7 +2015,7 @@ contains
       this%C_HO2NAT%MatCh(ch,ch)%DMat = &
           & this%C_HO2HF%MatCh(ch,ch)%DMat * &
           & this%C_HF2NAT%MatCh(ch,ch)%DMat
-      call this%rho%MatCh(ch,ch)%DMat%prt("rho")
+      !call this%rho%MatCh(ch,ch)%DMat%prt("rho")
       !call this%Occ%MatCh(ch,ch)%prt("Occupation Number")
       if(iz == -1) Z = Z + sum(sol%eig%v) * dble(jj+1)
       if(iz ==  1) N = N + sum(sol%eig%v) * dble(jj+1)
