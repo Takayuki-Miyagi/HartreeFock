@@ -107,7 +107,7 @@ module ThreeBodyNO2BInteraction
     procedure :: read_scalar_me3j_ascii_txt
     procedure :: read_scalar_me3j_gzip
     procedure :: read_scalar_me3j_ascii
-    !procedure :: read_scalar_me3j_binary_stream
+    procedure :: read_scalar_me3j_binary_stream
     !procedure :: read_scalar_me3j_binary_comp
     !procedure :: read_scalar_me3j_binary
   end type Read3BodyNO2B
@@ -650,10 +650,10 @@ contains
       return
     end if
 
-    !if(s%find(this%file_3n,'stream.bin')) then
-    !  call this%read_scalar_me3j_binary_stream(thr)
-    !  return
-    !end if
+    if(s%find(this%file_3n,'stream.bin')) then
+      call this%read_scalar_me3j_binary_stream(thr)
+      return
+    end if
 
     !if(s%find(this%file_3n,'.bin') .and. s%find(this%file_3n,'_comp')) then
     !  call this%read_scalar_me3j_binary_comp(thr)
@@ -700,6 +700,38 @@ contains
     deallocate(v)
     call spsf%fin()
   end subroutine read_scalar_me3j_ascii_txt
+
+  subroutine read_scalar_me3j_binary_stream(this,thr)
+    class(Read3BodyNO2B), intent(in) :: this
+    type(ThreeBodyNO2BForce), intent(inout) :: thr
+    type(OrbitsIsospin) :: spsf
+#ifdef single_precision_three_body_file
+    real(4), allocatable :: v(:)
+#else
+    real(8), allocatable :: v(:)
+#endif
+    integer(8) :: nelm, n
+    integer :: runit = 22, io
+
+    write(*,'(a)') "Reading three-body scalar from stream i/o format binary file"
+
+    call spsf%init(this%emax3, this%lmax3)
+    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    allocate(v(nelm))
+    open(runit, file=this%file_3n, action='read', iostat=io, &
+        & form='unformatted',access='stream')
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+      return
+    end if
+    read(runit) v
+    close(runit)
+
+    call store_scalar_3bme(thr,v,spsf,this%e2max3,this%e3max3)
+
+    deallocate(v)
+    call spsf%fin()
+  end subroutine read_scalar_me3j_binary_stream
 
   subroutine read_scalar_me3j_ascii(this,thr)
     class(Read3BodyNO2B), intent(in) :: this
@@ -854,6 +886,7 @@ contains
         end do
       end do
     end do
+    write(*,*) "Number of MEs: ", r
   end function count_scalar_3bme
 
   subroutine store_scalar_3bme(thr,v,spsf,e2max,e3max)
@@ -958,6 +991,7 @@ contains
                         if(i1==i2 .and. mod(J+T12,2)==0) then
                           if(abs(v(cnt)) > 1.d-6) then
                             write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
                           end if
                           cycle
                         end if
@@ -965,6 +999,7 @@ contains
                         if(i4==i5 .and. mod(J+T45,2)==0) then
                           if(abs(v(cnt)) > 1.d-6) then
                             write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
                           end if
                           cycle
                         end if

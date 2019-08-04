@@ -140,7 +140,7 @@ program HFMain
 
   ! Hamiltonian -----
 
-  if(p%Ops(1) /= 'none' .or. p%Ops(1) /= '') then
+  if(p%Ops(1) /= 'none' .and. p%Ops(1) /= '') then
     open(wunit, file = p%summary_file, action='write',status='old',position='append')
     write(wunit,'(a,1x,a,9x,a,9x,a,13x,a)') &
         & "# Operator", "HF exp. val.", "1st order", "2nd order", "Total"
