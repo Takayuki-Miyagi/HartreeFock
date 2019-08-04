@@ -70,14 +70,12 @@ module HFMBPT
   private :: GetCoef
 
   ! Methods for general
-  private :: denom1b
-  private :: denom2b
-  private :: denom3b
-  private :: denom4b
-  private :: Eket
-  private :: Pari
-  private :: Tz
-  private :: cross_couple
+  private :: get_denominator1
+  private :: get_denominator2
+  private :: get_denominator3
+  private :: get_denominator4
+  private :: get_pphh_part
+  private :: get_xc_pphh_to_phph
 
   type :: MBPTEnergy
     real(8) :: e_0 = 0.d0
@@ -98,11 +96,13 @@ module HFMBPT
   end type MBPTEnergy
 
   type :: MBPTDMat
-    type(OneBodyPart) :: rho
+    type(OneBodyPart) :: rho_HF
+    type(OneBodyPart) :: rho_HO
     type(OneBodyPart) :: C_HO2HF
     type(OneBodyPart) :: C_HF2NAT
     type(OneBodyPart) :: C_HO2NAT
-    type(OneBodyPart) :: Occ
+    type(OneBodyPart) :: Occ_HF
+    type(OneBodyPart) :: Occ_HO
     type(MSpace), pointer :: ms
   contains
     procedure :: init => InitMBPTDMat
@@ -128,24 +128,31 @@ module HFMBPT
     procedure :: scalar_second
   end type MBPTScalar
   type(SixJsStore), private :: sixjs
+  logical, private :: EN_denominator=.false.  ! Epstein-Nesbet denominator (Moller-Plesset is default)
 
 contains
 
-  subroutine CalcEnergyCorr(this,hamil,fourth_order)
+  subroutine CalcEnergyCorr(this,hamil,fourth_order, EN_denominator_in)
     class(MBPTEnergy), intent(inout) :: this
     type(Ops), intent(in) :: hamil
     logical, intent(in), optional :: fourth_order
+    logical, intent(in), optional :: EN_denominator_in
     logical :: is_4th_order=.false.
     integer :: i, jmax
 
     if(present(fourth_order)) is_4th_order=fourth_order
+    if(present(EN_denominator_in)) EN_denominator = EN_denominator_in
     write(*,*)
+
     if(.not. is_4th_order) then
-      write(*,'(a)') " Many-body perturbation calculation up to 3rd order"
+      write(*,'(a)') "# Many-body perturbation calculation up to 3rd order"
     end if
+
     if(is_4th_order) then
-      write(*,'(a)') " Many-body perturbation calculation up to 4th order"
+      write(*,'(a)') "# Many-body perturbation calculation up to 4th order"
     end if
+    if(.not. EN_denominator) write(*,"(a)") "# Moller-Plesset (MP) denominator"
+    if(EN_denominator)       write(*,"(a)") "# Epstein-Nesbet (EN) denominator"
     write(*,*)
 
     if(.not. hamil%is_normal_ordered) then
@@ -179,7 +186,7 @@ contains
           & this%e_2 + this%e_3 + sum(this%e_4)
     end if
     call sixjs%fin()
-
+    EN_denominator=.false.
   end subroutine CalcEnergyCorr
 
   function energy_second(h) result(r)
@@ -223,7 +230,7 @@ contains
           j = ch_two%n2spi2(ch_two%hhs(ij))
 
           v = v + h%two%GetTwBME(i,j,a,b,J2)**2 / &
-              & h%one%GetDenominator2(i,j,a,b)
+              & get_denominator2(h,i,j,a,b)
         end do
       end do
       !$omp end do
@@ -234,63 +241,51 @@ contains
     call timer%Add("Second order MBPT",omp_get_wtime()-ti)
   end function energy_second
 
-  function denom1b(f,h1,p1) result(r)
-    type(OneBodyPart), intent(in) :: f
+  function get_denominator1(h,h1,p1) result(r)
+    ! E_{0} - <p1h1| H | p1h1 >
+    type(Ops), intent(in) :: h
     integer, intent(in) :: h1, p1
     real(8) :: r
 
-    r = f%GetOBME(h1,h1) - f%GetOBME(p1,p1)
-  end function denom1b
+    r = h%one%GetDenominator1(h1,p1)
+    if(.not. EN_denominator) return
+    r = r - h%two%GetTwBMEMon(p1,h1,p1,h1)
+  end function get_denominator1
 
-  function denom2b(f,h1,h2,p1,p2) result(r)
-    type(OneBodyPart), intent(in) :: f
+  function get_denominator2(h,h1,h2,p1,p2) result(r)
+    ! E_{0} - <p1p2h1h2| H | p1p2h1h2 >
+    type(Ops), intent(in) :: h
     integer, intent(in) :: h1, h2, p1, p2
     real(8) :: r
 
-    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) - &
-        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2)
-  end function denom2b
+    r = h%one%GetDenominator2(h1,h2,p1,p2)
+    if(.not. EN_denominator) return
+    r = r - h%two%GetTwBMEMon(p1,p2,p1,p2) - h%two%GetTwBMEMon(h1,h2,h1,h2) + &
+      & h%two%GetTwBMEMon(p1,h1,p1,h1) + h%two%GetTwBMEMon(p2,h2,p2,h2) + &
+      & h%two%GetTwBMEMon(p2,h1,p2,h1) + h%two%GetTwBMEMon(p1,h2,p1,h2)
+  end function get_denominator2
 
-  function denom3b(f,h1,h2,h3,p1,p2,p3) result(r)
-    type(OneBodyPart), intent(in) :: f
+  function get_denominator3(h,h1,h2,h3,p1,p2,p3) result(r)
+    ! E_{0} - <p1p2p3h1h2h3| H | p1p2p3h1h2h3 >
+    type(Ops), intent(in) :: h
     integer, intent(in) :: h1, h2, h3, p1, p2, p3
     real(8) :: r
 
-    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) + f%GetOBME(h3,h3) - &
-        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - f%GetOBME(p3,p3)
-  end function denom3b
+    r = h%one%GetDenominator3(h1,h2,h3,p1,p2,p3)
+    if(.not. EN_denominator) return
+    write(*,*) "EN denominator for 3p3h: Not implemented yet"
+  end function get_denominator3
 
-  function denom4b(f,h1,h2,h3,h4,p1,p2,p3,p4) result(r)
-    type(OneBodyPart), intent(in) :: f
+  function get_denominator4(h,h1,h2,h3,h4,p1,p2,p3,p4) result(r)
+    ! E_{0} - <p1p2p3p4h1h2h3h4| H | p1p2p3p4h1h2h3h4 >
+    type(Ops), intent(in) :: h
     integer, intent(in) :: h1, h2, h3, h4, p1, p2, p3, p4
     real(8) :: r
 
-    r = f%GetOBME(h1,h1) + f%GetOBME(h2,h2) + &
-        & f%GetOBME(h3,h3) + f%GetOBME(h4,h4) - &
-        & f%GetOBME(p1,p1) - f%GetOBME(p2,p2) - &
-        & f%GetOBME(p3,p3) - f%GetOBME(p4,p4)
-  end function denom4b
-
-  function Eket(sps,a,b)
-    type(Orbits), intent(in) :: sps
-    integer, intent(in) :: a, b
-    integer :: Eket
-    Eket = sps%orb(a)%e + sps%orb(b)%e
-  end function Eket
-
-  function Pari(sps,a,b) result(p)
-    type(Orbits), intent(in) :: sps
-    integer, intent(in) :: a, b
-    integer :: p
-    p = (-1) ** (sps%orb(a)%l + sps%orb(b)%l)
-  end function Pari
-
-  function Tz(sps,a,b)
-    type(Orbits), intent(in) :: sps
-    integer, intent(in) :: a, b
-    integer :: Tz
-    Tz = sps%orb(a)%z + sps%orb(b)%z
-  end function Tz
+    r = h%one%GetDenominator4(h1,h2,h3,h4,p1,p2,p3,p4)
+    if(.not. EN_denominator) return
+    write(*,*) "EN denominator for 4p4h: Not implemented yet"
+  end function get_denominator4
 
   subroutine energy_third(this,h)
     class(MBPTEnergy), intent(inout) :: this
@@ -380,7 +375,7 @@ contains
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = h%two%MatCh(ch,ch)%get_pppp(ms%sps)
       m3 = m1%t() * (m2 * m1)
       v = 0.d0
@@ -426,7 +421,7 @@ contains
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = h%two%MatCh(ch,ch)%get_hhhh(ms%sps)
       m3 = m1%t() * (m1 * m2)
       v = 0.d0
@@ -472,7 +467,7 @@ contains
     do ch = 1,ms%cc_two%NChan
       ch_cc => ms%cc_two%jpz(ch)
       J2 = ch_cc%j
-      m1 = h%two%get_xc_pphh2phph(ch_cc, h%one)
+      m1 = get_xc_pphh_to_phph(h%two, ch_cc, h)
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%get_xc_hphp2phph(ch_cc)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
@@ -533,7 +528,7 @@ contains
     call v_h1p4p3p4%init(0,1,0,"v for MBPT",ms,2)
     do ch = 1, ms%two%NChan
       tbs => ms%two%jpz(ch)
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one) * (-1.d0)**tbs%j
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h) * (-1.d0) ** tbs%j
       if(m1%n_row<1 .or. m1%n_col<1) cycle
 
       m2 = h%two%MatCh(ch,ch)%get_phpp(ms%sps)
@@ -562,7 +557,7 @@ contains
             norm = 1.d0
             if(h1==h2) norm = norm * sqrt(2.d0)
             if(p3==p4) norm = norm * sqrt(2.d0)
-            denom = 1.d0 / h%one%GetDenominator1(h1,p3)
+            denom = 1.d0 / get_denominator1(h,h1,p3)
             Kmin = abs(oh1%j-op3%j)/2
             Kmax = min(oh1%j+op3%j, 2*oh2%j, 2*op4%j)/2
             do K = Kmin, Kmax
@@ -631,7 +626,7 @@ contains
     call v_phhh%init(0,1,0,"v for MBPT",ms,2)
     do ch = 1, ms%two%NChan
       tbs => ms%two%jpz(ch)
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one) * (-1.d0)**tbs%j
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h) * (-1.d0) ** tbs%j
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%MatCh(ch,ch)%get_phpp(ms%sps)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
@@ -658,7 +653,7 @@ contains
             norm = 1.d0
             if(h1==h2) norm = norm * sqrt(2.d0)
             if(h1==h3) norm = norm * sqrt(2.d0)
-            denom = 1.d0 / h%one%GetDenominator1(h1,p3)
+            denom = 1.d0 / get_denominator1(h,h1,p3)
             Kmin = abs(oh1%j-op3%j)/2
             Kmax = min(oh1%j+op3%j, 2*oh2%j, 2*oh3%j)/2
             do K = Kmin, Kmax
@@ -726,7 +721,7 @@ contains
     call v_phpp%init(0,1,0,"v for MBPT",ms,2)
     do ch = 1, ms%two%NChan
       tbs => ms%two%jpz(ch)
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one) * (-1.d0)**tbs%j
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h) * (-1.d0) ** tbs%j
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%MatCh(ch,ch)%get_phhh(ms%sps)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
@@ -755,7 +750,7 @@ contains
             norm = 1.d0
             if(p1==p2) norm = norm * sqrt(2.d0)
             if(p1==p3) norm = norm * sqrt(2.d0)
-            denom = 1.d0 / h%one%GetDenominator1(h3,p1)
+            denom = 1.d0 / get_denominator1(h,h3,p1)
             Kmin = abs(op1%j-oh3%j)/2
             Kmax = min(op1%j+oh3%j, 2*op2%j, 2*op3%j)/2
             do K = Kmin, Kmax
@@ -820,7 +815,7 @@ contains
     call v_pphh_2%init(0,1,0,"v for MBPT",ms,2)
     do ch = 1, ms%two%NChan
       tbs => ms%two%jpz(ch)
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%MatCh(ch,ch)%get_pppp(ms%sps)
       if(m2%n_row>0 .and. m2%n_col>0) then
@@ -850,7 +845,7 @@ contains
         do ij = 1, ch_two%n_hh_state
           i = ch_two%n2spi1(ch_two%hhs(ij))
           j = ch_two%n2spi2(ch_two%hhs(ij))
-          denom = 1.d0 / h%one%GetDenominator2(i,j,a,b)
+          denom = 1.d0 / get_denominator2(h,i,j,a,b)
 
           v = v + v_pphh_1%two%GetTwBME(i,j,a,b,J2) * &
               &   v_pphh_2%two%GetTwBME(a,b,i,j,J2) * denom
@@ -937,7 +932,7 @@ contains
 !        do ij = 1, ch_two%n_hh_state
 !          i = ch_two%n2spi1(ch_two%hhs(ij))
 !          j = ch_two%n2spi2(ch_two%hhs(ij))
-!          denom = 1.d0 / h%one%GetDenominator2(i,j,a,b)
+!          denom = 1.d0 / get_denominator2(h,i,j,a,b)
 !
 !          v = v + v_pphh_1%two%GetTwBME(i,j,a,b,J2) * &
 !              &   v_pphh_2%two%GetTwBME(a,b,i,j,J2) * denom
@@ -953,44 +948,116 @@ contains
 !    call timer%Add("Fourth order MBPT F7",omp_get_wtime()-ti)
 !  end function energy_fourth_F7
 
-  function cross_couple(v,i,j,a,b,L) result(r)
-    use MyLibrary, only: triag,sjs
-    type(TwoBodyPart), intent(in) :: v
-    integer, intent(in) :: i, j, a, b, L
-    type(TwoBodySpace), pointer :: two
+  function get_pphh_part(opch, h) result(m)
+    type(TwoBodyPartChannel), intent(in) :: opch
+    type(Ops), intent(in) :: h
+    type(TwoBodyChannel), pointer :: ch_bra, ch_ket
     type(Orbits), pointer :: sps
-    integer :: ji, jj, ja, jb
-    integer :: J2
-    real(8) :: r
+    type(DMat) :: m
+    integer :: ibra, iket, bra, ket
+    integer :: a, b, c, d
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
-    r = 0.d0
-    two => v%two
-    sps => two%sps
+    ch_bra => opch%ch_bra
+    ch_ket => opch%ch_ket
+    sps => h%ms%sps
 
-    if(Eket(sps,i,j) > two%e2max) return
-    if(Eket(sps,a,b) > two%e2max) return
-    if(Pari(sps,i,j) /= Pari(sps,a,b)) return
-    if(  Tz(sps,i,j) /=   Tz(sps,a,b)) return
-
-    ji = sps%orb(i)%j
-    jj = sps%orb(j)%j
-    ja = sps%orb(a)%j
-    jb = sps%orb(b)%j
-
-    if(triag(ji,jb,2*L)) return
-    if(triag(ja,jj,2*L)) return
-
-    do J2 = max( abs(ji-jj),abs(ja-jb) )/2, min( (ji+jj),(ja+jb) )/2
-      if(i==j .and. mod(J2,2)==1) cycle
-      if(a==b .and. mod(J2,2)==1) cycle
-      !r = r + dble(2*J2+1) * &
-      !    & sjs(ji, jj, 2*J2, ja, jb, 2*L) * &
-      !    & v%GetTwBME(i,j,a,b,J2)
-      r = r + dble(2*J2+1) * &
-          & sixjs%get(ji,jj,2*J2,ja,jb,2*L) * &
-          & v%GetTwBME(i,j,a,b,J2)
+    ch_bra => opch%ch_bra
+    ch_ket => opch%ch_ket
+    ibra = 0
+    do bra = 1, ch_bra%n_state
+      a = ch_bra%n2spi1(bra)
+      b = ch_bra%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
     end do
-  end function cross_couple
+
+    iket = 0
+    do bra = 1, ch_ket%n_state
+      a = ch_ket%n2spi1(bra)
+      b = ch_ket%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+    end do
+
+    call M%ini(ibra,iket)
+    ibra = 0
+    do bra = 1, ch_bra%n_state
+      a = ch_bra%n2spi1(bra)
+      b = ch_bra%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+      ibra = ibra + 1
+      iket = 0
+      do ket = 1, ch_ket%n_state
+        c = ch_ket%n2spi1(ket)
+        d = ch_ket%n2spi2(ket)
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        iket = iket + 1
+        M%m(ibra,iket) = opch%m(bra,ket) / get_denominator2(h,c,d,a,b)
+      end do
+    end do
+  end function get_pphh_part
+
+  function get_xc_pphh_to_phph(op, ch_cc, h) result(Mat)
+    !  only for scalar
+    !  _________________
+    !  <ph:J| V |p'h':J> = \sum_{J'} [J'] {jp  jp' J'} <pp':J'|V|h'h:J'> / denominator
+    !                                     {jh' jh  J }
+    type(TwoBodyPart), intent(in) :: op
+    type(Ops), intent(in) :: h
+    type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
+    type(Orbits), pointer :: sps
+    type(DMat) :: Mat
+    integer :: a, b, c, d, K
+    integer :: ibra, iket, bra, ket
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, od
+    real(8) :: v, norm
+
+    sps => op%two%sps
+    K = ch_cc%j
+    ibra = 0
+    do bra = 1, ch_cc%n_state
+      a = ch_cc%n2spi1(bra)
+      b = ch_cc%n2spi2(bra)
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+    end do
+    call Mat%zeros(ibra,ibra)
+    if(ibra < 1) return
+    ibra = 0
+    do bra = 1, ch_cc%n_state
+      a = ch_cc%n2spi1(bra) ! p
+      b = ch_cc%n2spi2(bra) ! h
+      oa => sps%GetOrbit(a)
+      ob => sps%GetOrbit(b)
+      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      ibra = ibra+1
+      iket = 0
+      do ket = 1, ch_cc%n_state
+        c = ch_cc%n2spi1(ket) ! p
+        d = ch_cc%n2spi2(ket) ! h
+        oc => sps%GetOrbit(c)
+        od => sps%GetOrbit(d)
+        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+        iket = iket+1
+        if(oa%z+oc%z /= ob%z+od%z) cycle
+        if(abs(oa%occ)+abs(oc%occ) > 1.d-6) cycle
+        if(abs(ob%occ)*abs(od%occ) < 1.d-6) cycle
+        norm = 1.d0
+        if(a==c) norm = norm*sqrt(2.d0)
+        if(b==d) norm = norm*sqrt(2.d0)
+        v = op%get_xc1423(a,c,d,b,K)
+        Mat%m(ibra,iket) = v * norm / get_denominator2(h,b,d,a,c)
+      end do
+    end do
+  end function get_xc_pphh_to_phph
 
   subroutine MBPTCriteria(this,h)
     !
@@ -1028,7 +1095,7 @@ contains
       do i = 1, norbs
       oi => ms%sps%orb(i)
       if( oi%ph /= 0 ) cycle
-        max_denom1b = max(max_denom1b, h%one%GetOBME(i,a) / abs(denom1b(h%one,i,a)))
+        max_denom1b = max(max_denom1b, h%one%GetOBME(i,a) / abs(get_denominator1(h,i,a)))
       end do
     end do
 
@@ -1051,7 +1118,7 @@ contains
           if( ms%sps%orb(i)%ph /= 0 ) cycle
           if( ms%sps%orb(j)%ph /= 0 ) cycle
           max_val = max(max_val, &
-              & abs(h%two%GetTwBME(i,j,a,b,J2)) / abs(denom2b(h%one,i,j,a,b)))
+              & abs(h%two%GetTwBME(i,j,a,b,J2)) / abs(get_denominator2(h,i,j,a,b)))
         end do
       end do
       !$omp end do
@@ -1069,16 +1136,18 @@ contains
     this%perturbativity2b = max_denom2b
   end subroutine MBPTCriteria
 
-  subroutine CalcScalarCorr(this,hamil,opr,is_MBPT_full)
+  subroutine CalcScalarCorr(this,hamil,opr,is_MBPT_full,EN_denominator_in)
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: hamil, opr
     logical, intent(in) :: is_MBPT_full
+    logical, intent(in), optional :: EN_denominator_in
     type(MSpace), pointer :: ms
     integer :: jmax
     write(*,*)
     write(*,'(a)') " Many-body perturbation calculation up to 2nd order (scalar)"
     write(*,*)
 
+    if(present(EN_denominator_in)) EN_denominator = EN_denominator_in
     if(.not. hamil%is_normal_ordered) then
       write(*,"(a)") "In CalcScalarCorr: "
       write(*,"(a)") " Hamiltonian has to be normal ordered"
@@ -1090,6 +1159,8 @@ contains
       write(*,"(a)") " Operator has to be normal ordered"
       return
     end if
+    if(.not. EN_denominator) write(*,"(a)") "# Moller-Plesset (MP) denominator"
+    if(EN_denominator)       write(*,"(a)") "# Epstein-Nesbet (EN) denominator"
 
     jmax = 2*hamil%ms%sps%lmax+1
     call sixjs%init(1,jmax,.true., 1,jmax,.true., 1,jmax,.true.)
@@ -1102,21 +1173,22 @@ contains
     end if
 
     call this%scalar_second(hamil,opr,is_MBPT_full)
-    write(*,'(a)') "Second order corrections: "
-    write(*,'(a,f16.8)') "s1 p ladder  = ", this%s_2_s1p
-    write(*,'(a,f16.8)') "s1 h ladder  = ", this%s_2_s1h
-    write(*,'(a,f16.8)') "s1 ph bubble = ", this%s_2_s1ph
+    write(*,'(a)') "# Second order corrections: "
+    write(*,'(a,f16.8)') "# s1 p ladder  = ", this%s_2_s1p
+    write(*,'(a,f16.8)') "# s1 h ladder  = ", this%s_2_s1h
+    write(*,'(a,f16.8)') "# s1 ph bubble = ", this%s_2_s1ph
     if(is_MBPT_full) then
-      write(*,'(a,f16.8)') "s2 pp ladder = ", this%s_2_s2pp
-      write(*,'(a,f16.8)') "s2 hh ladder = ", this%s_2_s2hh
-      write(*,'(a,f16.8)') "s2 ph ladder = ", this%s_2_s2ph
-      write(*,'(a,f16.8)') "v2 pp ladder = ", this%s_2_v2pp
-      write(*,'(a,f16.8)') "v2 hh ladder = ", this%s_2_v2hh
-      write(*,'(a,f16.8)') "v2 ph ladder = ", this%s_2_v2ph
+      write(*,'(a,f16.8)') "# s2 pp ladder = ", this%s_2_s2pp
+      write(*,'(a,f16.8)') "# s2 hh ladder = ", this%s_2_s2hh
+      write(*,'(a,f16.8)') "# s2 ph ladder = ", this%s_2_s2ph
+      write(*,'(a,f16.8)') "# v2 pp ladder = ", this%s_2_v2pp
+      write(*,'(a,f16.8)') "# v2 hh ladder = ", this%s_2_v2hh
+      write(*,'(a,f16.8)') "# v2 ph ladder = ", this%s_2_v2ph
     end if
-    write(*,'(a,f16.8)') "Total        = ", this%s_2
+    write(*,'(a,f16.8)') "# Total        = ", this%s_2
 
     call sixjs%fin()
+    EN_denominator=.false.
   end subroutine CalcScalarCorr
 
   function scalar_first(h,s) result(r)
@@ -1161,7 +1233,7 @@ contains
 
           v = v + h%two%GetTwBME(i,j,a,b,J2) * &
               &   s%two%GetTwBME(a,b,i,j,J2) / &
-              &   denom2b(h%one,i,j,a,b)
+              &   get_denominator2(h,i,j,a,b)
         end do
       end do
       !$omp end do
@@ -1226,7 +1298,7 @@ contains
       J2 = ch_two%j
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = m1 * m1%t()
       call tmp%init(ch_two, ch_two)
       call tmp%set_pppp(ms%sps, m2)
@@ -1298,7 +1370,7 @@ contains
       J2 = ch_two%j
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = m1%t() * m1
       call tmp%init(ch_two, ch_two)
       call tmp%set_hhhh(ms%sps, m2)
@@ -1372,7 +1444,7 @@ contains
       if(ch_two%n_pp_state < 1) cycle
       call tmp_phpp%init(ch_two, ch_two)
       call tmp_phhh%init(ch_two, ch_two)
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = h%two%MatCh(ch,ch)%get_phpp(ms%sps)
       if(m2%n_row < 1 .or. m2%n_col < 1) cycle
       call tmp_phhh%set_phhh(ms%sps, m2*m1)
@@ -1403,7 +1475,7 @@ contains
             if(i==j) norm = norm*sqrt(2.d0)
             v = v + norm * dble(2*J2+1) * dble(iph) * &
                 & tmp_phhh%m(bra,ket) * s%one%GetOBME(c,i) / &
-                & h%one%GetDenominator1(i,c)
+                & get_denominator1(h,i,c)
           end do
         end do
       end do
@@ -1430,7 +1502,7 @@ contains
             if(a==b) norm = norm*sqrt(2.d0)
             v = v - norm * dble(2*J2+1) * dble(iph) * &
                 & tmp_phpp%m(bra,ket) * s%one%GetOBME(a,k) / &
-                & h%one%GetDenominator1(k,a)
+                & get_denominator1(h,k,a)
           end do
         end do
       end do
@@ -1475,7 +1547,7 @@ contains
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = s%two%MatCH(ch,ch)%get_pppp(ms%sps)
       m3 = m1%t() * (m2 * m1)
 
@@ -1521,7 +1593,7 @@ contains
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = s%two%MatCH(ch,ch)%get_hhhh(ms%sps)
       m3 = m1 * (m2 * m1%t())
 
@@ -1564,7 +1636,7 @@ contains
     do ch = 1,ms%cc_two%NChan
       ch_cc => ms%cc_two%jpz(ch)
       J2 = ch_cc%j
-      m1 = h%two%get_xc_pphh2phph(ch_cc, h%one)
+      m1 = get_xc_pphh_to_phph(h%two, ch_cc, h)
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = s%two%get_xc_hphp2phph(ch_cc)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
@@ -1613,9 +1685,9 @@ contains
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = h%two%MatCH(ch,ch)%get_pppp(ms%sps)
-      m3 = s%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m3 = get_pphh_part(s%two%MatCh(ch,ch), h)
       m3 = m3%t() * (m2 * m1)
 
       v = 0.d0
@@ -1660,9 +1732,9 @@ contains
       if(ch_two%n_hh_state < 1) cycle
       if(ch_two%n_pp_state < 1) cycle
 
-      m1 = h%two%MatCh(ch,ch)%get_pphh(ms%sps, h%one)
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
       m2 = h%two%MatCH(ch,ch)%get_hhhh(ms%sps)
-      m3 = s%two%MatCH(ch,ch)%get_pphh(ms%sps, h%one)
+      m3 = get_pphh_part(s%two%MatCh(ch,ch), h)
       m3 = m1 * (m2 * m3%t())
 
       v = 0.d0
@@ -1703,11 +1775,11 @@ contains
     do ch = 1,ms%cc_two%NChan
       ch_cc => ms%cc_two%jpz(ch)
       J2 = ch_cc%j
-      m1 = h%two%get_xc_pphh2phph(ch_cc, h%one)
+      m1 = get_xc_pphh_to_phph(h%two, ch_cc, h)
       if(m1%n_row<1 .or. m1%n_col<1) cycle
       m2 = h%two%get_xc_hphp2phph(ch_cc)
       if(m2%n_row<1 .or. m2%n_col<1) cycle
-      m3 = s%two%get_xc_pphh2phph(ch_cc, h%one)
+      m3 = get_xc_pphh_to_phph(s%two, ch_cc, h)
       if(m3%n_row<1 .or. m3%n_col<1) cycle
       m3 = m3 * (m2 * m1%t())
       v = 0.d0
@@ -1726,32 +1798,41 @@ contains
 
   subroutine FinMBPTDMat(this)
     class(MBPTDMat), intent(inout) :: this
-    call this%rho%fin()
-    call this%Occ%fin()
+    call this%rho_HF%fin()
+    call this%rho_HO%fin()
+    call this%Occ_HF%fin()
+    call this%Occ_HO%fin()
     call this%C_HO2HF%fin()
     call this%C_HF2NAT%fin()
     call this%C_HO2NAT%fin()
+    EN_denominator = .false.
     this%ms => null()
   end subroutine FinMBPTDMat
 
-  subroutine InitMBPTDMat(this, HF, hamil)
+  subroutine InitMBPTDMat(this, HF, hamil, EN_denominator_in)
     use Profiler, only: timer
     class(MBPTDMat), intent(inout) :: this
     type(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: hamil
+    logical, intent(in), optional :: EN_denominator_in
     type(MSPace), pointer :: ms
     type(Orbits), pointer :: sps
-    integer :: idx, a, b
+    integer :: idx, a, b, ch
     integer, allocatable :: aa(:), bb(:)
     type(SingleParticleOrbit), pointer :: oa, ob
-    logical :: is_read = .false.
     real(8) :: me, ti
     ms => hamil%ms
     this%ms => hamil%ms
     sps => ms%sps
+    if(present(EN_denominator_in)) EN_denominator = EN_denominator_in
     write(*,"(a)") "# Calculating density matrix w/ MBPT"
-    call this%rho%init(ms%one, .true., 'DenMat',  0, 1, 0)
-    call this%Occ%init(ms%one, .true., 'Occupation',  0, 1, 0)
+    if(.not. EN_denominator) write(*,"(a)") "# Moller-Plesset (MP) denominator"
+    if(EN_denominator)       write(*,"(a)") "# Epstein-Nesbet (EN) denominator"
+
+    call this%rho_HF%init(ms%one, .true., 'DenMat',  0, 1, 0)
+    call this%rho_HO%init(ms%one, .true., 'DenMat',  0, 1, 0)
+    call this%Occ_HF%init(ms%one, .true., 'Occupation',  0, 1, 0)
+    call this%Occ_HO%init(ms%one, .true., 'Occupation',  0, 1, 0)
     call this%C_HF2NAT%init(ms%one, .true., 'UT',  0, 1, 0)
     call this%C_HO2NAT%init(ms%one, .true., 'UT',  0, 1, 0)
 
@@ -1779,17 +1860,24 @@ contains
     if(oa%l /= ob%l) cycle
     if(oa%z /= ob%z) cycle
     me = 0.d0
-    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_hh(a, b, hamil)
-    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) > 1.d-6) me = density_matrix_element_ph(a, b, hamil)
-    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_ph(b, a, hamil)
-    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) < 1.d-6) me = density_matrix_element_pp(a, b, hamil)
-    call this%rho%SetOBME(a,b,me)
-    call this%rho%SetOBME(b,a,me)
+    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) > 1.d-6) me = me + density_matrix_element_hh(a, b, hamil)
+    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) > 1.d-6) me = me + density_matrix_element_ph(a, b, hamil)
+    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) < 1.d-6) me = me + density_matrix_element_ph(b, a, hamil)
+    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) < 1.d-6) me = me + density_matrix_element_pp(a, b, hamil)
+    call this%rho_HF%SetOBME(a,b,me)
+    call this%rho_HF%SetOBME(b,a,me)
     end do
     !$omp end do
     !$omp end parallel
     call timer%Add("Density matrix @ 2nd order MBPT",omp_get_wtime()-ti)
     deallocate(aa,bb)
+
+    do ch = 1, this%rho_HF%one%NChan
+      this%rho_HO%MatCh(ch,ch)%DMat = &
+        & this%C_HO2HF%MatCh(ch,ch)%DMat * &
+        & this%rho_HF%MatCh(ch,ch)%DMat * &
+        & this%C_HO2HF%MatCh(Ch,ch)%DMat%t()
+    end do
 
     call this%GetCoef()
   end subroutine InitMBPTDMat
@@ -1823,10 +1911,8 @@ contains
           if((-1)**(oa%l+oc%l+oi%l+oj%l) == -1) cycle
           if(oa%z+oc%z /= oi%z+oj%z) cycle
 
-          e_acij = denom2b(hamil%one,i,j,a,c)
-          e_bcij = denom2b(hamil%one,i,j,b,c)
-          if(abs(e_acij) < 1.d-8) cycle
-          if(abs(e_bcij) < 1.d-8) cycle
+          e_acij = get_denominator2(hamil,i,j,a,c)
+          e_bcij = get_denominator2(hamil,i,j,b,c)
 
           norm_ac = 1.d0
           norm_bc = 1.d0
@@ -1881,10 +1967,8 @@ contains
           if((-1)**(oa%l+ob%l+oi%l+ok%l) == -1) cycle
           if(oa%z + ob%z /= oi%z + ok%z) cycle
 
-          e_abik = denom2b(hamil%one,i,k,a,b)
-          e_abjk = denom2b(hamil%one,j,k,a,b)
-          if(abs(e_abik) < 1.d-8) cycle
-          if(abs(e_abjk) < 1.d-8) cycle
+          e_abik = get_denominator2(hamil,i,k,a,b)
+          e_abjk = get_denominator2(hamil,j,k,a,b)
 
           Jmin = max(abs(oa%j-ob%j), abs(oi%j-ok%j))/2
           Jmax = min(    oa%j+ob%j ,     oi%j+ok%j )/2
@@ -1936,10 +2020,8 @@ contains
           if(abs(oj%occ) < 1.d-6) cycle
           if((-1)**(oa%l+oj%l+ob%l+oc%l) == -1) cycle
           if(oa%z+oj%z /= ob%z+oc%z) cycle
-          e_ai = denom1b(hamil%one, i, a)
-          e_bcij = denom2b(hamil%one, i, j, b, c)
-          if(abs(e_ai) < 1.d-8) cycle
-          if(abs(e_bcij) < 1.d-8) cycle
+          e_ai = get_denominator1(hamil, i, a)
+          e_bcij = get_denominator2(hamil, i, j, b, c)
 
           Jmin = max(abs(oa%j-oj%j), abs(ob%j-oc%j))/2
           Jmax = min(    oa%j+oj%j ,     ob%j+oc%j )/2
@@ -1972,10 +2054,9 @@ contains
           if((-1)**(oa%l+ob%l+oj%l+ok%l) == -1) cycle
           if(oa%z + ob%z /= oj%z + ok%z) cycle
 
-          e_ai = denom1b(hamil%one, i, a)
-          e_abjk = denom2b(hamil%one, j, k, a, b)
-          if(abs(e_ai) < 1.d-8) cycle
-          if(abs(e_abjk) < 1.d-8) cycle
+          e_ai = get_denominator1(hamil, i, a)
+          e_abjk = get_denominator2(hamil, j, k, a, b)
+
           norm_ab = 1.d0
           norm_jk = 1.d0
           if(a==b) norm_ab = sqrt(2.d0)
@@ -2002,24 +2083,36 @@ contains
     real(8) :: N, Z
     N = 0.d0
     Z = 0.d0
-    do ch = 1, this%rho%one%NChan
-      jj = this%rho%one%jpz(ch)%j
-      iz = this%rho%one%jpz(ch)%z
-      call sol%init(this%rho%MatCh(ch,ch)%DMat)
-      call sol%DiagSym(this%rho%MatCh(ch,ch)%DMat)
+    do ch = 1, this%rho_HF%one%NChan
+      jj = this%rho_HF%one%jpz(ch)%j
+      iz = this%rho_HF%one%jpz(ch)%z
+
+      ! for HF => NAT
+      call sol%init(this%rho_HF%MatCh(ch,ch)%DMat)
+      call sol%DiagSym(this%rho_HF%MatCh(ch,ch)%DMat)
       m = size(sol%eig%v)
       do i = 1, m
         this%C_HF2NAT%MatCh(ch,ch)%m(:,i) = sol%vec%m(:,m-i+1)
-        this%Occ%MatCh(ch,ch)%m(i,i) = sol%eig%v(m-i+1)
+        this%Occ_HF%MatCh(ch,ch)%m(i,i) = sol%eig%v(m-i+1)
       end do
-      this%C_HO2NAT%MatCh(ch,ch)%DMat = &
-          & this%C_HO2HF%MatCh(ch,ch)%DMat * &
-          & this%C_HF2NAT%MatCh(ch,ch)%DMat
-      !call this%rho%MatCh(ch,ch)%DMat%prt("rho")
-      !call this%Occ%MatCh(ch,ch)%prt("Occupation Number")
+      !call this%rho_HF%MatCh(ch,ch)%DMat%prt("rho HF")
       if(iz == -1) Z = Z + sum(sol%eig%v) * dble(jj+1)
       if(iz ==  1) N = N + sum(sol%eig%v) * dble(jj+1)
       call sol%fin()
+
+      ! for HO => NAT
+      call sol%init(this%rho_HO%MatCh(ch,ch)%DMat)
+      call sol%DiagSym(this%rho_HO%MatCh(ch,ch)%DMat)
+      m = size(sol%eig%v)
+      do i = 1, m
+        this%C_HO2NAT%MatCh(ch,ch)%m(:,i) = sol%vec%m(:,m-i+1)
+        this%Occ_HO%MatCh(ch,ch)%m(i,i) = sol%eig%v(m-i+1)
+      end do
+      !call this%rho_HO%MatCh(ch,ch)%DMat%prt("rho HO")
+      !if(iz == -1) Z = Z + sum(sol%eig%v) * dble(jj+1)
+      !if(iz ==  1) N = N + sum(sol%eig%v) * dble(jj+1)
+      call sol%fin()
+
     end do
     write(*,"(a,i4,a,f6.2)") " Actual Z: ", this%ms%Z, ", Z from tr(rho): ", Z
     write(*,"(a,i4,a,f6.2)") " Actual N: ", this%ms%N, ", N from tr(rho): ", N
@@ -2546,9 +2639,9 @@ contains
 !                    if(h1==h2) delh12 = 2.d0
 !                    if(h3==h4) delh34 = 2.d0
 !                    vsum = vsum + v * delp12*delh12*delp34*delh34 / ( &
-!                        & h%one%GetDenominator2(h1,h2,p1,p2) * &
-!                        & h%one%GetDenominator2(h3,h4,p3,p4) * &
-!                        & h%one%GetDenominator2(h1,h2,p3,p4))
+!                        & get_denominator2(h,h1,h2,p1,p2) * &
+!                        & get_denominator2(h,h3,h4,p3,p4) * &
+!                        & get_denominator2(h,h1,h2,p3,p4))
 !                  end do
 !                end do
 !              end do

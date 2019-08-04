@@ -61,7 +61,7 @@ def gen_script(params, file_nn, file_3n, batch, machine):
         prt += "#SBATCH --ntasks=1\n"
         prt += "#SBATCH --cpus-per-task=32\n"
         prt += "#SBATCH --mem=125G\n"
-        prt += "#SBATCH --time=0-03:00\n\n"
+        prt += "#SBATCH --time=0-05:00\n\n"
 
     prt += 'echo "start ' +fsh + '..."\n'
     prt += "cat > "+file_input + " <<EOF\n"
