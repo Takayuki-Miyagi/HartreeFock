@@ -251,6 +251,8 @@ contains
     allocate(this%n2spi2(n))
     allocate(this%spis2n(sps%norbs,sps%norbs))
     allocate(this%iphase(sps%norbs,sps%norbs))
+    this%spis2n(:,:) = 0
+    this%iphase(:,:) = 0
     cnt = 0
     do loop = 1, 9
       cnt_sub = 0

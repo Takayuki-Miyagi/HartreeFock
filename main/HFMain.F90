@@ -12,7 +12,7 @@ program HFMain
   implicit none
   type(InputParameters) :: p
   type(MSpace) :: ms
-  type(Ops) :: h, opr, htr
+  type(Ops) :: h, opr, htr, Rho
   type(HFSolver) :: HF
   type(MBPTEnergy) :: PT
   type(MBPTScalar) :: PTs
@@ -91,7 +91,7 @@ program HFMain
 
   if(p%is_MBPTEnergy) then
     htr = HF%BasisTransform(h)
-    call PT%calc(htr, p%is_4th_order)
+    call PT%calc(htr, p%is_4th_order, p%EN_denominator)
     write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
     write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
     write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
@@ -107,25 +107,40 @@ program HFMain
 
   if(p%is_NAT) then
     htr = HF%BasisTransform(h)
-    call PTd%init(HF, htr)
+    call PTd%init(HF, htr, p%EN_denominator)
+    HF%C = PTd%C_HO2NAT
     select case(p%density_matrix_file)
     case("", "none", "NONE", "None")
+      if(p%is_Op_out) then
+        call Rho%init("DenMat", ms, 2)
+        Rho%one = PTd%rho_HO
+        call w%SetFileName(p%out_dir, p%Op_file_format, Rho)
+        call w%writef(p,Rho)
+      end if
     case default
-      call PTd%rho%ReadOneBodyFile(p%density_matrix_file, p%emax_1n, p%lmax_1n)
+      ! reading density matri file from M. Gennari
+      call PTd%rho_HO%ReadOneBodyFile(p%density_matrix_file, p%emax_1n, p%lmax_1n)
       call PTd%GetCoef()
+      HF%C = PTd%C_HO2NAT
+      if(p%is_Op_out) then
+        call Rho%init("DenMat", ms, 2)
+        Rho%one = PTd%rho_HO
+        call w%SetFileName(p%out_dir, p%Op_file_format, Rho)
+        call w%writef(p,Rho)
+      end if
     end select
-    HF%C = PTd%C_HO2NAT
     htr = HF%BasisTransform(h)
   end if
-  call h%fin()
 
   if(p%is_Op_out) then
     call w%SetFileName(p%out_dir, p%Op_file_format, htr)
     call w%writef(p,htr)
   end if
+  call h%fin()
+
   ! Hamiltonian -----
 
-  if(p%Ops(1) /= 'none' .or. p%Ops(1) /= '') then
+  if(p%Ops(1) /= 'none' .and. p%Ops(1) /= '') then
     open(wunit, file = p%summary_file, action='write',status='old',position='append')
     write(wunit,'(a,1x,a,9x,a,9x,a,13x,a)') &
         & "# Operator", "HF exp. val.", "1st order", "2nd order", "Total"
@@ -140,7 +155,7 @@ program HFMain
     call opr%set()
     opr = HF%BasisTransform(opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(htr,opr,p%is_MBPTScalar_full)
+      call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
       write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
@@ -162,7 +177,7 @@ program HFMain
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
     opr = HF%BasisTransform(opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(htr,opr,p%is_MBPTScalar_full)
+      call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
@@ -187,7 +202,7 @@ program HFMain
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
     opr = HF%BasisTransform(opr)
     if(p%is_MBPTScalar) then
-      call PTs%calc(htr,opr,p%is_MBPTScalar_full)
+      call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))

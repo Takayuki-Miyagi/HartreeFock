@@ -109,6 +109,7 @@ module TwoBodyOperator
     procedure :: SetTwBME_tensor
     procedure :: GetTwBME_scalar
     procedure :: GetTwBME_tensor
+    procedure :: GetTwBMEMon
     procedure :: AddToTwBME_scalar
     procedure :: AddToTwBME_tensor
     procedure :: CopyTwoBodyPart
@@ -502,6 +503,50 @@ contains
 
     r = dble(iphase) * this%MatCh(ch,ch)%m(bra,ket)
   end function GetTwBME_scalar
+
+  function GetTwBMEMon(this, i1, i2, i3, i4) result(r)
+    real(8) :: r
+    class(TwoBodyPart), intent(in) :: this
+    integer, intent(in) :: i1,i2,i3,i4
+    integer :: J, Jmin, Jmax
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
+    integer :: P12, P34
+    integer :: Z12, Z34
+    real(8) :: norm, sumJ
+    r = 0.d0
+    tbs => this%two
+    o1 => tbs%sps%GetOrbit(i1)
+    o2 => tbs%sps%GetOrbit(i2)
+    o3 => tbs%sps%GetOrbit(i3)
+    o4 => tbs%sps%GetOrbit(i4)
+    P12 = (-1) ** (o1%l + o2%l)
+    P34 = (-1) ** (o3%l + o4%l)
+    Z12 = (o1%z + o2%z)/2
+    Z34 = (o3%z + o4%z)/2
+
+    if(P12 * P34 /= 1) then
+      write(*,*) "Warning: in GetTwBMEMon: P"
+      return
+    end if
+
+    if(Z12 - Z34 /= 0) then
+      write(*,*) "Warning: in GetTwBMEMon: Tz"
+      return
+    end if
+    norm = 1.d0
+    if(i1==i2) norm = norm * sqrt(2.d0)
+    if(i3==i4) norm = norm * sqrt(2.d0)
+    Jmin = max(abs(o1%j-o2%j), abs(o3%j-o4%j))/2
+    Jmax = min(   (o1%j+o2%j),    (o3%j+o4%j))/2
+    sumJ = 0.d0
+    do J = Jmin, Jmax
+      r = r + dble(2*J+1) * this%GetTwBME(i1, i2, i3, i4, J)
+      sumJ = sumJ + dble(2*J+1)
+    end do
+    !r = r * norm / sqrt(dble( (o1%j+1) * (o2%j+1) * (o3%j+1) * (o4%j+1)) )
+    r = r * norm / sumJ
+  end function GetTwBMEMon
 
   subroutine SetTwBME_tensor(this,i1,i2,i3,i4,J12,J34,me)
     use MyLibrary, only: triag
@@ -965,21 +1010,17 @@ contains
     end do
   end function ExtractTwoBodyChannel_hhhh
 
-  function ExtractTwoBodyChannel_pphh(opch, sps, f) result(Mat)
+  function ExtractTwoBodyChannel_pphh(opch, sps) result(Mat)
     class(TwoBodyPartChannel), intent(in) :: opch
     type(Orbits), intent(in) :: sps
-    type(OneBodyPart), intent(in), optional :: f
     type(TwoBodyChannel), pointer :: ch_bra, ch_ket
-    logical :: denom = .false.
     type(DMat) :: Mat
     integer :: ibra, iket, bra, ket
     integer :: a, b, c, d
-    real(8) :: eps
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
 
     ch_bra => opch%ch_bra
     ch_ket => opch%ch_ket
-    if(present(f)) denom = .true.
     ibra = 0
     do bra = 1, ch_bra%n_state
       a = ch_bra%n2spi1(bra)
@@ -1015,9 +1056,7 @@ contains
         od => sps%GetOrbit(d)
         if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
         iket = iket + 1
-        eps = 1.d0
-        if(denom) eps = 1.d0 / f%GetDenominator2(c,d,a,b)
-        Mat%m(ibra,iket) = opch%m(bra,ket) * eps
+        Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
     end do
   end function ExtractTwoBodyChannel_pphh
@@ -1481,23 +1520,20 @@ contains
     end do
   end function ExtractCrossCoupledChannel_phph2phph
 
-  function ExtractCrossCoupledChannel_pphh2phph(op, ch_cc, f) result(Mat)
+  function ExtractCrossCoupledChannel_pphh2phph(op, ch_cc) result(Mat)
     !  only for scalar
     !  _________________
     !  <ph:J| V |p'h':J> = \sum_{J'} [J'] {jp  jp' J'} <pp':J'|V|h'h:J'>
     !                                     {jh' jh  J }
     class(TwoBodyPart), intent(in) :: op
     type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
-    type(OneBodyPart), intent(in), optional :: f
     type(Orbits), pointer :: sps
     type(DMat) :: Mat
     integer :: a, b, c, d, K
     integer :: ibra, iket, bra, ket
-    logical :: denom = .false.
     type(SingleParticleOrbit), pointer :: oa, ob, oc, od
-    real(8) :: v, eps, norm
+    real(8) :: v, norm
 
-    if(present(f)) denom = .true.
     sps => op%two%sps
     K = ch_cc%j
     ibra = 0
@@ -1533,9 +1569,7 @@ contains
         if(a==c) norm = norm*sqrt(2.d0)
         if(b==d) norm = norm*sqrt(2.d0)
         v = op%get_xc1423(a,c,d,b,K)
-        eps = 1.d0
-        if(denom) eps = 1.d0 / f%GetDenominator2(b,d,a,c)
-        Mat%m(ibra,iket) = v * eps * norm
+        Mat%m(ibra,iket) = v * norm
       end do
     end do
   end function ExtractCrossCoupledChannel_pphh2phph

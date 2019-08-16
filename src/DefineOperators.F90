@@ -12,7 +12,7 @@ contains
     select case(optr)
     case('hamil', 'Hamil', "HOHamil", "Hohamil", 'hohamil' ,&
           & 'Hcm','HCM','RM2', 'Rm2', "rm2", &
-          & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2')
+          & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2',"DenMat")
       jr = 0
       pr = 1
       zr = 0

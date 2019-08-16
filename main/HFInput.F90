@@ -49,6 +49,7 @@ module HFInput
     logical :: is_MBPTEnergy
     logical :: is_NAT
     logical :: is_4th_order
+    logical :: EN_denominator ! Epstein-Nesbet denominator (Moller-Plesset is default)
     character(256) :: Op_file_format
 
     ! atomic mode
@@ -95,11 +96,12 @@ contains
     integer :: lmax_1n=-1
     character(256) :: density_matrix_file = 'none'
     logical :: is_Op_out = .false.
-    logical :: is_MBPTscalar_full = .false.
+    logical :: is_MBPTscalar_full = .true.
     logical :: is_MBPTScalar = .true.
     logical :: is_MBPTEnergy = .true.
     logical :: is_NAT = .false.
     logical :: is_4th_order = .false.
+    logical :: EN_denominator =.false. ! Epstein-Nesbet denominator (Moller-Plesset is default)
     character(256) :: Op_file_format = "snt"
     ! atomic mode
     logical :: is_Atomic=.false.
@@ -113,7 +115,8 @@ contains
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
         & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
-        & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n
+        & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
+        & EN_denominator
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -165,6 +168,7 @@ contains
     this%beta_cm = beta_cm
     this%is_Atomic = is_Atomic
     this%is_4th_order = is_4th_order
+    this%EN_denominator = EN_denominator
 
     if(lmax == -1) this%lmax = emax
     if(lmax_1n == -1) this%lmax_1n = emax_1n
@@ -224,7 +228,12 @@ contains
       if( this%Ops(n) == 'none' .or. this%Ops(n) == '') cycle
       write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))
     end do
-    if(this%is_MBPTEnergy) write(iut,'(a)') "#  MBPT calc g.s. energy is done up to 3rd order"
+
+    if(this%is_MBPTEnergy) then
+      write(iut,'(a)') "#  MBPT calc g.s. energy is done up to 3rd order"
+      if(.not. this%EN_denominator) write(iut,'(a)') "#  Moller-Plesset (MP) denominator"
+      if(      this%EN_denominator) write(iut,'(a)') "#  Epstein-Nesbet (EN) denominator"
+    end if
     if(this%is_MBPTScalar) then
       write(iut,'(a)') "#  MBPT calc g.s. scalar is done up to 2nd order"
       if(this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is fully done up to 2nd order."

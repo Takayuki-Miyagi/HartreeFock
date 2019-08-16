@@ -310,7 +310,7 @@ end module Profiler
 !  call timer%init()
 !  allocate(a(10000000))
 !  a = 0.d0
-!  call timer%cmemory(.true.,'a is allocated : ')
+!  call timer%cmemory('a is allocated : ')
 !  ti = omp_get_wtime()
 !  allocate(b(100000000))
 !  call timer%add("Allocation ", omp_get_wtime() - ti)
