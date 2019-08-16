@@ -68,10 +68,11 @@ module ThreeBodyNO2BInteraction
   end type ThreeBodyNO2BSpace
 
   type :: ThreeBodyNO2BForceChannel
+    integer(8) :: nelms=0
 #ifdef single_precision_three_body_file
-    real(4), allocatable :: v(:,:)
+    real(4), allocatable :: v(:)
 #else
-    real(8), allocatable :: v(:,:)
+    real(8), allocatable :: v(:)
 #endif
   end type ThreeBodyNO2BForceChannel
 
@@ -88,6 +89,7 @@ module ThreeBodyNO2BInteraction
     procedure :: FinThreeBodyNO2BForce
     procedure :: GetThBMENO2B_isospin
     procedure :: GetThBMENO2B_pn
+    procedure :: SetThBMENO2B
 
     generic :: init => InitThreeBodyNO2BForce
     generic :: fin => FinThreeBodyNO2BForce
@@ -434,11 +436,15 @@ contains
 
     do ch = 1, this%thr%NChan
       n_state = this%thr%chan(ch)%n_state
-      allocate(this%MatCh(ch)%v(n_state,n_state))
+      this%MatCh(ch)%nelms = &
+          & int(n_state, kind(this%MatCh(ch)%nelms)) * &
+          & int(n_state+1, kind(this%MatCh(ch)%nelms)) / &
+          int(2, kind(this%MatCh(ch)%nelms))
+      allocate(this%MatCh(ch)%v(this%MatCh(ch)%nelms))
 #ifdef single_precision_three_body_file
-      this%MatCh(ch)%v(:,:) = 0.0
+      this%MatCh(ch)%v(:) = 0.0
 #else
-      this%MatCh(ch)%v(:,:) = 0.d0
+      this%MatCh(ch)%v(:) = 0.d0
 #endif
     end do
 
@@ -539,6 +545,7 @@ contains
     integer :: ch, bra, ket, ch_t, ch_no2b, iphase
     integer :: ch12, ch3
     integer :: P123, P456
+    integer(8) :: pos, i_max, i_min
     real(8) :: r
 
     r = 0.d0
@@ -573,8 +580,64 @@ contains
     iphase = this%thr%chan(ch)%iphase(i1,i2,o3%n,t12) * &
         &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
     if(bra * ket == 0) return
-    r = dble(this%MatCh(ch)%v(bra,ket)) * dble(iphase)
+    i_max = max(int(bra, kind(pos)), int(ket, kind(pos)))
+    i_min = min(int(bra, kind(pos)), int(ket, kind(pos)))
+    pos = i_max * (i_max-1) / 2 + i_min
+    r = dble(this%MatCh(ch)%v(pos)) * dble(iphase)
   end function GetThBMENO2B_Isospin
+
+  subroutine SetThBMENO2B(this,i1,i2,i3,T12,i4,i5,i6,T45,J,T,me)
+    class(ThreeBodyNO2BForce), intent(inout) :: this
+    integer, intent(in) :: i1,i2,i3,i4,i5,i6
+    integer, intent(in) :: T12,T45,T,J
+#ifdef single_precision_three_body_file
+    real(4), intent(in) :: me
+#else
+    real(8), intent(in) :: me
+#endif
+    type(OrbitsIsospin), pointer :: isps
+    type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
+    integer :: ch, bra, ket, ch_t, ch_no2b, iphase
+    integer :: ch12, ch3
+    integer :: P123, P456
+    integer(8) :: pos, i_max, i_min
+
+    isps => this%isps
+    o1 => isps%GetOrbit(i1)
+    o2 => isps%GetOrbit(i2)
+    o3 => isps%GetOrbit(i3)
+    o4 => isps%GetOrbit(i4)
+    o5 => isps%GetOrbit(i5)
+    o6 => isps%GetOrbit(i6)
+    if(o3%j /= o6%j) return
+    if(o3%l /= o6%l) return
+
+    P123 = (-1) ** (o1%l+o2%l+o3%l)
+    P456 = (-1) ** (o4%l+o5%l+o6%l)
+    if(P123 * P456 /= 1) then
+      write(*,*) 'Warning: in GetThBMEIso_scalar: P'
+      return
+    end if
+
+    ch12 = this%thr%two%jp2ch(J, (-1)**(o1%l+o2%l))
+    ch3 = this%thr%one%jp2ch(o3%j, (-1)**o3%l)
+
+    ch_t = this%thr%t2ch(T)
+    ch_no2b = this%thr%no2b2ch(ch12,ch3)
+    if(ch_t * ch_no2b == 0) return
+    ch = this%thr%tno2b2ch(ch_t,ch_no2b)
+    if(ch == 0) return
+
+    bra = this%thr%chan(ch)%abnctab2n(i1,i2,o3%n,t12)
+    ket = this%thr%chan(ch)%abnctab2n(i4,i5,o6%n,t45)
+    iphase = this%thr%chan(ch)%iphase(i1,i2,o3%n,t12) * &
+        &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
+    if(bra * ket == 0) return
+    i_max = max(int(bra, kind(pos)), int(ket, kind(pos)))
+    i_min = min(int(bra, kind(pos)), int(ket, kind(pos)))
+    pos = i_max * (i_max-1) / 2 + i_min
+    this%MatCh(ch)%v(pos) = real(iphase, kind(me)) * me
+  end subroutine SetThBMENO2B
 
   !
   !
@@ -705,31 +768,27 @@ contains
     class(Read3BodyNO2B), intent(in) :: this
     type(ThreeBodyNO2BForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_file
-    real(4), allocatable :: v(:)
-#else
-    real(8), allocatable :: v(:)
-#endif
-    integer(8) :: nelm, n
-    integer :: runit = 22, io
+    integer(8) :: nelm
 
     write(*,'(a)') "Reading three-body scalar from stream i/o format binary file"
 
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
-    allocate(v(nelm))
-    open(runit, file=this%file_3n, action='read', iostat=io, &
-        & form='unformatted',access='stream')
-    if(io /= 0) then
-      write(*,'(2a)') "File opening error: ", trim(this%file_3n)
-      return
-    end if
-    read(runit) v
-    close(runit)
+    !allocate(v(nelm))
+    !open(runit, file=this%file_3n, action='read', iostat=io, &
+    !    & form='unformatted',access='stream')
+    !if(io /= 0) then
+    !  write(*,'(2a)') "File opening error: ", trim(this%file_3n)
+    !  return
+    !end if
+    !read(runit) v
+    !close(runit)
+    !call store_scalar_3bme(thr,v,spsf,this%e2max3,this%e3max3)
+    !deallocate(v)
 
-    call store_scalar_3bme(thr,v,spsf,this%e2max3,this%e3max3)
+    call store_scalar_3bme_from_binary_stream(thr,spsf,&
+        & this%e2max3,this%e3max3,this%file_3n,nelm)
 
-    deallocate(v)
     call spsf%fin()
   end subroutine read_scalar_me3j_binary_stream
 
@@ -769,42 +828,42 @@ contains
   end subroutine read_scalar_me3j_ascii
 
   subroutine read_scalar_me3j_gzip(this,thr)
-    use, intrinsic :: iso_c_binding
-    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
+    !use, intrinsic :: iso_c_binding
+    !use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     class(Read3BodyNO2B), intent(in) :: this
     type(ThreeBodyNO2BForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_file
-    real(4), allocatable :: v(:)
-#else
-    real(8), allocatable :: v(:)
-#endif
-    integer(8) :: nelm, n
-    character(256) :: header="", buffer=""
-    type(c_ptr) :: fp, err
+!#ifdef single_precision_three_body_file
+!    real(4), allocatable :: v(:)
+!#else
+!    real(8), allocatable :: v(:)
+!#endif
+    integer(8) :: nelm
+    !integer(8) :: n
+    !character(256) :: header="", buffer=""
+    !type(c_ptr) :: fp, err
 
     write(*,'(a)') "Reading three-body scalar line-by-line from gzip file"
 
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
-    allocate(v(nelm))
+    !allocate(v(nelm))
+    !fp = gzip_open(this%file_3n, "rt")
+    !err = gzip_readline(fp, header, len(header))
+    !do n = 1, nelm/10
+    !  err = gzip_readline(fp, buffer, len(buffer))
+    !  read(buffer,*) v((n-1)*10+1 : n*10)
+    !end do
+    !if(nelm - (nelm/10) * 10 > 0) then
+    !  err = gzip_readline(fp, buffer, len(buffer))
+    !  read(buffer,*) v((nelm/10)*10+1 : nelm)
+    !end if
+    !err = gzip_close(fp)
+    !call store_scalar_3bme(thr,v,spsf,this%e2max3,this%e3max3)
+    !deallocate(v)
+    call store_scalar_3bme_from_gzip(thr,spsf,&
+        & this%e2max3,this%e3max3,this%file_3n,nelm)
 
-    fp = gzip_open(this%file_3n, "rt")
-    err = gzip_readline(fp, header, len(header))
-    do n = 1, nelm/10
-      err = gzip_readline(fp, buffer, len(buffer))
-      read(buffer,*) v((n-1)*10+1 : n*10)
-    end do
-
-    if(nelm - (nelm/10) * 10 > 0) then
-      err = gzip_readline(fp, buffer, len(buffer))
-      read(buffer,*) v((nelm/10)*10+1 : nelm)
-    end if
-    err = gzip_close(fp)
-
-    call store_scalar_3bme(thr,v,spsf,this%e2max3,this%e3max3)
-
-    deallocate(v)
     call spsf%fin()
   end subroutine read_scalar_me3j_gzip
 
@@ -1004,21 +1063,7 @@ contains
                           cycle
                         end if
 
-                        ch12 = ms%two%jp2ch(J,(-1)**(l1+l2))
-                        ch3 = ms%one%jp2ch(j3,(-1)**l3)
-                        ch_t = ms%t2ch(T)
-                        ch_no2b = ms%no2b2ch(ch12,ch3)
-                        if(ch_t * ch_no2b == 0) cycle
-                        ch = ms%tno2b2ch(ch_t,ch_no2b)
-                        if(ch == 0) cycle
-
-                        bra = ms%chan(ch)%abnctab2n(i1,i2,n3,t12)
-                        ket = ms%chan(ch)%abnctab2n(i4,i5,n6,t45)
-                        iphase = ms%chan(ch)%iphase(i1,i2,n3,t12) * &
-                            &    ms%chan(ch)%iphase(i4,i5,n6,t45)
-                        if(bra * ket == 0) cycle
-                        thr%MatCh(ch)%v(bra,ket) = v(cnt) * real(iphase, kind(v))
-                        thr%MatCh(ch)%v(ket,bra) = v(cnt) * real(iphase, kind(v))
+                        call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
                       end do
                     end do
                   end do
@@ -1034,4 +1079,324 @@ contains
     end do
   end subroutine store_scalar_3bme
 
+  subroutine store_scalar_3bme_from_binary_stream(thr,spsf,e2max,e3max,filename,nelms)
+    type(ThreeBodyNO2BForce), intent(inout), target :: thr
+    type(OrbitsIsospin), intent(in) :: spsf
+    integer, intent(in) :: e2max, e3max
+    character(*), intent(in) :: filename
+    integer(8), intent(in) :: nelms
+#ifdef single_precision_three_body_file
+    real(4), allocatable :: v(:)
+#else
+    real(8), allocatable :: v(:)
+#endif
+    type(ThreeBodyNO2BSpace), pointer :: ms
+    type(OrbitsIsospin), pointer :: sps
+    integer(8) :: cnt, total_cnt
+    integer :: i1, n1, l1, j1, e1, ch12
+    integer :: i2, n2, l2, j2, e2
+    integer :: i3, n3, l3, j3, e3, ch3
+    integer :: i4, n4, l4, j4, e4
+    integer :: i5, n5, l5, j5, e5
+    integer :: i6, n6, l6, j6, e6
+    integer :: T12, T45, T, P123, P456, J
+    integer :: ch, ch_t, ch_no2b, bra, ket, iphase
+    integer :: buffer_size=100000000
+    integer :: io, runit=22
+
+    allocate(v(buffer_size))
+    open(runit, file=filename, action='read', iostat=io, &
+        & form='unformatted',access='stream')
+    if(io /= 0) then
+      write(*,'(2a)') "File opening error: ", trim(filename)
+      return
+    end if
+
+    ms => thr%thr
+    sps => ms%sps
+    cnt = 0
+    total_cnt = 0
+    do i1 = 1, spsf%norbs
+      n1 = spsf%orb(i1)%n
+      l1 = spsf%orb(i1)%l
+      j1 = spsf%orb(i1)%j
+      e1 = spsf%orb(i1)%e
+      do i2 = 1, i1
+        n2 = spsf%orb(i2)%n
+        l2 = spsf%orb(i2)%l
+        j2 = spsf%orb(i2)%j
+        e2 = spsf%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, spsf%norbs
+          n3 = spsf%orb(i3)%n
+          l3 = spsf%orb(i3)%l
+          j3 = spsf%orb(i3)%j
+          e3 = spsf%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+
+          P123 = (-1) ** (l1+l2+l3)
+          do i4 = 1, spsf%norbs
+            n4 = spsf%orb(i4)%n
+            l4 = spsf%orb(i4)%l
+            j4 = spsf%orb(i4)%j
+            e4 = spsf%orb(i4)%e
+
+            do i5 = 1, i4
+              n5 = spsf%orb(i5)%n
+              l5 = spsf%orb(i5)%l
+              j5 = spsf%orb(i5)%j
+              e5 = spsf%orb(i5)%e
+              if(e4 + e5 > e2max) cycle
+
+              do i6 = 1, spsf%norbs
+                n6 = spsf%orb(i6)%n
+                l6 = spsf%orb(i6)%l
+                j6 = spsf%orb(i6)%j
+                e6 = spsf%orb(i6)%e
+                if(j3 /= j6) cycle
+                if(l3 /= l6) cycle
+                if(e4 + e6 > e2max) cycle
+                if(e5 + e6 > e2max) cycle
+                if(e4 + e5 + e6 > e3max) cycle
+
+                P456 = (-1) ** (l4+l5+l6)
+
+                if(P123 /= P456) cycle
+
+                do J = max(abs(j1-j2), abs(j4-j5))/2, min((j1+j2), (j4+j5))/2
+                  do T12 = 0, 1
+                    do T45 = 0, 1
+                      do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                            &min(   (2*T12+1),   (2*T45+1)), 2
+                        if(cnt==0) then
+                          v(:) = 0.d0
+                          if(nelms - total_cnt >= buffer_size) then
+                            read(runit) v(:)
+                          else
+                            read(runit) v(:nelms-total_cnt)
+                          end if
+                        end if
+                        cnt = cnt + 1
+                        total_cnt = total_cnt + 1
+
+                        if(e1 > ms%emax) cycle
+                        if(e2 > ms%emax) cycle
+                        if(e3 > ms%emax) cycle
+
+                        if(e4 > ms%emax) cycle
+                        if(e5 > ms%emax) cycle
+                        if(e6 > ms%emax) cycle
+
+                        if(e1 + e2 > ms%e2max) cycle
+                        if(e2 + e3 > ms%e2max) cycle
+                        if(e3 + e1 > ms%e2max) cycle
+
+                        if(e4 + e5 > ms%e2max) cycle
+                        if(e5 + e6 > ms%e2max) cycle
+                        if(e6 + e4 > ms%e2max) cycle
+
+                        if(e1 + e2 + e3 > ms%e3max) cycle
+                        if(e4 + e5 + e6 > ms%e3max) cycle
+
+                        if(i1==i2 .and. mod(J+T12,2)==0) then
+                          if(abs(v(cnt)) > 1.d-6) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
+                          end if
+                          cycle
+                        end if
+
+                        if(i4==i5 .and. mod(J+T45,2)==0) then
+                          if(abs(v(cnt)) > 1.d-6) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
+                          end if
+                          cycle
+                        end if
+
+                        call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
+                        if(cnt==buffer_size) cnt=0
+                      end do
+                    end do
+                  end do
+                end do
+
+
+              end do
+            end do
+          end do
+
+        end do
+      end do
+    end do
+    close(runit)
+    deallocate(v)
+  end subroutine store_scalar_3bme_from_binary_stream
+
+  subroutine store_scalar_3bme_from_gzip(thr,spsf,e2max,e3max,filename,nelms)
+    use, intrinsic :: iso_c_binding
+    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
+    type(ThreeBodyNO2BForce), intent(inout), target :: thr
+    type(OrbitsIsospin), intent(in) :: spsf
+    integer, intent(in) :: e2max, e3max
+    character(*), intent(in) :: filename
+    integer(8), intent(in) :: nelms
+#ifdef single_precision_three_body_file
+    real(4), allocatable :: v(:)
+#else
+    real(8), allocatable :: v(:)
+#endif
+    type(ThreeBodyNO2BSpace), pointer :: ms
+    type(OrbitsIsospin), pointer :: sps
+    integer(8) :: cnt, total_cnt
+    integer :: i1, n1, l1, j1, e1, ch12
+    integer :: i2, n2, l2, j2, e2
+    integer :: i3, n3, l3, j3, e3, ch3
+    integer :: i4, n4, l4, j4, e4
+    integer :: i5, n5, l5, j5, e5
+    integer :: i6, n6, l6, j6, e6
+    integer :: T12, T45, T, P123, P456, J
+    integer :: ch, ch_t, ch_no2b, bra, ket, iphase
+    integer :: buffer_size=100000000, n
+    character(256) :: header="", buffer=""
+    type(c_ptr) :: fp, err
+
+    allocate(v(buffer_size))
+    fp = gzip_open(filename, "rt")
+    err = gzip_readline(fp, header, len(header))
+
+    ms => thr%thr
+    sps => ms%sps
+    cnt = 0
+    total_cnt = 0
+    do i1 = 1, spsf%norbs
+      n1 = spsf%orb(i1)%n
+      l1 = spsf%orb(i1)%l
+      j1 = spsf%orb(i1)%j
+      e1 = spsf%orb(i1)%e
+      do i2 = 1, i1
+        n2 = spsf%orb(i2)%n
+        l2 = spsf%orb(i2)%l
+        j2 = spsf%orb(i2)%j
+        e2 = spsf%orb(i2)%e
+        if(e1 + e2 > e2max) cycle
+        do i3 = 1, spsf%norbs
+          n3 = spsf%orb(i3)%n
+          l3 = spsf%orb(i3)%l
+          j3 = spsf%orb(i3)%j
+          e3 = spsf%orb(i3)%e
+          if(e1 + e3 > e2max) cycle
+          if(e2 + e3 > e2max) cycle
+          if(e1 + e2 + e3 > e3max) cycle
+
+          P123 = (-1) ** (l1+l2+l3)
+          do i4 = 1, spsf%norbs
+            n4 = spsf%orb(i4)%n
+            l4 = spsf%orb(i4)%l
+            j4 = spsf%orb(i4)%j
+            e4 = spsf%orb(i4)%e
+
+            do i5 = 1, i4
+              n5 = spsf%orb(i5)%n
+              l5 = spsf%orb(i5)%l
+              j5 = spsf%orb(i5)%j
+              e5 = spsf%orb(i5)%e
+              if(e4 + e5 > e2max) cycle
+
+              do i6 = 1, spsf%norbs
+                n6 = spsf%orb(i6)%n
+                l6 = spsf%orb(i6)%l
+                j6 = spsf%orb(i6)%j
+                e6 = spsf%orb(i6)%e
+                if(j3 /= j6) cycle
+                if(l3 /= l6) cycle
+                if(e4 + e6 > e2max) cycle
+                if(e5 + e6 > e2max) cycle
+                if(e4 + e5 + e6 > e3max) cycle
+
+                P456 = (-1) ** (l4+l5+l6)
+
+                if(P123 /= P456) cycle
+
+                do J = max(abs(j1-j2), abs(j4-j5))/2, min((j1+j2), (j4+j5))/2
+                  do T12 = 0, 1
+                    do T45 = 0, 1
+                      do T = max(abs(2*T12-1),abs(2*T45-1)),&
+                            &min(   (2*T12+1),   (2*T45+1)), 2
+                        if(cnt==0) then
+                          v(:) = 0.d0
+                          if(nelms - total_cnt >= buffer_size) then
+                            do n = 1, buffer_size/10
+                              err = gzip_readline(fp, buffer, len(buffer))
+                              read(buffer,*) v((n-1)*10+1 : n*10)
+                            end do
+                          else
+                            do n = 1, (nelms-total_cnt)/10
+                              err = gzip_readline(fp, buffer, len(buffer))
+                              read(buffer,*) v((n-1)*10+1 : n*10)
+                            end do
+                            if(nelms-total_cnt - ((nelms-total_cnt)/10)*10 > 0) then
+                              read(buffer,*) v(((nelms-total_cnt)/10)*10+1 : nelms)
+                            end if
+                          end if
+
+                        end if
+                        cnt = cnt + 1
+                        total_cnt = total_cnt + 1
+
+                        if(e1 > ms%emax) cycle
+                        if(e2 > ms%emax) cycle
+                        if(e3 > ms%emax) cycle
+
+                        if(e4 > ms%emax) cycle
+                        if(e5 > ms%emax) cycle
+                        if(e6 > ms%emax) cycle
+
+                        if(e1 + e2 > ms%e2max) cycle
+                        if(e2 + e3 > ms%e2max) cycle
+                        if(e3 + e1 > ms%e2max) cycle
+
+                        if(e4 + e5 > ms%e2max) cycle
+                        if(e5 + e6 > ms%e2max) cycle
+                        if(e6 + e4 > ms%e2max) cycle
+
+                        if(e1 + e2 + e3 > ms%e3max) cycle
+                        if(e4 + e5 + e6 > ms%e3max) cycle
+
+                        if(i1==i2 .and. mod(J+T12,2)==0) then
+                          if(abs(v(cnt)) > 1.d-6) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
+                          end if
+                          cycle
+                        end if
+
+                        if(i4==i5 .and. mod(J+T45,2)==0) then
+                          if(abs(v(cnt)) > 1.d-6) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
+                          end if
+                          cycle
+                        end if
+
+                        call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
+                        if(cnt==buffer_size) cnt=0
+                      end do
+                    end do
+                  end do
+                end do
+
+
+              end do
+            end do
+          end do
+
+        end do
+      end do
+    end do
+    deallocate(v)
+    err = gzip_close(fp)
+  end subroutine store_scalar_3bme_from_gzip
 end module ThreeBodyNO2BInteraction

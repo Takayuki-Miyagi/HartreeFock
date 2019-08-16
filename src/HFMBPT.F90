@@ -899,7 +899,7 @@ contains
     do ch = 1,ms%cc_two%NChan
       ch_cc => ms%cc_two%jpz(ch)
       J2 = ch_cc%j
-      m1 = h%two%get_xc_pphh2phph(ch_cc, h%one)
+      m1 = get_xc_pphh_to_phph(h%two, ch_cc, h)
       m2 = h%two%get_xc_hphp2phph(ch_cc)
       m3 = m2 * m1%t()
     end do
