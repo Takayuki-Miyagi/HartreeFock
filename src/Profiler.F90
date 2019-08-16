@@ -15,7 +15,7 @@ module Profiler
     real(8) :: max_memory = 0.d0
     character(2) :: memory_unit = 'MB'
     character(:), allocatable :: OS
-    character(9) :: tempfile = 'temp_prof'
+    character(128) :: tempfile = 'temp_prof'
   contains
     procedure :: init => InitProf
     procedure :: start => StartProf
@@ -36,9 +36,11 @@ contains
   subroutine InitProf(this, ut)
     class(prof), intent(inout) :: this
     character(*), intent(in), optional :: ut
-    character(512) :: os_str
-    integer :: io
+    character(512) :: os_str, c_num
+    integer :: io, getpid
 
+    write(c_num,'(i0)') getpid()
+    this%tempfile = "prof_" // trim(c_num)
     call execute_command_line( 'uname > ' // trim(this%tempfile) )
     open(999,file=this%tempfile,iostat=io)
     if(io /= 0) then

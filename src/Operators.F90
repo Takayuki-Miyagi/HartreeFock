@@ -252,6 +252,7 @@ contains
     type(Read3BodyMonopole) :: rd3_mon
     type(Read3BodyNO2B) :: rd3_no2b
     type(MSpace), pointer :: ms
+    real(8) :: ti
 
     if(file_nn == 'none' .and. file_3n == 'none') return
     ms => this%ms
@@ -322,11 +323,13 @@ contains
       call Tcm_one%init(ms%one, .true., 'Tcm', 0, 1, 0)
       call Tcm_two%init(ms%two, .true., 'Tcm', 0, 1, 0)
 
+      ti = omp_get_wtime()
       call Tcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
       call Tcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
 
       this%one = this%one - Tcm_one
       this%two = this%two - Tcm_two
+      call timer%add("Set Tcm operator",omp_get_wtime() - ti)
 
       if(ms%beta > 1.d-4) then
         call Hcm_one%init(ms%one, .true., 'Hcm', 0, 1, 0)
