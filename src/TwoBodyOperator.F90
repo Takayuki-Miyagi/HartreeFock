@@ -341,7 +341,7 @@ contains
     chket => this%ch_ket
 
     !$omp parallel
-    !$omp do private(bra,ia,ib,ket,ic,id) schedule(dynamic)
+    !$omp do private(bra,ia,ib,ket,ic,id)
     do bra = 1, chbra%n_state
       ia = chbra%n2spi1(bra)
       ib = chbra%n2spi2(bra)

@@ -1170,6 +1170,7 @@ contains
                     do T45 = 0, 1
                       do T = max(abs(2*T12-1),abs(2*T45-1)),&
                             &min(   (2*T12+1),   (2*T45+1)), 2
+                        if(cnt==buffer_size) cnt=0
                         if(cnt==0) then
                           v(:) = 0.d0
                           if(nelms - total_cnt >= buffer_size) then
@@ -1215,9 +1216,7 @@ contains
                           end if
                           cycle
                         end if
-
                         call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
-                        if(cnt==buffer_size) cnt=0
                       end do
                     end do
                   end do
@@ -1259,14 +1258,14 @@ contains
     integer :: i6, n6, l6, j6, e6
     integer :: T12, T45, T, P123, P456, J
     integer :: ch, ch_t, ch_no2b, bra, ket, iphase
-    integer :: buffer_size=100000000, n
+    integer :: buffer_size=100000000
+    integer :: n
     character(256) :: header="", buffer=""
     type(c_ptr) :: fp, err
 
     allocate(v(buffer_size))
     fp = gzip_open(filename, "rt")
     err = gzip_readline(fp, header, len(header))
-
     ms => thr%thr
     sps => ms%sps
     cnt = 0
@@ -1325,6 +1324,7 @@ contains
                     do T45 = 0, 1
                       do T = max(abs(2*T12-1),abs(2*T45-1)),&
                             &min(   (2*T12+1),   (2*T45+1)), 2
+                        if(cnt==buffer_size) cnt=0
                         if(cnt==0) then
                           v(:) = 0.d0
                           if(nelms - total_cnt >= buffer_size) then
@@ -1341,7 +1341,6 @@ contains
                               read(buffer,*) v(((nelms-total_cnt)/10)*10+1 : nelms)
                             end if
                           end if
-
                         end if
                         cnt = cnt + 1
                         total_cnt = total_cnt + 1
@@ -1380,9 +1379,7 @@ contains
                           end if
                           cycle
                         end if
-
                         call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
-                        if(cnt==buffer_size) cnt=0
                       end do
                     end do
                   end do

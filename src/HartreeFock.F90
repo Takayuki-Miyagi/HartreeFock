@@ -54,7 +54,6 @@ module HartreeFock
   ! density matrix mixing ratio
   ! (has to be 0.d0 < alpha <= 1.d0, alpha = 1.d0 means direct iteration)
   type :: HFSolver
-    logical :: is_three_body
     integer :: n_iter_max = 1000
     integer :: rank
     real(8) :: alpha = 1.d0
@@ -139,7 +138,6 @@ contains
       this%is_roothaan = .true.
       this%S = norm_kernel
     end if
-    this%is_three_body = hamil%ms%is_three_body_jt .or. hamil%ms%is_three_body
     this%rank = hamil%rank
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
     call this%Occ%init(ms%one, .true., 'Occ',     0, 1, 0)
@@ -157,7 +155,7 @@ contains
     call timer%countup_memory('Monople 2Body int.')
     call timer%Add("Construct Monopole 2Body int.", omp_get_wtime() - ti)
 
-    if(this%rank == 3 .and. this%is_three_body) then
+    if(this%rank == 3) then
       ti = omp_get_wtime()
       call timer%cmemory()
 
@@ -335,7 +333,7 @@ contains
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
-          if(H%rank/=3 .or. .not. H%ms%is_three_body_jt) cycle
+          if(H%rank==2 .or. .not. H%ms%is_three_body_jt) cycle
           do e = 1, sps%norbs
             je = sps%orb(e)%j
             le = sps%orb(e)%l
@@ -432,7 +430,7 @@ contains
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
-          if(H%rank/=3 .or. .not. H%ms%is_three_body_jt) cycle
+          if(H%rank==2) cycle
           do e = 1, sps%norbs
             je = sps%orb(e)%j
             le = sps%orb(e)%l
@@ -524,7 +522,7 @@ contains
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
 
           if(ket > bra) cycle
-          if(Opr%rank/=3 .or. .not. Opr%ms%is_three_body_jt) cycle
+          if(Opr%rank==2 .or. .not. Opr%ms%is_three_body_jt) cycle
           do e = 1, ms%sps%norbs
             je = ms%sps%orb(e)%j
             le = ms%sps%orb(e)%l
@@ -1052,7 +1050,7 @@ contains
           & this%rho%MatCh(ch2,ch2)%m(ii2,ii4) * this%V2%v(num)
     end do
 
-    if(this%rank == 3 .and. this%is_three_body) then
+    if(this%rank == 3) then
       do num = 1, this%V3%nidx
         idx = this%V3%idx(num)
         call GetSpLabels3(idx,i1,i2,i3,i4,i5,i6)

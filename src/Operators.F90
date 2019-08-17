@@ -132,13 +132,9 @@ contains
 
     select case(type_thbme)
     case("monopole", "mon", "Monopole", "Mon")
-      if(rank == 3) then
-        call this%thr21_mon%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
-      end if
+      if(rank == 3) call this%thr21_mon%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
     case("NO2B", "no2b")
-      if(rank == 3) then
-        call this%thr21_no2b%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
-      end if
+      if(rank == 3) call this%thr21_no2b%init(ms%sps, ms%isps, ms%e2max, ms%e3max)
     case("full", "FULL", "Full")
       if(rank == 3 .and. this%ms%is_three_body_jt) then
         call this%thr21%init(ms%thr21) ! Three-body interaction
@@ -287,7 +283,7 @@ contains
     end if
 
     ! NO2B case
-    if(this%rank == 3 .and. .not. this%thr21_no2b%zero) then
+    if(.not. this%thr21_no2b%zero) then
       ! -- boundary for three-body file
       call rd3_no2b%set(file_3n)
       call rd3_no2b%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)
@@ -303,7 +299,7 @@ contains
     end if
 
     ! Monopole case
-    if(this%rank == 3 .and. .not. this%thr21_mon%zero) then
+    if(.not. this%thr21_mon%zero) then
       ! -- boundary for three-body file
       call rd3_mon%set(file_3n)
       call rd3_mon%set(ms%emax, ms%e2max, ms%e3max, ms%lmax)

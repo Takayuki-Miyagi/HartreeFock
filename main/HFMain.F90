@@ -64,12 +64,20 @@ program HFMain
     if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, lmax=p%lmax, beta=p%beta_cm)
     rank = 2
   case default
-    if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
-        & hw=p%hw, emax=p%emax, e2max=p%e2max, e3max=p%e3max, lmax=p%lmax, &
-        & beta=p%beta_cm, is_three_body_jt=.true.)
-    if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, &
-        & e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm, is_three_body_jt=.true.)
-    rank = 3
+    if(p%type_3n_file=="full" .or. p%type_3n_file=="FULL") then
+      if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
+          & hw=p%hw, emax=p%emax, e2max=p%e2max, e3max=p%e3max, lmax=p%lmax, &
+          & beta=p%beta_cm, is_three_body_jt=.true.)
+      if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, emax=p%emax, e2max=p%e2max, &
+          & e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm, is_three_body_jt=.true.)
+      rank = 3
+    else
+      if(conffile == 'none') call ms%init(Nucl=p%Nucl, Core=p%Core, valence_orbits=p%valence_list, &
+          & hw=p%hw, emax=p%emax, e2max=p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
+      if(conffile /= 'none') call ms%init(filename=conffile, hw=p%hw, &
+          & emax=p%emax, e2max=p%e2max, e3max=p%e3max, lmax=p%lmax, beta=p%beta_cm)
+      rank = 3
+    end if
   end select
 
   call h%init('hamil',ms, rank, p%type_3n_file)
