@@ -2143,6 +2143,7 @@ contains
         this%Occ_HF%MatCh(ch,ch)%m(i,i) = sol%eig%v(m-i+1)
       end do
       !call this%rho_HF%MatCh(ch,ch)%DMat%prt("rho HF")
+      call this%Occ_HF%MatCh(ch,ch)%DMat%prt("Occupation number HF")
       if(iz == -1) Z = Z + sum(sol%eig%v) * dble(jj+1)
       if(iz ==  1) N = N + sum(sol%eig%v) * dble(jj+1)
       call sol%fin()
@@ -2156,6 +2157,7 @@ contains
         this%Occ_HO%MatCh(ch,ch)%m(i,i) = sol%eig%v(m-i+1)
       end do
       !call this%rho_HO%MatCh(ch,ch)%DMat%prt("rho HO")
+      !call this%Occ_HO%MatCh(ch,ch)%DMat%prt("Occupation number HO")
       !if(iz == -1) Z = Z + sum(sol%eig%v) * dble(jj+1)
       !if(iz ==  1) N = N + sum(sol%eig%v) * dble(jj+1)
       call sol%fin()
