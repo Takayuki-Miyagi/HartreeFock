@@ -91,6 +91,7 @@ program HFMain
 
   open(wunit, file = p%summary_file, action='write',status='replace')
   call p%PrintInputParameters(wunit)
+  call HF%PrintSPEs(ms,wunit)
 
   if(.not. p%is_MBPTEnergy) then
     write(wunit,'(a,6x,a)') "# Operator", "HF energy"

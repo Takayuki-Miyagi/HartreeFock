@@ -1091,11 +1091,16 @@ contains
 
   end subroutine UpdateFockMatrix
 
-  subroutine PrintSPEs(this,ms)
+  subroutine PrintSPEs(this,ms,iunit)
     class(HFSolver), intent(in) :: this
     type(MSpace), intent(in) :: ms
-    integer :: i, io, ch
+    integer, intent(in) :: iunit
+    integer :: e, g, j, l, n, iop, ion
+    integer :: i, io, ch, z
     type(OneBodyPart) :: F_HF
+    type(SingleParticleOrbit), pointer :: op, on
+    character(40) :: char_spe, sp_label, ph_proton, ph_neutron
+    character(256) :: line
 
     F_HF = this%F
     do ch = 1, ms%one%NChan
@@ -1103,19 +1108,45 @@ contains
           &  this%F%MatCh(ch,ch)%DMat * this%C%MatCh(ch,ch)%DMat
     end do
 
-    write(*,'(a)') "  Hartree-Fock single-particle energies"
+    write(iunit,'(a)') "#  Hartree-Fock single-particle energies (spe)"
+    write(iunit,'(a)') "#    Orbit:                 proton spe               neutron spe"
 
-    do i = 1, size(ms%holes)
-      io = ms%holes(i)
-      write(*,'(a,a10,i4,f12.6)') 'hole:     ', trim(ms%sps%GetLabelFromIndex(io)), io, &
-          & F_HF%GetOBME(io,io)
+    do e = 0, ms%sps%emax
+      do g = 2*e+1, -2*e+1, -4
+        j = abs(g)
+        if(g > 0) l = (j-1)/2
+        if(g < 0) l = (j+1)/2
+        n = (e-l)/2
+        if(l > ms%sps%lmax) cycle
+        iop = ms%sps%nljz2idx(n,l,j,-1)
+        ion = ms%sps%nljz2idx(n,l,j, 1)
+        op => ms%sps%GetOrbit(iop)
+        on => ms%sps%GetOrbit(ion)
+        sp_label = trim(ms%sps%GetLabelFromIndex(iop))
+        ph_proton = "hole"
+        if(op%ph == 1) ph_proton = "particle"
+        ph_neutron = "hole"
+        if(on%ph == 1) ph_neutron = "particle"
+        write(line,"(a,a8,a,a12,f14.6,a12,f14.6)") "# ", trim(sp_label(2:)), ": ", trim(ph_proton), F_HF%GetOBME(iop,iop), &
+            & trim(ph_neutron), F_HF%GetOBME(ion, ion)
+        write(iunit,"(a)") trim(line)
+      end do
     end do
 
-    do i = 1, size(ms%particles)
-      io = ms%particles(i)
-      write(*,'(a,a10,i4,f12.6)') 'particle: ', trim(ms%sps%GetLabelFromIndex(io)), io, &
-          & F_HF%GetOBME(io,io)
-    end do
+
+    !do i = 1, size(ms%holes)
+    !  io = ms%holes(i)
+    !  if(ms%sps%orb(io)%z /= 1) cycle
+    !  write(iunit,'(a,a10,i4,f12.6)') '# hole:     ', trim(ms%sps%GetLabelFromIndex(io)), io, &
+    !      & F_HF%GetOBME(io,io)
+    !end do
+
+    !do i = 1, size(ms%particles)
+    !  io = ms%particles(i)
+    !  if(ms%sps%orb(io)%z /= 1) cycle
+    !  write(iunit,'(a,a10,i4,f12.6)') '# particle: ', trim(ms%sps%GetLabelFromIndex(io)), io, &
+    !      & F_HF%GetOBME(io,io)
+    !end do
     call F_HF%fin()
   end subroutine PrintSPEs
 
