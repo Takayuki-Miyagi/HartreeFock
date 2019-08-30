@@ -22,6 +22,7 @@ module HartreeFock
   private :: BasisTransNO2BHamiltonian
   private :: BasisTransNO2BHamiltonianFromNO2B
   private :: BasisTransNO2BScalar
+  private :: BasisTransNO2BScalarFromNO2B
   private :: BasisTransNO2BTensor
   private :: BasisTransScalar
   private :: BasisTransTensor
@@ -90,6 +91,7 @@ module HartreeFock
     procedure :: BasisTransNO2BHamiltonian
     procedure :: BasisTransNO2BHamiltonianFromNO2B
     procedure :: BasisTransNO2BScalar
+    procedure :: BasisTransNO2BScalarFromNO2B
     procedure :: BasisTransNO2BTensor
     procedure :: BasisTransScalar
     procedure :: BasisTransTensor
@@ -251,7 +253,9 @@ contains
       end if
 
       if(Optr%Scalar) then
-        op = HF%BasisTransNO2BScalar(Optr)
+        if(Optr%rank < 3) op = HF%BasisTransNO2BScalar(Optr)
+        if(.not. Optr%thr21%zero) op = HF%BasisTransNO2BScalar(Optr)              ! w/ full three-body scalar
+        if(.not. Optr%thr21_no2b%zero) op = HF%BasisTransNO2BScalarFromNO2B(Optr) ! w/ no2b relevant three-body scalar
         op%is_normal_ordered = .true.
         return
       end if
@@ -582,6 +586,121 @@ contains
     call timer%Add("BasisTransNO2BScalar",omp_get_wtime() - ti)
 
   end function BasisTransNO2BScalar
+
+  function BasisTransNO2BScalarFromNO2B(HF,opr) result(op)
+    use Profiler, only: timer
+    class(HFSolver), intent(in) :: HF
+    type(Ops), intent(in) :: opr
+    type(Ops) :: op
+    type(MSpace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
+    type(Orbits), pointer :: sps
+    type(TwoBodyPart) :: o2from3
+    type(OneBodyPart) :: o1from3, o1from2
+    integer :: ch, J, n, bra, ket, a, b, c, d, e, f
+    integer :: ea, eb, ec, ed
+    integer :: je, le, ze, ee
+    integer :: jf, lf, zf, ef
+    real(8) :: ph, ti, o0from1, o0from2, o0from3
+    type(DMat) :: UT
+
+    ti = omp_get_wtime()
+    ms => opr%ms
+    sps => ms%sps
+    call op%init(0, 1, 0, opr%oprtr, ms, 2)
+    op%zero = opr%zero
+    do ch = 1, ms%one%NChan
+      op%one%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+          &  Opr%one%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
+    end do
+
+    call o2from3%init(ms%two, .true., Opr%oprtr, 0, 1, 0)
+    do ch = 1, ms%two%NChan
+      ch_two => ms%two%jpz(ch)
+      J = ch_two%j
+      n = ch_two%n_state
+      call UT%zeros(n,n)
+
+      !$omp parallel
+      !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
+      !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef)
+      do bra = 1, n
+        a = ch_two%n2spi1(bra)
+        b = ch_two%n2spi2(bra)
+        ea = sps%orb(a)%e
+        eb = sps%orb(b)%e
+        ph = (-1.d0)**((sps%orb(a)%j+sps%orb(b)%j)/2-J)
+        do ket = 1, n
+          c = ch_two%n2spi1(ket)
+          d = ch_two%n2spi2(ket)
+          ec = sps%orb(c)%e
+          ed = sps%orb(d)%e
+
+          UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
+          if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
+              & HF%C%GetOBME(a,d) * HF%C%GetOBME(b,c)
+          if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
+          if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
+
+          if(ket > bra) cycle
+          if(Opr%rank==2) cycle
+          do e = 1, sps%norbs
+            je = sps%orb(e)%j
+            le = sps%orb(e)%l
+            ze = sps%orb(e)%z
+            ee = sps%orb(e)%e
+            if(ea+eb+ee > ms%e3max) cycle
+            do f = 1, ms%sps%norbs
+              jf = sps%orb(f)%j
+              lf = sps%orb(f)%l
+              zf = sps%orb(f)%z
+              ef = sps%orb(f)%e
+              if(je /= jf) cycle
+              if(le /= lf) cycle
+              if(ze /= zf) cycle
+              if(ec+ed+ef > ms%e3max) cycle
+
+              o2from3%MatCh(ch,ch)%m(bra,ket) = &
+                  & o2from3%MatCh(ch,ch)%m(bra,ket) + &
+                  & HF%rho%GetOBME(e,f) * &
+                  & Opr%thr21_no2b%GetNO2BThBME(a,b,e,c,d,f,J)
+
+            end do
+          end do
+          o2from3%MatCh(ch,ch)%m(bra,ket) = &
+              & o2from3%MatCh(ch,ch)%m(bra,ket) / dble(2*J+1)
+          if(a==b) o2from3%MatCh(ch,ch)%m(bra,ket) = &
+              &    o2from3%MatCh(ch,ch)%m(bra,ket) / dsqrt(2.d0)
+          if(c==d) o2from3%MatCh(ch,ch)%m(bra,ket) = &
+              &    o2from3%MatCh(ch,ch)%m(bra,ket) / dsqrt(2.d0)
+          o2from3%MatCh(ch,ch)%m(ket,bra) = &
+              & o2from3%MatCh(ch,ch)%m(bra,ket)
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      Op%two%MatCh(ch,ch)%DMat = &
+          & UT%T() * Opr%two%MatCh(ch,ch)%DMat * UT
+      if(Opr%rank/=3 .or. .not. Opr%ms%is_three_body_jt) o2from3%MatCh(ch,ch)%DMat = &
+          & UT%T() * o2from3%MatCh(ch,ch)%DMat * UT
+      call UT%fin()
+    end do
+    o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
+    o1from2 = Op%two%NormalOrderingFrom2To1(ms%one)
+
+    o0from3 = o1from3%NormalOrderingFrom1To0()
+    o0from2 = o1from2%NormalOrderingFrom1To0()
+    o0from1 = Op%one%NormalOrderingFrom1To0()
+
+    Op%zero = Op%zero + o0from1 + o0from2 * 0.5d0 + o0from3 / 6.d0
+    Op%one = Op%one + o1from2 + o1from3 * 0.5d0
+    Op%two = Op%two + o2from3
+    call o2from3%fin()
+    call o1from3%fin()
+    call o1from2%fin()
+    call timer%Add("BasisTransNO2BScalarFromNO2B",omp_get_wtime() - ti)
+
+  end function BasisTransNO2BScalarFromNO2B
 
   function BasisTransNO2BTensor(HF,Opr) result(op)
     use Profiler, only: timer

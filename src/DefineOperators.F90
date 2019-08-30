@@ -1,18 +1,45 @@
 module DefineOperators
+  use ClassSys, only: sys
   implicit none
 contains
   subroutine GetOperatorRank(optr, jr, pr, zr)
     character(*), intent(in) :: optr
     integer, intent(out) :: jr, pr, zr
+    character(256), allocatable :: splt(:)
+    character(:), allocatable :: str
+    type(sys) :: s
 
     jr = 0
     pr = 0
     zr = 0
 
+    if(s%find(optr, "file_")) then
+      call s%split(optr, "file_", splt)
+      str = splt(2)
+      call s%split(str, "+", splt)
+      if(size(splt) > 1) then
+        read(splt(1),*) jr
+        pr = 1
+        read(splt(2),*) zr
+        return
+      end if
+
+      call s%split(str, "-", splt)
+      if(size(splt) > 1) then
+        read(splt(1),*) jr
+        pr = -1
+        read(splt(2),*) zr
+        return
+      end if
+
+      write(*,"(2a)") "operator from file: ", trim(optr)
+    end if
+
     select case(optr)
     case('hamil', 'Hamil', "HOHamil", "Hohamil", 'hohamil' ,&
           & 'Hcm','HCM','RM2', 'Rm2', "rm2", &
-          & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2',"DenMat")
+          & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2',"DenMat",&
+          & "Tkin", "tkin")
       jr = 0
       pr = 1
       zr = 0
@@ -21,7 +48,7 @@ contains
     end select
   end subroutine GetOperatorRank
 
-  function one_body_element(optr, ia, ib, hw, A, Z, N) result(r)
+  recursive function one_body_element(optr, ia, ib, hw, A, Z, N) result(r)
     use MyLibrary, only: hc, amp, amn
     real(8) :: r
     character(*), intent(in) :: optr
@@ -52,6 +79,11 @@ contains
       if(na == nb + 1) r = dsqrt(dble(na) * (dble(na+la)+0.5d0))
       if(na == nb - 1) r = dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
       r = r * 0.5d0 * hw
+      return
+
+    case("Tkin", "tkin")
+      r = one_body_element("kinetic", ia, ib, hw, A, Z, N) - &
+          & one_body_element("tcm", ia, ib, hw, A, Z, N)
       return
 
     case("Tcm", "tcm")
@@ -128,7 +160,7 @@ contains
     end select
   end function one_body_element
 
-  function two_body_element(optr, ia, ib, ic, id, Jab, Jcd, hw, A, Z, N) result(r)
+  recursive function two_body_element(optr, ia, ib, ic, id, Jab, Jcd, hw, A, Z, N) result(r)
     use MyLibrary, only: hc, amp, amn
     real(8) :: r
     character(*), intent(in) :: optr
@@ -153,6 +185,10 @@ contains
         return
       end if
       r = p_dot_p(ia,ib,ic,id,Jab) * hw / dble(A)
+      return
+
+    case("Tkin", "tkin")
+      r = - two_body_element("tcm", ia, ib, ic, id, Jab, Jcd, hw, A, Z, N)
       return
 
     case("Hcm","HCM")

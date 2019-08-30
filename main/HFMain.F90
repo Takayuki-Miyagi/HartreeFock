@@ -1,5 +1,6 @@
 program HFMain
   use omp_lib
+  use ClassSys, only: sys
   use Profiler, only: timer
   use HFInput
   use ModelSpace
@@ -18,6 +19,7 @@ program HFMain
   type(MBPTScalar) :: PTs
   type(MBPTDMat) :: PTd
   type(WriteFiles) :: w
+  type(sys) :: s
   character(256) :: inputfile='none', conffile='none'
   integer :: n, istatus, wunit=23
   integer :: rank
@@ -107,9 +109,9 @@ program HFMain
     if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0 .or. PT%energy_gap < 0.d0) then
       write(wunit,'(a)') "# MBPT might be dengerous! "
     end if
-    write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
-        & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
-    write(wunit,'(a,4f18.8)') 'hamil: ', PT%e_0, PT%e_2, PT%e_3, &
+    write(wunit,'(a,11x,a,6x,a,9x,a,9x,a,13x,a)') &
+        & "#", "Operator", "HF energy", "2nd order", "3rd order", "Total"
+    write(wunit,'(a20,4f18.8)') 'hamil', PT%e_0, PT%e_2, PT%e_3, &
         & PT%e_0+PT%e_2+PT%e_3
   end if
   close(wunit)
@@ -151,14 +153,14 @@ program HFMain
 
   if(p%Ops(1) /= 'none' .and. p%Ops(1) /= '') then
     open(wunit, file = p%summary_file, action='write',status='old',position='append')
-    write(wunit,'(a,1x,a,9x,a,9x,a,13x,a)') &
-        & "# Operator", "HF exp. val.", "1st order", "2nd order", "Total"
+    write(wunit,'(a,11x,a,3x,a,9x,a,9x,a,13x,a)') &
+        & "#", "Operator", "HF exp. val.", "1st order", "2nd order", "Total"
     close(wunit)
   end if
 
   ! -- bare Ops --
   do n = 1, size(p%Ops)
-    if(p%Ops(n) == 'none' .or. p%Ops(n) == "") cycle
+    if(p%Ops(n) == 'none' .or. p%Ops(n) == "" .or. s%find(p%Ops(n), "_file")) cycle
     write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
     call opr%init(p%Ops(n),ms,2)
     call opr%set()
@@ -167,7 +169,7 @@ program HFMain
       call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF> "
-      write(wunit,'(2a,4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      write(wunit,'(a20, 4f18.8)') trim(p%Ops(n)), PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
       close(wunit)
     end if
     if(p%is_Op_out) then
@@ -190,7 +192,7 @@ program HFMain
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
-      write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      write(wunit,'(a20, 4f18.8)') trim(p%Ops(n)), PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
       close(wunit)
     end if
     if(p%is_Op_out) then
@@ -205,7 +207,7 @@ program HFMain
     if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n)), &
         & " and ", trim(p%files_3n(n))
-    call opr%init(p%Ops(n),ms, 3)
+    call opr%init(p%Ops(n),ms, 3, p%type_3n_file)
     call opr%set(p%files_nn(n), p%files_3n(n), &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
@@ -217,7 +219,7 @@ program HFMain
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
       !write(wunit,'(2a)') "# 3B file is ", trim(p%files_3n(n))
       !write(wunit,'(4f18.8)') PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
-      write(wunit,'(2a, 4f18.8)') trim(p%Ops(n)), ": ", PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
+      write(wunit,'(a20, 4f18.8)') trim(p%Ops(n)), PTs%s_0, PTs%s_1, PTs%s_2, PTs%s_0+PTs%s_1+PTs%s_2
       close(wunit)
     end if
     if(p%is_Op_out) then

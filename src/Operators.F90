@@ -1,5 +1,6 @@
 module Operators
   use omp_lib
+  use ClassSys, only: sys
   use ModelSpace
   use OneBodyOperator
   use TwoBodyOperator
@@ -248,6 +249,7 @@ contains
     type(Read3BodyMonopole) :: rd3_mon
     type(Read3BodyNO2B) :: rd3_no2b
     type(MSpace), pointer :: ms
+    type(sys) :: s
     real(8) :: ti
 
     if(file_nn == 'none' .and. file_3n == 'none') return
@@ -260,8 +262,9 @@ contains
       call rd2%set(bound_2b_file(1), bound_2b_file(2), bound_2b_file(3))
     end if
 
-
-    call this%one%set(ms%hw, ms%A, ms%Z, ms%N)
+    if(.not.s%find(this%oprtr,"file_")) then
+      call this%one%set(ms%hw, ms%A, ms%Z, ms%N)
+    end if
     write(*,'(2a)') "2B file: ", trim(file_nn)
     call rd2%ReadTwoBodyFile(this%two)
 
