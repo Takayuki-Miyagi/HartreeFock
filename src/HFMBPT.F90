@@ -111,6 +111,7 @@ module HFMBPT
   end type MBPTDMat
 
   type :: MBPTScalar
+    logical :: part_of_hamil = .false.
     real(8) :: s_0 = 0.d0
     real(8) :: s_1 = 0.d0
     real(8) :: s_2 = 0.d0
@@ -1183,11 +1184,12 @@ contains
     this%perturbativity2b = max_denom2b
   end subroutine MBPTCriteria
 
-  subroutine CalcScalarCorr(this,hamil,opr,is_MBPT_full,EN_denominator_in)
+  subroutine CalcScalarCorr(this,hamil,opr,is_MBPT_full,EN_denominator_in,part_of_hamil)
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: hamil, opr
     logical, intent(in) :: is_MBPT_full
     logical, intent(in), optional :: EN_denominator_in
+    logical, intent(in), optional :: part_of_hamil
     type(MSpace), pointer :: ms
     integer :: jmax
     write(*,*)
@@ -1195,6 +1197,7 @@ contains
     write(*,*)
 
     if(present(EN_denominator_in)) EN_denominator = EN_denominator_in
+    if(present(part_of_hamil)) this%part_of_hamil = part_of_hamil
     if(.not. hamil%is_normal_ordered) then
       write(*,"(a)") "In CalcScalarCorr: "
       write(*,"(a)") " Hamiltonian has to be normal ordered"
@@ -1206,8 +1209,10 @@ contains
       write(*,"(a)") " Operator has to be normal ordered"
       return
     end if
+
     if(.not. EN_denominator) write(*,"(a)") "# Moller-Plesset (MP) denominator"
     if(EN_denominator)       write(*,"(a)") "# Epstein-Nesbet (EN) denominator"
+    if(this%part_of_hamil) write(*,"(a)") "# Calculating as a part of Hamiltonian"
 
     jmax = 2*hamil%ms%sps%lmax+1
     call sixjs%init(1,jmax,.true., 1,jmax,.true., 1,jmax,.true.)
@@ -1216,10 +1221,11 @@ contains
     this%s_0 = opr%zero
     if(is_MBPT_full) then
       this%s_1 = scalar_first(hamil,opr)
+      if(this%part_of_hamil) this%s_1 = 0.5d0 * this%s_1
       write(*,'(a,f16.8)') "First order correction: ", this%s_1
     end if
 
-    call this%scalar_second(hamil,opr,is_MBPT_full)
+    call this%scalar_second(hamil,opr,is_MBPT_full,this%part_of_hamil)
     write(*,'(a)') "# Second order corrections: "
     write(*,'(a,f16.8)') "# s1 p ladder  = ", this%s_2_s1p
     write(*,'(a,f16.8)') "# s1 h ladder  = ", this%s_2_s1h
@@ -1236,6 +1242,7 @@ contains
 
     call sixjs%fin()
     EN_denominator=.false.
+    this%part_of_hamil=.false.
   end subroutine CalcScalarCorr
 
   function scalar_first(h,s) result(r)
@@ -1291,20 +1298,27 @@ contains
     call timer%Add("First order MBPT for Scalar",omp_get_wtime()-ti)
   end function scalar_first
 
-  subroutine scalar_second(this,h,s, is_MBPT_full)
+  subroutine scalar_second(this,h,s, is_MBPT_full, part_of_hamil)
     class(MBPTScalar), intent(inout) :: this
     type(Ops), intent(in) :: h, s
     logical, intent(in) :: is_MBPT_full
-    this%s_2_s1p = scalar_second_s1p( h,s)
-    this%s_2_s1h = scalar_second_s1h( h,s)
-    this%s_2_s1ph= scalar_second_s1ph(h,s)
+    logical, intent(in) :: part_of_hamil
+
+    if(.not. part_of_hamil) then
+      this%s_2_s1p = scalar_second_s1p( h,s)
+      this%s_2_s1h = scalar_second_s1h( h,s)
+      this%s_2_s1ph= scalar_second_s1ph(h,s)
+    end if
+
     if(is_MBPT_full) then
       this%s_2_s2pp = scalar_second_s2pp(h,s)
       this%s_2_s2hh = scalar_second_s2hh(h,s)
       this%s_2_s2ph = scalar_second_s2ph(h,s)
-      this%s_2_v2pp = scalar_second_v2pp(h,s)
-      this%s_2_v2hh = scalar_second_v2hh(h,s)
-      this%s_2_v2ph = scalar_second_v2ph(h,s)
+      if(.not. part_of_hamil) then
+        this%s_2_v2pp = scalar_second_v2pp(h,s)
+        this%s_2_v2hh = scalar_second_v2hh(h,s)
+        this%s_2_v2ph = scalar_second_v2ph(h,s)
+      end if
     end if
 
     this%s_2 = this%s_2_s1h + this%s_2_s1p + this%s_2_s1ph + &

@@ -2069,6 +2069,7 @@ contains
       la = sps_me2j%orb(a)%l
       ja = sps_me2j%orb(a)%j
       ea = sps_me2j%orb(a)%e
+      if(ea > ms%emax) cycle
       ap = sps_me2j%iso2pn(sps,a,-1)
       an = sps_me2j%iso2pn(sps,a, 1)
       do b = 1, a
@@ -2202,6 +2203,7 @@ contains
       la = sps_me2j%orb(a)%l
       ja = sps_me2j%orb(a)%j
       ea = sps_me2j%orb(a)%e
+      if(ea > ms%emax) cycle
       ap = sps_me2j%iso2pn(sps,a,-1)
       an = sps_me2j%iso2pn(sps,a, 1)
       do b = 1, a

@@ -82,8 +82,10 @@ contains
     this%zero = 0.d0
     call this%one%fin()
     call this%two%fin()
-    if(this%rank == 3 .and. this%ms%is_three_body_jt) call this%thr21%fin()
-    if(this%rank == 3 .and. this%ms%is_three_body) call this%thr%fin()
+    call this%thr21%fin()
+    call this%thr%fin()
+    call this%thr21_no2b%fin()
+    call this%thr21_mon%fin()
     this%ms => null()
     this%is_normal_ordered = .false.
   end subroutine FinOps

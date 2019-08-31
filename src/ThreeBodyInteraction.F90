@@ -824,6 +824,7 @@ contains
       l1 = spsf%orb(i1)%l
       j1 = spsf%orb(i1)%j
       e1 = spsf%orb(i1)%e
+      if(e1 > ms%emax) cycle
       do i2 = 1, i1
         l2 = spsf%orb(i2)%l
         j2 = spsf%orb(i2)%j
