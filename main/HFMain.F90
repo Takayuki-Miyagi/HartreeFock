@@ -20,6 +20,7 @@ program HFMain
   type(MBPTDMat) :: PTd
   type(WriteFiles) :: w
   type(sys) :: s
+  logical :: isfile
   character(256) :: inputfile='none', conffile='none'
   integer :: n, istatus, wunit=23
   integer :: rank
@@ -55,6 +56,14 @@ program HFMain
     call timer%fin()
     stop
   end if
+
+  ! input files checking
+  if(p%int_nn_file /= 'none') isfile = s%isfile(p%int_nn_file, "main, 2N interaction")
+  if(p%int_3n_file /= 'none') isfile = s%isfile(p%int_3n_file, "main, 3N interaction")
+  do n = 1, size(p%Ops)
+    if(p%files_nn(n) /= 'none') isfile = s%isfile(p%files_nn(n), "main, 2N file")
+    if(p%files_3n(n) /= 'none') isfile = s%isfile(p%files_3n(n), "main, 3N file")
+  end do
 
   call w%init(p%emax, p%e2max)
 
@@ -161,6 +170,7 @@ program HFMain
   ! -- bare Ops --
   do n = 1, size(p%Ops)
     if(p%Ops(n) == 'none' .or. p%Ops(n) == "" .or. s%find(p%Ops(n), "_file")) cycle
+    write(*,*)
     write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
     call opr%init(p%Ops(n),ms,2)
     call opr%set()
@@ -186,6 +196,7 @@ program HFMain
   ! -- Ops from NN file (srg evolved or two-body current) --
   do n = 1, size(p%Ops)
     if(p%files_nn(n) == 'none' .or. p%Ops(n) == "") cycle
+    write(*,*)
     write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n))
     call opr%init(p%Ops(n),ms, 2)
     call opr%set(p%files_nn(n), 'none', &
@@ -210,6 +221,7 @@ program HFMain
   ! -- Ops from NN+3N file (srg evolved) --
   do n = 1, size(p%Ops)
     if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
+    write(*,*)
     write(*,'(6a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n)), &
         & " and ", trim(p%files_3n(n))
     call opr%init(p%Ops(n),ms, 3, p%type_3n_file)

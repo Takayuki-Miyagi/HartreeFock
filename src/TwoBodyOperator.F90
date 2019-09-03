@@ -2048,7 +2048,7 @@ contains
     ms => two%two
     sps => ms%sps
     call sps_me2j%init(this%emax2, this%lmax2)
-    nelm = count_scalar_me2j(sps_me2j,this%e2max2)
+    nelm = count_scalar_me2j(sps_me2j,ms%emax,this%e2max2)
     allocate(v(nelm))
     if( s%find(this%file_nn, '.gz') ) then
       call get_vector_me2j_gz(this%file_nn,v)
@@ -2187,7 +2187,7 @@ contains
     ms => two%two
     sps => ms%sps
     call sps_me2j%init(this%emax2, this%lmax2)
-    nelm = count_scalar_me2j(sps_me2j,this%e2max2)
+    nelm = count_scalar_me2j(sps_me2j,ms%emax,this%e2max2)
     allocate(v(nelm))
     open(runit, file=this%file_nn, action='read',iostat=io, &
         & form='unformatted', access='stream')
@@ -2285,9 +2285,9 @@ contains
     return
   end subroutine read_scalar_me2j_bin
 
-  function count_scalar_me2j(sps,e2max) result(r)
+  function count_scalar_me2j(sps,e_cut,e2max) result(r)
     type(OrbitsIsospin), intent(in) :: sps
-    integer, intent(in) :: e2max
+    integer, intent(in) :: e_cut,e2max
     integer(8) :: r
     integer :: a, b, c, d, dmax
     integer :: la, ja, ea
@@ -2300,6 +2300,7 @@ contains
       la = sps%orb(a)%l
       ja = sps%orb(a)%j
       ea = sps%orb(a)%e
+      if(ea>e_cut) cycle
       do b = 1, a
         lb = sps%orb(b)%l
         jb = sps%orb(b)%j

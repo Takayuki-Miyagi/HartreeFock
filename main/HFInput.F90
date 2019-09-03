@@ -179,6 +179,19 @@ contains
     call s%split(files_nn, ',', this%files_nn)
     call s%split(files_3n, ',', this%files_3n)
 
+    if( size(this%Ops) /= size(this%files_nn) ) then
+      write(*,*) "# Number of Op is not same as the number of NN files. Assuming all NN files are 'none'."
+      deallocate(this%files_nn)
+      allocate(this%files_nn(size(this%Ops)))
+      this%files_nn(:) = 'none'
+    end if
+
+    if( size(this%Ops) /= size(this%files_3n) ) then
+      write(*,*) "# Number of Op is not same as the number of NNN files. Assuming all NNN files are 'none'."
+      deallocate(this%files_3n)
+      allocate(this%files_3n(size(this%Ops)))
+      this%files_3n(:) = 'none'
+    end if
   end subroutine InitInputParameters
 
   subroutine PrintInputParameters(this,iunit)
