@@ -185,6 +185,7 @@ program HFMain
 
   ! -- Ops from NN file (srg evolved or two-body current) --
   do n = 1, size(p%Ops)
+    if(n > size(p%files_nn)) cycle
     if(p%files_nn(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(4a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n))
     call opr%init(p%Ops(n),ms, 2)
@@ -209,6 +210,8 @@ program HFMain
 
   ! -- Ops from NN+3N file (srg evolved) --
   do n = 1, size(p%Ops)
+    if(n > size(p%files_nn)) cycle
+    if(n > size(p%files_3n)) cycle
     if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,'(6a)') "## Calculating ", trim(p%Ops(n)), " operator using ", trim(p%files_nn(n)), &
         & " and ", trim(p%files_3n(n))

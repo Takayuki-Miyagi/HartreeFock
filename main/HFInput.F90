@@ -135,6 +135,7 @@ contains
     this%alpha = alpha
     this%Nucl = Nucl
     this%Core = Core
+    if(this%Core=="") this%Core=this%Nucl
     this%valence_list = valence_list
     this%int_nn_file = int_nn_file
     this%int_3n_file = int_3n_file
