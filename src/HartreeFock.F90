@@ -178,6 +178,7 @@ contains
     call this%SetOccupationMatrix(ms%NOcoef)
     call this%UpdateDensityMatrix()
     call this%UpdateFockMatrix()
+    call this%F%prt()
 
   end subroutine InitHFSolver
 
@@ -1421,10 +1422,19 @@ contains
     integer :: l4, j4, z4, e4
     integer :: l5, j5, z5, e5
     integer :: l6, j6, z6, e6
+    integer, allocatable :: map(:)
     real(8) :: v
 
     if(this%constructed) return
     ms => v3n%thr
+    allocate(map(ms%sps%norbs))
+    map(:) = 0
+    map(1) = 0
+    map(2) = 1
+    map(3) = 4
+    map(4) = 5
+    map(5) = 2
+    map(6) = 3
     n = 0
     do i1 = 1, ms%sps%norbs
       l1 = ms%sps%orb(i1)%l
@@ -1562,8 +1572,8 @@ contains
       end do
     end do
 
-    !$omp parallel
-    !$omp do private(idx,num,i1,i2,i3,i4,i5,i6,j1,j2,j3,v,JJ,JJJ)
+    !!$omp parallel
+    !!$omp do private(idx,num,i1,i2,i3,i4,i5,i6,j1,j2,j3,v,JJ,JJJ)
     do idx = 1, this%nidx
       num = this%idx(idx)
       call GetSpLabels3(num,i1,i2,i3,i4,i5,i6)
@@ -1572,23 +1582,25 @@ contains
       j3 = ms%sps%orb(i3)%j
       v = 0.d0
       do JJ = abs(j1-j2)/2, (j1+j2)/2
-        if(i1 == i2 .and. mod(JJ,2) == 1) cycle
-        if(i4 == i5 .and. mod(JJ,2) == 1) cycle
+        !if(i1 == i2 .and. mod(JJ,2) == 1) cycle
+        !if(i4 == i5 .and. mod(JJ,2) == 1) cycle
         do JJJ = abs(2*JJ-j3), (2*JJ+j3), 2
           v = v + dble(JJJ+1) * &
               & v3n%GetThBME(&
               & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
               & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
           ! need to convert integer(8) -> integer(4)
-          !write(*,'(8i4,f12.6)') i1,i2,i3,i4,i5,i6,JJ,JJJ,v3n%GetThBME(&
-          !    & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
-          !    & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
+          write(*,'(8i4,f12.6)') map(i1),map(i2),map(i3),map(i4),map(i5),map(i6),&
+              & JJ,JJJ,v3n%GetThBME(&
+              & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
+              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
         end do
       end do
       this%v(idx) = v / dble(j1+1)
+      !write(*,"(6i4,f12.6)") map(i1),map(i2),map(i3),map(i4),map(i5),map(i6),this%v(idx)
     end do
-    !$omp end do
-    !$omp end parallel
+    !!$omp end do
+    !!$omp end parallel
     this%constructed = .true.
   end subroutine InitMonopole3
 

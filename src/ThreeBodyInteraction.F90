@@ -513,7 +513,7 @@ contains
     write(*,'(a)') "Reading three-body scalar line-by-line from human-readable file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
     open(runit, file=this%file_3n, action='read', iostat=io)
     if(io /= 0) then
@@ -546,7 +546,7 @@ contains
     write(*,'(a)') "Reading three-body scalar line-by-line from human-readable file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
 
     open(runit, file=this%file_3n, action='read')
@@ -585,7 +585,7 @@ contains
     write(*,'(a)') "Reading three-body scalar line-by-line from gzip file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
 
     fp = gzip_open(this%file_3n, "rt")
@@ -622,8 +622,7 @@ contains
 
     write(*,'(a)') "Reading three-body scalar line-by-line from binary file"
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
-    write(*,*) "Number of three-body matrix element: ", nelm
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
     open(runit, file=this%file_3n, action='read', iostat=io, &
         & form='unformatted')
@@ -656,7 +655,7 @@ contains
 
     write(*,'(a)') "Reading three-body scalar from comp format binary file"
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
     open(runit, file=this%file_3n, action='read', iostat=io, &
         & form='unformatted')
@@ -687,7 +686,7 @@ contains
 
     write(*,'(a)') "Reading three-body scalar from stream i/o format binary file"
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
     open(runit, file=this%file_3n, action='read', iostat=io, &
         & form='unformatted', access='stream')
@@ -704,9 +703,9 @@ contains
     call spsf%fin()
   end subroutine read_scalar_me3j_binary_stream
 
-  function count_scalar_3bme(spsf, e2max, e3max) result(r)
+  function count_scalar_3bme(spsf, e_cut, e2max, e3max) result(r)
     type(OrbitsIsospin), intent(in) :: spsf
-    integer, intent(in) :: e2max, e3max
+    integer, intent(in) :: e_cut, e2max, e3max
     integer(8) :: r
     integer :: i1, l1, j1, e1
     integer :: i2, l2, j2, e2
@@ -721,6 +720,7 @@ contains
       l1 = spsf%orb(i1)%l
       j1 = spsf%orb(i1)%j
       e1 = spsf%orb(i1)%e
+      if(e1 > e_cut) cycle
       do i2 = 1, i1
         l2 = spsf%orb(i2)%l
         j2 = spsf%orb(i2)%j

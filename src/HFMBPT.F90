@@ -1192,7 +1192,7 @@ contains
     logical, intent(in), optional :: part_of_hamil
     type(MSpace), pointer :: ms
     integer :: jmax
-    write(*,*)
+
     write(*,'(a)') " Many-body perturbation calculation up to 2nd order (scalar)"
     write(*,*)
 

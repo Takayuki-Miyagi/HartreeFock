@@ -746,7 +746,7 @@ contains
     write(*,'(a)') "Reading three-body scalar line-by-line from human-readable file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
     open(runit, file=this%file_3n, action='read', iostat=io)
     if(io /= 0) then
@@ -773,7 +773,7 @@ contains
     write(*,'(a)') "Reading three-body scalar from stream i/o format binary file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     !allocate(v(nelm))
     !open(runit, file=this%file_3n, action='read', iostat=io, &
     !    & form='unformatted',access='stream')
@@ -807,7 +807,7 @@ contains
     write(*,'(a)') "Reading three-body scalar line-by-line from human-readable file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     allocate(v(nelm))
 
     open(runit, file=this%file_3n, action='read')
@@ -846,7 +846,7 @@ contains
     write(*,'(a)') "Reading three-body scalar line-by-line from gzip file"
 
     call spsf%init(this%emax3, this%lmax3)
-    nelm = count_scalar_3bme(spsf, this%e2max3, this%e3max3)
+    nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
     !allocate(v(nelm))
     !fp = gzip_open(this%file_3n, "rt")
     !err = gzip_readline(fp, header, len(header))
@@ -867,9 +867,9 @@ contains
     call spsf%fin()
   end subroutine read_scalar_me3j_gzip
 
-  function count_scalar_3bme(spsf, e2max, e3max) result(r)
+  function count_scalar_3bme(spsf, e_cut, e2max, e3max) result(r)
     type(OrbitsIsospin), intent(in) :: spsf
-    integer, intent(in) :: e2max, e3max
+    integer, intent(in) :: e_cut, e2max, e3max
     integer(8) :: r
     integer :: i1, l1, j1, e1
     integer :: i2, l2, j2, e2
@@ -884,6 +884,7 @@ contains
       l1 = spsf%orb(i1)%l
       j1 = spsf%orb(i1)%j
       e1 = spsf%orb(i1)%e
+      if(e1>e_cut) cycle
       do i2 = 1, i1
         l2 = spsf%orb(i2)%l
         j2 = spsf%orb(i2)%j
@@ -945,7 +946,7 @@ contains
         end do
       end do
     end do
-    write(*,*) "Number of MEs: ", r
+    !write(*,*) "Number of MEs: ", r
   end function count_scalar_3bme
 
   subroutine store_scalar_3bme(thr,v,spsf,e2max,e3max)
@@ -1340,13 +1341,14 @@ contains
                               err = gzip_readline(fp, buffer, len(buffer))
                               read(buffer,*) v((n-1)*10+1 : n*10)
                             end do
-                            if(nelms-total_cnt - ((nelms-total_cnt)/10)*10 > 0) then
-                              read(buffer,*) v(((nelms-total_cnt)/10)*10+1 : nelms)
+                            if(nelms-total_cnt-10*n - ((nelms-total_cnt-10*n)/10)*10 > 0) then
+                              write(*,*) nelms, total_cnt
+                              read(buffer,*) v(((nelms-total_cnt-10*n)/10)*10+1 : nelms)
                             end if
                           end if
                         end if
-                        cnt = cnt + 1
                         total_cnt = total_cnt + 1
+                        cnt = cnt + 1
 
                         if(e1 > ms%emax) cycle
                         if(e2 > ms%emax) cycle
