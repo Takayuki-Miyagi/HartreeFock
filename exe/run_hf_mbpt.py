@@ -8,9 +8,8 @@ HOME = os.path.expanduser('~')
 
 Params=OrderedDict()
 exe = 'HartreeFock.exe'
-inputf='hf_input.txt'
 hwlist=[25]
-elist=[6]
+elist=[8]
 e3list = [8]
 file_extension_2n = ".me2j.gz"
 file_extension_3n = ".me3j.gz"
@@ -21,8 +20,7 @@ emax_3n =  8
 e2max_3n = 8
 e3max_3n = 8
 
-Params['optrs']='Rm2,Rp2,Rn2'
-#Params['optrs']=''
+Params['optrs']='Rp2'
 Params['is_MBPTEnergy']=True
 Params['type_3n_file']="no2b"
 
@@ -40,7 +38,7 @@ element_table = [
     'Pa', 'U',  'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm',
     'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds',
     'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og' ]
-ZAList=[(8,16)]
+ZNList=[(2,2),(8,8),(20,20),(28,28),(50,50),(50,82),(62,82),(70,82),(70,102),(82,112),(82,126)]
 
 def SetHamil(hw, emax_nn, e2max_nn, emax_3n, e2max_3n, e3max_3n):
     path2 = HOME + '/MtxElmnt/2BME'
@@ -50,7 +48,7 @@ def SetHamil(hw, emax_nn, e2max_nn, emax_3n, e2max_3n, e3max_3n):
     #file_3n_int = "ThBME_srg2.00_N4LO_EMN500_ChEFT_N2LO_cD-1.80cE-0.31_LNL2_IS_hw"
     file_3n_int = "NO2B_ThBME_srg2.00_N4LO_EMN500_ChEFT_N2LO_cD-1.80cE-0.31_LNL2_IS_hw"
     file_3n_int += str(hw)+"_ms"+str(emax_3n)+"_"+str(e2max_3n)+"_"+str(e3max_3n)+file_extension_3n
-    #file_3n_int = "none"
+    file_3n_int = "none"
     return path2, file_nn_int, path3, file_3n_int
 
 def gen_script(params, file_nn, file_3n, batch, machine):
@@ -64,6 +62,14 @@ def gen_script(params, file_nn, file_3n, batch, machine):
     params["summary_file"] = summary_file
     fsh = "run_" + fbase + ".sh"
     prt = ""
+    time = "0-04:00"
+    if(params["emax"] <=16): time = "0-04:00"
+    if(params["emax"] <=14): time = "0-02:00"
+    if(params["emax"] <=12): time = "0-01:30"
+    if(params["emax"] <=10): time = "0-01:00"
+    if(params["emax"] <= 8): time = "0-00:45"
+    if(params["emax"] <= 6): time = "0-00:30"
+    if(params["emax"] <= 4): time = "0-00:20"
     if(machine=="oak"):
         prt += "#!/bin/bash \n"
         prt += "#PBS -q oak \n"
@@ -76,7 +82,7 @@ def gen_script(params, file_nn, file_3n, batch, machine):
         prt += "#SBATCH --ntasks=1\n"
         prt += "#SBATCH --cpus-per-task=32\n"
         prt += "#SBATCH --mem=125G\n"
-        prt += "#SBATCH --time=0-05:00\n\n"
+        prt += "#SBATCH --time="+time+"\n\n"
 
     prt += 'echo "start ' +fsh + '..."\n'
     prt += "cat > "+file_input + " <<EOF\n"
@@ -106,15 +112,19 @@ def gen_script(params, file_nn, file_3n, batch, machine):
     os.chmod(fsh, 0o755)
     return fsh
 
-def get_energy(params):
+def get_item(params, Op="hamil"):
     if(not os.path.exists(params["summary_file"])): return None
     f = open(params["summary_file"],"r")
     lines = f.readlines()
     f.close()
     for line in lines:
         if(line[0] == "#"): continue
-        data = line.split()
-        return (float(data[1]), float(data[2]), float(data[3]), float(data[4]))
+        try:
+            data = line.split()
+            if(data != Op): continue
+            return (float(data[1]), float(data[2]), float(data[3]), float(data[4]))
+        except:
+            return None
 
 def main(machinename=None):
     if(machinename==None):
@@ -129,14 +139,14 @@ def main(machinename=None):
         if(machinename.lower() =="cedar"):
             machine = "cedar"
 
-    for ZA, e, e3, hw in itertools.product(ZAList,elist,e3list,hwlist):
+    for ZN, e, e3, hw in itertools.product(ZNList,elist,e3list,hwlist):
         path2, file_nn, path3, file_3n = SetHamil(hw,emax_nn,e2max_nn,emax_3n,e2max_3n,e3max_3n)
         file_nn_int = path2 + '/' + file_nn
         file_3n_int = 'none'
         if(file_3n != 'none'):
             file_3n_int = path3 + '/' + file_3n
 
-        Params['Nucl'] = element_table[ZA[0]] + str(ZA[1])
+        Params['Nucl'] = element_table[ZN[0]] + str(ZN[0]+ZN[1])
         Params['hw']=hw
         Params['emax'] = e
         Params['e3max'] = e3
@@ -159,8 +169,8 @@ def main(machinename=None):
 
     # create csv file
     prt = ""
-    for ZA, e, e3, hw in itertools.product(ZAList,elist,e3list,hwlist):
-        Params['Nucl'] = element_table[ZA[0]] + str(ZA[1])
+    for ZN, e, e3, hw in itertools.product(ZNList,elist,e3list,hwlist):
+        Params['Nucl'] = element_table[ZN[0]] + str(ZN[0]+ZN[1])
         Params['hw']=hw
         Params['emax'] = e
         Params['e3max'] = e3
@@ -170,15 +180,16 @@ def main(machinename=None):
         if(file_3n != 'none'):
             file_3n_int = path3 + '/' + file_3n
         fsh = gen_script(Params, file_nn, file_3n, batch, machine)
-        data = get_energy(Params)
-        if(data == None): continue
+        en = get_item(Params)
+        rp = get_item(Params,"Rp2")
+        if(en == None): continue
         if(file_3n == "none"):
-            prt += "{0:s}, {1:d}, {2:d}, {3:d}, {4:d}, {5:6.2f}, {6:12.6f}, {7:12.6f}, {8:12.6f}, {9:12.6f}\n".format(\
-                    element_table[ZA[0]], ZA[0], ZA[1]-ZA[0], ZA[1], e, hw, data[0], data[1], data[2], data[3])
+            prt += "{0:s}, {1:3d}, {2:3d}, {3:3d}, {4:3d}, {5:6.2f}, {6:12.6f}, {7:12.6f}, {8:12.6f}, {9:12.6f}, {10:12.6f}, {11:12.6f}, {12:12.6f}, {13:12.6f}\n".format(\
+                    element_table[ZN[0]], ZN[0], ZN[1], ZN[0]+ZN[1], e, hw, en[0], en[1], en[2], en[3], rp[0], rp[1], rp[2], rp[3])
         if(file_3n != "none"):
-            prt += "{0:s}, {1:d}, {2:d}, {3:d}, {4:d}, {5:d}, {6:6.2f}, {7:12.6f}, {8:12.6f}, {9:12.6f}, {10:12.6f}\n".format(\
-                    element_table[ZA[0]], ZA[0], ZA[1]-ZA[0], ZA[1], e, e3, hw, data[0], data[1], data[2], data[3])
-    f = open("energy.csv", "w")
+            prt += "{0:s}, {1:3d}, {2:3d}, {3:3d}, {4:3d}, {5:3d}, {6:6.2f}, {7:12.6f}, {8:12.6f}, {9:12.6f}, {10:12.6f}, {11:12.6f}, {12:12.6f}, {13:12.6f}, {14:12.6f}\n".format(\
+                    element_table[ZN[0]], ZN[0], ZN[1], ZN[0]+ZN[1], e, e3, hw, en[0], en[1], en[2], en[3], rp[0], rp[1], rp[2], rp[3])
+    f = open("data.csv", "w")
     f.write(prt)
     f.close()
 
