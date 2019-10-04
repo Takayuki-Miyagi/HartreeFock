@@ -1590,10 +1590,10 @@ contains
               & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
               & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
           ! need to convert integer(8) -> integer(4)
-          write(*,'(8i4,f12.6)') map(i1),map(i2),map(i3),map(i4),map(i5),map(i6),&
-              & JJ,JJJ,v3n%GetThBME(&
-              & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
-              & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
+          !write(*,'(8i4,f12.6)') map(i1),map(i2),map(i3),map(i4),map(i5),map(i6),&
+          !    & JJ,JJJ,v3n%GetThBME(&
+          !    & int(i1,kind(JJ)),int(i2,kind(JJ)),int(i3,kind(JJ)),JJ,&
+          !    & int(i4,kind(JJ)),int(i5,kind(JJ)),int(i6,kind(JJ)),JJ,JJJ)
         end do
       end do
       this%v(idx) = v / dble(j1+1)
