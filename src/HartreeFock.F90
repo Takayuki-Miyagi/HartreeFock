@@ -178,7 +178,6 @@ contains
     call this%SetOccupationMatrix(ms%NOcoef)
     call this%UpdateDensityMatrix()
     call this%UpdateFockMatrix()
-    call this%F%prt()
 
   end subroutine InitHFSolver
 
