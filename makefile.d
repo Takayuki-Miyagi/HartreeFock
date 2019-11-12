@@ -1,13 +1,13 @@
 obj/ClassSys.o : src/ClassSys.f90 
 obj/MyLibrary.o : src/MyLibrary.f90 obj/ClassSys.o 
-obj/DefineOperators.o : src/DefineOperators.F90 obj/MyLibrary.o 
+obj/DefineOperators.o : src/DefineOperators.F90 obj/MyLibrary.o obj/ClassSys.o 
 obj/HFMBPT.o : src/HFMBPT.F90 obj/MyLibrary.o obj/Profiler.o obj/HartreeFock.o obj/StoreCouplings.o obj/Operators.o obj/ModelSpace.o 
-obj/HartreeFock.o : src/HartreeFock.F90 obj/MyLibrary.o obj/Profiler.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/LinAlgLib.o 
+obj/HartreeFock.o : src/HartreeFock.F90 obj/MyLibrary.o obj/Profiler.o obj/Iteration.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/LinAlgLib.o 
 obj/MPIFunction.o : src/MPIFunction.F90 
 obj/ModelSpace.o : src/ModelSpace.F90 obj/MyLibrary.o obj/Profiler.o obj/ClassSys.o obj/ThreeBodyModelSpace.o obj/TwoBodyModelSpace.o obj/OneBodyModelSpace.o obj/SingleParticleState.o 
 obj/OneBodyModelSpace.o : src/OneBodyModelSpace.F90 obj/SingleParticleState.o 
 obj/OneBodyOperator.o : src/OneBodyOperator.F90 obj/ClassSys.o obj/DefineOperators.o obj/MyLibrary.o obj/OneBodyModelSpace.o obj/LinAlgLib.o 
-obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/ThreeBodyInteraction.o obj/ThreeBodyOperator.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ModelSpace.o 
+obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/ThreeBodyInteraction.o obj/ThreeBodyOperator.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ModelSpace.o obj/ClassSys.o 
 obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o 
 obj/SingleParticleState.o : src/SingleParticleState.F90 obj/ClassSys.o 
 obj/StoreCouplings.o : src/StoreCouplings.F90 obj/MyLibrary.o obj/Profiler.o 
@@ -30,7 +30,8 @@ obj/SingleDoubleComplex.o : submodule/LinAlgf90/src/SingleDoubleComplex.f90 obj/
 obj/VectorComplex.o : submodule/LinAlgf90/src/VectorComplex.f90 obj/LinAlgParameters.o 
 obj/VectorDouble.o : submodule/LinAlgf90/src/VectorDouble.f90 obj/LinAlgParameters.o 
 obj/VectorSingle.o : submodule/LinAlgf90/src/VectorSingle.f90 obj/LinAlgParameters.o 
+obj/Iteration.o : submodule/Iteration/src/Iteration.F90 obj/LinAlgLib.o 
 obj/Atomic.o : main/Atomic.F90 obj/MyLibrary.o obj/HFMBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o 
 obj/HFInput.o : main/HFInput.F90 obj/ClassSys.o 
-obj/HFMain.o : main/HFMain.F90 obj/Atomic.o obj/WriteOperator.o obj/HFMBPT.o obj/HartreeFock.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/Profiler.o 
+obj/HFMain.o : main/HFMain.F90 obj/Atomic.o obj/WriteOperator.o obj/HFMBPT.o obj/HartreeFock.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/Profiler.o obj/ClassSys.o 
 obj/WriteOperator.o : main/WriteOperator.F90 obj/Profiler.o obj/ClassSys.o obj/Operators.o obj/HFInput.o 

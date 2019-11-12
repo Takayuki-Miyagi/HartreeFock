@@ -99,11 +99,21 @@ program HFMain
 
   call HF%init(h,alpha=p%alpha)
   call HF%SetDynamicReference(p%dynamic_reference)
+  call HF%SetIterMethod(p%iter_method, p%alpha, p%iter_n_history)
   call HF%solve()
 
   open(wunit, file = p%summary_file, action='write',status='replace')
   call p%PrintInputParameters(wunit)
   call HF%PrintSPEs(wunit)
+  if(HF%fail) then
+    write(wunit,"(a)") "#*************************************************"
+    write(wunit,"(a)") "#*************************************************"
+    write(wunit,"(a)") "# Hartree-Fock doesn't converge"
+    write(*,"(a)") "#*************************************************"
+    write(*,"(a)") "#*************************************************"
+    write(*,"(a)") "# Hartree-Fock doesn't converge"
+    stop
+  end if
 
   if(.not. p%is_MBPTEnergy) then
     write(wunit,'(a,6x,a)') "# Operator", "HF energy"

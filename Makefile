@@ -113,6 +113,7 @@ endif
 
 SRCDIR = src
 SRCDIR_LinAlg = submodule/LinAlgf90/src
+SRCDIR_Iter = submodule/Iteration/src
 SRCDIR_HF = main
 DEPDIR = .
 OBJDIR = obj
@@ -143,6 +144,11 @@ OBJF95_LinAlg:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_Li
 SRCS_LinAlg= $(SRCC_LinAlg) $(SRCF77_LinAlg) $(SRCF90_LinAlg) $(SRCF95_LinAlg)
 OBJS_LinAlg= $(OBJC_LinAlg) $(OBJF77_LinAlg) $(OBJF90_LinAlg) $(OBJF95_LinAlg)
 
+SRCF95_Iter:=$(wildcard $(SRCDIR_Iter)/*.F90)
+OBJF95_Iter:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_Iter))))
+SRCS_Iter= $(SRCF95_Iter)
+OBJS_Iter= $(OBJF95_Iter)
+
 SRCC_HF:=$(wildcard $(SRCDIR_HF)/*.c)
 SRCF77_HF:=$(wildcard $(SRCDIR_HF)/*.f)
 SRCF90_HF:=$(wildcard $(SRCDIR_HF)/*.f90)
@@ -155,8 +161,8 @@ SRCS_HF= $(SRCC_HF) $(SRCF77_HF) $(SRCF90_HF) $(SRCF95_HF)
 OBJS_HF= $(OBJC_HF) $(OBJF77_HF) $(OBJF90_HF) $(OBJF95_HF)
 
 
-SRCS_ALL = $(SRCS) $(SRCS_LinAlg) $(SRCS_HF)
-OBJS_ALL = $(OBJS) $(OBJS_LinAlg) $(OBJS_HF)
+SRCS_ALL = $(SRCS) $(SRCS_LinAlg) $(SRCS_Iter) $(SRCS_HF)
+OBJS_ALL = $(OBJS) $(OBJS_LinAlg) $(OBJS_Iter) $(OBJS_HF)
 
 MODOUT=
 ifeq ($(strip $(HOST)),other)
@@ -209,6 +215,9 @@ $(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.f
 $(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.f90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.F90
+	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
+
+$(OBJDIR)/%.o:$(SRCDIR_Iter)/%.F90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 
 $(OBJDIR)/%.o:$(SRCDIR_HF)/%.c

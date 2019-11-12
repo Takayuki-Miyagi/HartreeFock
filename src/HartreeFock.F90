@@ -4,6 +4,7 @@ module HartreeFock
   use Operators
   use ThreeBodyMonInteraction
   use ThreeBodyNO2BInteraction
+  use Iteration, only: Optimizer
   implicit none
 
   public :: HFSolver
@@ -57,6 +58,8 @@ module HartreeFock
   type :: HFSolver
     integer :: n_iter_max = 1000
     integer :: rank
+    character(len=:), allocatable :: Method
+    integer :: niter_history = 1
     real(8) :: alpha = 1.d0
     real(8) :: tol = 1.d-8
     real(8) :: diff
@@ -68,6 +71,7 @@ module HartreeFock
 
     logical :: dynamic_reference = .false.
     logical :: is_roothaan=.false.
+    logical :: fail = .false.
     type(MSpace), pointer :: ms => null()
     type(OneBodyPart) :: F   ! Fock opeartor
     type(OneBodyPart) :: T   ! kinetic term
@@ -83,6 +87,7 @@ module HartreeFock
     procedure :: init => InitHFSolver
     procedure :: solve => SolveHFSolver
     procedure :: SetDynamicReference
+    procedure :: SetIterMethod
     procedure :: PrintSPEs
     procedure :: DiagonalizeFockMatrix
     procedure :: SetOccupationMatrix
@@ -100,7 +105,7 @@ module HartreeFock
     procedure :: BasisTransScalar
     procedure :: BasisTransTensor
   end type HFSolver
-
+  type(Optimizer), private :: opt
 contains
 
   subroutine FinHFSolver(this)
@@ -129,6 +134,7 @@ contains
 
     ms => hamil%ms
     this%ms => ms
+    this%Method = "direct"
     if(hamil%is_normal_ordered) then
       write(*,'(a)') "Hamiltonian has to be normal ordered w.r.t the vacuum."
       return
@@ -182,9 +188,8 @@ contains
       call this%C%MatCh(ch,ch)%eye( ndim )
     end do
     call this%SetOccupationMatrix(ms%NOcoef)
-    call this%UpdateDensityMatrix()
+    call this%UpdateDensityMatrixFromCoef()
     call this%UpdateFockMatrix()
-
   end subroutine InitHFSolver
 
   subroutine SolveHFSolver(this)
@@ -199,6 +204,7 @@ contains
         & "one-body ", "two-body ", &
         & "three-body ", "Ehf"
 
+    call initialize_optimizer(this)
     call this%CalcEnergy()
     write(*,'(4x,a,5f18.6)') "HO", this%e0, this%e1, &
         &  this%e2, this%e3,this%ehf
@@ -206,7 +212,7 @@ contains
 
       call this%DiagonalizeFockMatrix()
       if(iter > 5 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
-      call this%UpdateDensityMatrix()
+      call this%UpdateDensityMatrix(iter)
       call this%UpdateFockMatrix()
 
       call this%CalcEnergy()
@@ -214,12 +220,13 @@ contains
       write(*,'(2x,i4,5f18.6)') iter, this%e0, this%e1, &
           &  this%e2, this%e3,this%ehf
 
-      if(this%tol > this%diff) exit
+      if(this%tol > opt%r) exit
 
       if(iter == this%n_iter_max) then
         write(*,'(a,i5,a)') "Hartree-Fock iteration does not converge after ", &
             & this%n_iter_max, " iterations"
-        write(*,'(es14.6)') this%diff
+        write(*,'(es14.6)') opt%r
+        this%fail = .true.
       end if
     end do
 
@@ -248,8 +255,27 @@ contains
       call this%ms%InitSubSpace()
     end if
 
+    call opt%fin()
     call timer%Add("Hartree-Fock iteration",omp_get_wtime() - ti)
   end subroutine SolveHFSolver
+
+  subroutine initialize_optimizer(this)
+    class(HFSolver), intent(in) :: this
+    integer :: n, i, j
+    real(8), allocatable :: v(:)
+    n = this%ms%sps%norbs
+    allocate(v((n*(n+1)/2)))
+    v(:) = 0.d0
+    do i = 1, n
+      do j = 1, i
+        v(i*(i-1)/2+j) = this%rho%GetOBME(i,j)
+      end do
+    end do
+    call opt%init(n=n*(n+1)/2, m=10, method="mbroyden", a=this%alpha)
+    !call opt%init(n=n*(n+1)/2, m=10, method="broyden", a=this%alpha)
+    call opt%set_init(v)
+    deallocate(v)
+  end subroutine initialize_optimizer
 
   function BasisTransform(HF,Optr,is_NO2B) result(op)
     !  Input: Operator is HO basis operator (not normal ordered)
@@ -1251,15 +1277,30 @@ contains
     deallocate(spe)
   end subroutine SetDynamicalOccupation
 
-  subroutine UpdateDensityMatrix(this)
+  subroutine UpdateDensityMatrix(this, iter)
     class(HFSolver), intent(inout) :: this
+    integer, intent(in) :: iter
     integer :: ich
-    do ich = 1, this%rho%one%NChan
-      this%rho%MatCh(ich,ich)%DMat = &
-          & this%rho%MatCh(ich,ich)%DMat * (1.d0-this%alpha) + &
-          & (this%C%MatCh(ich,ich)%DMat * this%Occ%MatCh(ich,ich)%DMat * &
-          & this%C%MatCh(ich,ich)%DMat%T()) * this%alpha
+    integer :: n, i, j
+    real(8), allocatable :: v(:)
+
+    call this%UpdateDensityMatrixFromCoef()
+    n = this%ms%sps%norbs
+    allocate(v((n*(n+1)/2)))
+    v(:) = 0.d0
+    do i = 1, n
+      do j = 1, i
+        v(i*(i-1)/2+j) = this%rho%GetOBME(i,j)
+      end do
     end do
+    call opt%get_next(v, iter)
+    do i = 1, n
+      do j = 1, i
+        call this%rho%SetOBME( i,j, v(i*(i-1)/2+j) )
+        call this%rho%SetOBME( j,i, v(i*(i-1)/2+j) )
+      end do
+    end do
+    deallocate(v)
   end subroutine UpdateDensityMatrix
 
   subroutine UpdateDensityMatrixFromCoef(this)
@@ -1412,6 +1453,17 @@ contains
       write(*,"(a)") "# The occupation is dynamically changed during HF iteration"
     end if
   end subroutine SetDynamicReference
+
+  subroutine SetIterMethod(this, Method, alpha, n_history)
+    class(HFSolver), intent(inout) :: this
+    character(*), intent(in) :: Method
+    real(8), intent(in), optional :: alpha
+    integer, intent(in), optional :: n_history
+    this%Method = Method
+    if(present(alpha)) this%alpha = alpha
+    if(present(n_history)) this%niter_history = n_history
+    write(*,"(2a)") "# Iteration method: ", trim(this%Method)
+  end subroutine SetIterMethod
 
   subroutine FinMonopole(this)
     class(Monopole), intent(inout) :: this

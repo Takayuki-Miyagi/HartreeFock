@@ -1,3 +1,6 @@
 [submodule "submodule/LinAlgf90"]
 	path = submodule/LinAlgf90
 	url = https://github.com/Takayuki-Miyagi/LinAlgf90.git
+[submodule "submodule/Iteration"]
+	path = submodule/Iteration
+	url = https://github.com/Takayuki-Miyagi/Iteration.git

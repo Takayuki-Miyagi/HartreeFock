@@ -42,6 +42,8 @@ module HFInput
     integer :: lmax_1n
     character(:), allocatable :: density_matrix_file
 
+    character(:), allocatable :: iter_method
+    integer :: iter_n_history
     !
     logical :: is_Op_out
     logical :: is_MBPTscalar_full
@@ -107,9 +109,12 @@ contains
     character(256) :: Op_file_format = "snt"
     ! atomic mode
     logical :: is_Atomic=.false.
+    character(512) :: iter_method = "linear"
+    integer :: iter_n_history = 10
 
     type(sys) :: s
     integer :: io
+
     namelist /input/ emax, e2max, e3max, lmax, hw, &
         & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
@@ -118,7 +123,7 @@ contains
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
         & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
-        & EN_denominator, dynamic_reference
+        & EN_denominator, dynamic_reference, iter_method, iter_n_history
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -173,6 +178,8 @@ contains
     this%is_4th_order = is_4th_order
     this%EN_denominator = EN_denominator
     this%dynamic_reference = dynamic_reference
+    this%iter_method = iter_method
+    this%iter_n_history = iter_n_history
 
     if(lmax == -1) this%lmax = emax
     if(lmax_1n == -1) this%lmax_1n = emax_1n

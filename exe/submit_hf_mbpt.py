@@ -23,6 +23,10 @@ e3max_3n = 8
 Params['optrs']='Rp2'
 Params['is_MBPTEnergy']=True
 Params['type_3n_file']="no2b"
+Params['dynamic_reference']=True
+Params['alpha']=0.7
+Params['iter_method']="mbroyden"
+Params['iter_n_history']=9
 
 element_table = [
     'NA',
