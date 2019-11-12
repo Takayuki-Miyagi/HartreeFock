@@ -66,6 +66,8 @@ contains
     integer :: j, p, z, n, i
     integer, allocatable :: jj(:), pp(:), zz(:), nn(:)
 
+    if(allocated(this%jpz)) call this%fin()
+
     this%sps => sps
     ich = 0
     allocate(this%jpz2ch(1:2*sps%lmax+1,-1:1,-1:1))
@@ -153,7 +155,7 @@ contains
     type(SingleParticleOrbit), pointer :: o
     integer, intent(in) :: j, p, z, n
     integer :: cnt, i, loop, cnt_sub
-    integer :: partition(3) = [0,2,1]
+    integer :: partition(3) = [0,1,2]
     this%j = j
     this%p = p
     this%z = z
@@ -166,7 +168,7 @@ contains
       cnt_sub = 0
       do i = 1, sps%norbs
         o => sps%GetOrbit(i)
-        if(o%ph /= partition(loop)) cycle
+        if(o%GetCoreValenceOutside() /= partition(loop)) cycle
         if(o%j /= j) cycle
         if((-1)**o%l /= p) cycle
         if(o%z /= z) cycle

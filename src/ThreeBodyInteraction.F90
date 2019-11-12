@@ -372,7 +372,7 @@ contains
             vsum = 0.d0
             do ih = 1, two%sps%norbs
               oh => two%sps%GetOrbit(ih)
-              if(oh%occ < 1.d-6) cycle
+              if(oh%GetOccupation() < 1.d-6) cycle
               jh = oh%j
               eh = oh%e
               if(e1+e2+eh > this%thr%e3max) cycle
@@ -388,7 +388,7 @@ contains
                         & (-1.d0) ** ( J12 + (jh+Jket)/2 + 0) * &
                         & sjs(2*J12,Jbra,jh,Jket,2*J34,0)
                   end if
-                  v = v + tfact * oh%occ * &
+                  v = v + tfact * oh%GetOccupation() * &
                       & this%GetThBME(i1,i2,ih,J12,i3,i4,ih,J34,Jket)
                 end do
               end do

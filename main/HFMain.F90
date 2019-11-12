@@ -98,11 +98,12 @@ program HFMain
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
   call HF%init(h,alpha=p%alpha)
+  call HF%SetDynamicReference(p%dynamic_reference)
   call HF%solve()
 
   open(wunit, file = p%summary_file, action='write',status='replace')
   call p%PrintInputParameters(wunit)
-  call HF%PrintSPEs(ms,wunit)
+  call HF%PrintSPEs(wunit)
 
   if(.not. p%is_MBPTEnergy) then
     write(wunit,'(a,6x,a)') "# Operator", "HF energy"

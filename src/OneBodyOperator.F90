@@ -365,8 +365,8 @@ contains
       do n = 1, this%one%jpz(ch)%n_state
         i = this%one%jpz(ch)%n2spi(n)
         io => sps%GetOrbit(i)
-        if(io%occ < 1.d-8) cycle
-        zero = zero + dble(j+1) * this%MatCh(ch,ch)%m(n,n) * io%occ
+        if(io%GetOccupation() < 1.d-8) cycle
+        zero = zero + dble(j+1) * this%MatCh(ch,ch)%m(n,n) * io%GetOccupation()
       end do
     end do
   end function NormalOrderingFrom1To0

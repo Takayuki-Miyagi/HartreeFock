@@ -926,7 +926,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -935,7 +935,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) iket = iket+1
     end do
     call Mat%ini(ibra,iket)
     ibra = 0
@@ -944,7 +944,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ+ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation()+ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -952,7 +952,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ+od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation()+od%GetOccupation()) > 1.d-6) cycle
         iket = iket + 1
         Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
@@ -976,7 +976,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -985,7 +985,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     call Mat%ini(ibra,iket)
@@ -995,7 +995,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) < 1.d-6) cycle
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1003,7 +1003,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
@@ -1027,7 +1027,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1036,7 +1036,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     call Mat%ini(ibra,iket)
@@ -1046,7 +1046,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1054,7 +1054,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
@@ -1078,7 +1078,8 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1087,7 +1088,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     call Mat%ini(ibra,iket)
@@ -1097,7 +1098,8 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. &
+          & abs(oa%GetOccupation())*abs(oa%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1105,7 +1107,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
@@ -1129,7 +1131,8 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1138,7 +1141,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) iket=iket+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) iket=iket+1
     end do
 
     call Mat%ini(ibra,iket)
@@ -1148,7 +1151,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. abs(oa%GetOccupation())*abs(oa%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1156,7 +1159,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)+abs(od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation())+abs(od%GetOccupation()) > 1.d-6) cycle
         iket = iket + 1
         Mat%m(ibra,iket) = opch%m(bra,ket)
       end do
@@ -1180,7 +1183,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1189,7 +1192,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) iket = iket+1
     end do
 
     ibra = 0
@@ -1198,7 +1201,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ+ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation()+ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1206,7 +1209,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ+od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation()+od%GetOccupation()) > 1.d-6) cycle
         iket = iket + 1
         opch%m(bra,ket) = Mat%m(ibra,iket)
         opch%m(ket,bra) = Mat%m(ibra,iket)
@@ -1231,7 +1234,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1240,7 +1243,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     ibra = 0
@@ -1249,7 +1252,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) < 1.d-6) cycle
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1257,7 +1260,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         opch%m(bra,ket) = Mat%m(ibra,iket)
         opch%m(ket,bra) = Mat%m(ibra,iket)
@@ -1282,7 +1285,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1291,7 +1294,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     ibra = 0
@@ -1300,7 +1303,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1308,7 +1311,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         opch%m(bra,ket) = Mat%m(ibra,iket)
         opch%m(ket,bra) = Mat%m(ibra,iket)
@@ -1333,7 +1336,8 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1342,7 +1346,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     ibra = 0
@@ -1351,7 +1355,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. abs(oa%GetOccupation())*abs(oa%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1359,7 +1363,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         opch%m(bra,ket) = Mat%m(ibra,iket)
         opch%m(ket,bra) = Mat%m(ibra,iket)
@@ -1384,7 +1388,8 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1393,7 +1398,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) iket=iket+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) iket=iket+1
     end do
 
     ibra = 0
@@ -1402,7 +1407,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. abs(oa%GetOccupation())*abs(oa%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1410,7 +1415,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)+abs(od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation())+abs(od%GetOccupation()) > 1.d-6) cycle
         iket = iket + 1
         opch%m(bra,ket) = Mat%m(ibra,iket)
         opch%m(ket,bra) = Mat%m(ibra,iket)
@@ -1440,7 +1445,8 @@ contains
       b = ch_cc%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     call Mat%zeros(ibra,ibra)
@@ -1451,7 +1457,7 @@ contains
       b = ch_cc%n2spi2(bra) ! h
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra+1
       iket = 0
       do ket = 1, ch_cc%n_state
@@ -1459,10 +1465,13 @@ contains
         d = ch_cc%n2spi2(ket) ! h
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation())+abs(od%GetOccupation()) < 1.d-6 .or. &
+            & abs(oc%GetOccupation())*abs(od%GetOccupation()) > 1.d-6) cycle
         iket = iket+1
-        if(abs(oa%occ)+abs(od%occ) < 1.d-6 .or. abs(oa%occ)*abs(od%occ) > 1.d-6) cycle
-        if(abs(ob%occ)+abs(oc%occ) < 1.d-6 .or. abs(ob%occ)*abs(oc%occ) > 1.d-6) cycle
+        if(abs(oa%GetOccupation())+abs(od%GetOccupation()) < 1.d-6 .or. &
+            & abs(oa%GetOccupation())*abs(od%GetOccupation()) > 1.d-6) cycle
+        if(abs(ob%GetOccupation())+abs(oc%GetOccupation()) < 1.d-6 .or. &
+            & abs(ob%GetOccupation())*abs(oc%GetOccupation()) > 1.d-6) cycle
         if(oa%z+od%z /= ob%z+oc%z) cycle
         Mat%m(ibra,iket) = op%get_xc1423(b,c,d,a,K)
       end do
@@ -1491,7 +1500,8 @@ contains
       b = ch_cc%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     call Mat%zeros(ibra,ibra)
@@ -1502,7 +1512,8 @@ contains
       b = ch_cc%n2spi2(bra) ! h
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra+1
       iket = 0
       do ket = 1, ch_cc%n_state
@@ -1510,10 +1521,13 @@ contains
         d = ch_cc%n2spi2(ket) ! h
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation())+abs(od%GetOccupation()) < 1.d-6 .or. &
+            & abs(oc%GetOccupation())*abs(od%GetOccupation()) > 1.d-6) cycle
         iket = iket+1
-        if(abs(oa%occ)+abs(od%occ) < 1.d-6 .or. abs(oa%occ)*abs(od%occ) > 1.d-6) cycle
-        if(abs(ob%occ)+abs(oc%occ) < 1.d-6 .or. abs(ob%occ)*abs(oc%occ) > 1.d-6) cycle
+        if(abs(oa%GetOccupation())+abs(od%GetOccupation()) < 1.d-6 .or. &
+            & abs(oa%GetOccupation())*abs(od%GetOccupation()) > 1.d-6) cycle
+        if(abs(ob%GetOccupation())+abs(oc%GetOccupation()) < 1.d-6 .or. &
+            & abs(ob%GetOccupation())*abs(oc%GetOccupation()) > 1.d-6) cycle
         if(oa%z+od%z /= ob%z+oc%z) cycle
         Mat%m(ibra,iket) = op%get_xc1423(a,d,c,b,K)
       end do
@@ -1542,7 +1556,8 @@ contains
       b = ch_cc%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
     call Mat%zeros(ibra,ibra)
     if(ibra < 1) return
@@ -1552,7 +1567,8 @@ contains
       b = ch_cc%n2spi2(bra) ! h
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. &
+          & abs(oa%GetOccupation())*abs(oa%GetOccupation()) > 1.d-6) cycle
       ibra = ibra+1
       iket = 0
       do ket = 1, ch_cc%n_state
@@ -1560,11 +1576,12 @@ contains
         d = ch_cc%n2spi2(ket) ! h
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation())+abs(od%GetOccupation()) < 1.d-6 .or. &
+            & abs(oc%GetOccupation())*abs(od%GetOccupation()) > 1.d-6) cycle
         iket = iket+1
         if(oa%z+oc%z /= ob%z+od%z) cycle
-        if(abs(oa%occ)+abs(oc%occ) > 1.d-6) cycle
-        if(abs(ob%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oa%GetOccupation())+abs(oc%GetOccupation()) > 1.d-6) cycle
+        if(abs(ob%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         norm = 1.d0
         if(a==c) norm = norm*sqrt(2.d0)
         if(b==d) norm = norm*sqrt(2.d0)
@@ -1809,7 +1826,7 @@ contains
         vsum = 0.d0
         do ih = 1, one%sps%norbs
           oh => one%sps%GetOrbit(ih)
-          if(oh%occ < 1.d-8) cycle
+          if(oh%GetOccupation() < 1.d-8) cycle
           if(o1%e + oh%e > this%two%e2max) cycle
           if(o1%e + oh%e > this%two%e2max) cycle
           fact = 1.d0
@@ -1821,7 +1838,7 @@ contains
             if(ket == ih .and. mod(J,2)==1) cycle
             v = v + dble(2*J+1) * &
                 & this%GetTwBME(bra,ih,ket,ih,J) * &
-                & oh%occ
+                & oh%GetOccupation()
           end do
           vsum = vsum + v * fact
         end do

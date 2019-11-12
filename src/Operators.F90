@@ -629,8 +629,8 @@ contains
     call op%UnNormalOrdering2B()
     do idx = 1, ms%sps%norbs
       o => ms%sps%GetOrbit(idx)
-      if(o%ph == 2) then
-        o%occ = 0.d0
+      if(o%GetCoreValenceOutside() == 1) then
+        call o%SetOccupation(0.d0)
       end if
     end do
     call op%NormalOrdering()

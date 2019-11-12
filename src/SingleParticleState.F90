@@ -36,13 +36,17 @@ module SingleParticleState
     integer :: z =  0
     integer :: e = -1
     integer :: idx = -1
-    real(8) :: occ = -1.d0
-    integer :: ph = -1 ! 0:hole,1:particle,2:partial occ
+    real(8), private :: occ = -1.d0
+    integer, private :: ph = -1  ! 0:hole, 1:particle
+    integer, private :: cvo = -1 ! 0:core, 1:valence, 2: outside
   contains
     procedure :: set => SetSingleParticleOrbit
     procedure :: SetOccupation
-    procedure :: SetHoleParticleValence
-
+    procedure :: SetHoleParticle
+    procedure :: SetCoreValenceOutside
+    procedure :: GetOccupation
+    procedure :: GetHoleParticle
+    procedure :: GetCoreValenceOutside
   end type SingleParticleOrbit
 
   type :: OrbitsIsospin
@@ -290,11 +294,35 @@ contains
     this%occ = occ
   end subroutine SetOccupation
 
-  subroutine SetHoleParticleValence(this,ph_label)
+  function GetOccupation(this) result(occ)
+    class(SingleParticleOrbit), intent(in) :: this
+    real(8) :: occ
+    occ = this%occ
+  end function GetOccupation
+
+  subroutine SetHoleParticle(this,ph_label)
     class(SingleParticleOrbit), intent(inout) :: this
     integer, intent(in) :: ph_label
     this%ph = ph_label
-  end subroutine SetHoleParticleValence
+  end subroutine SetHoleParticle
+
+  function GetHoleParticle(this) result(ph)
+    class(SingleParticleOrbit), intent(in) :: this
+    integer :: ph
+    ph = this%ph
+  end function GetHoleParticle
+
+  subroutine SetCoreValenceOutside(this,cvo_label)
+    class(SingleParticleOrbit), intent(inout) :: this
+    integer, intent(in) :: cvo_label
+    this%cvo = cvo_label
+  end subroutine SetCOreValenceOutside
+
+  function GetCoreValenceOutside(this) result(cvo)
+    class(SingleParticleOrbit), intent(in) :: this
+    integer :: cvo
+    cvo = this%cvo
+  end function GetCoreValenceOutside
 
   function iso2pn(this, sps, idx, z) result(r)
     class(OrbitsIsospin), intent(in) :: this

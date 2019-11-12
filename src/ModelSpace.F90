@@ -215,16 +215,13 @@ contains
 
     write(*,'(2a)') " Target Nuclide is ", trim(this%Nucl)
     write(*,'(2a)') "   Core Nuclide is ", trim(this%Core)
-    write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
+    write(*,'(a)') "    c/v/o, idx,  n,  l,  j, tz,   occupation"
     do i = 1, this%sps%norbs ! print hole states
       o => this%sps%GetOrbit(i)
-      if(o%ph /= 0) cycle
-      write(*,'(a10,5i4,f14.6)') '     hole:', i, o%n, o%l, o%j, o%z, o%occ
-    end do
-    do i = 1, this%sps%norbs ! print valence states
-      o => this%sps%GetOrbit(i)
-      if(o%ph /= 2) cycle
-      write(*,'(a10,5i4,f14.6)') '  valence:', i, o%n, o%l, o%j, o%z, o%occ
+      if(o%GetHoleParticle() == 1) cycle
+      if(o%GetCoreValenceOutside() == 0 ) write(*,'(a10,5i4,f14.6)') '     core:', i, o%n, o%l, o%j, o%z, o%GetOccupation()
+      if(o%GetCoreValenceOutside() == 1 ) write(*,'(a10,5i4,f14.6)') '  valence:', i, o%n, o%l, o%j, o%z, o%GetOccupation()
+      if(o%GetCoreValenceOutside() == 2 ) write(*,'(a10,5i4,f14.6)') '  outside:', i, o%n, o%l, o%j, o%z, o%GetOccupation()
     end do
 
     write(*,*)
@@ -288,15 +285,15 @@ contains
     this%Nucl = trim(elements(this%Z+1)) // trim(s%str(this%A))
     write(*,'(2a)') " Target Nuclide is ", trim(this%Nucl)
     write(*,'(2a)') "   Core Nuclide is ", trim(this%Core)
-    write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
+    write(*,'(a)') "      cvo, idx,  n,  l,  j, tz,   occupation"
     do i = 1, this%sps%norbs ! print hole states
       o => this%sps%GetOrbit(i)
-      if(o%ph /= 0) cycle
-      write(*,'(a10,5i4,f14.6)') '     hole:', i, o%n, o%l, o%j, o%z, this%NOcoef(i)
+      if(o%GetCoreValenceOutside() /= 0) cycle
+      write(*,'(a10,5i4,f14.6)') '     core:', i, o%n, o%l, o%j, o%z, this%NOcoef(i)
     end do
     do i = 1, this%sps%norbs ! print valence states
       o => this%sps%GetOrbit(i)
-      if(o%ph /= 2) cycle
+      if(o%GetCoreValenceOutside() /= 2) cycle
       write(*,'(a10,5i4,f14.6)') '  valence:', i, o%n, o%l, o%j, o%z, this%NOcoef(i)
     end do
     write(*,*)
@@ -355,9 +352,9 @@ contains
       if(zz ==  1) N = N + occ_num
       if(cvp(1:1) == "c" .and. zz == -1) Zc = Zc + occ_num
       if(cvp(1:1) == "c" .and. zz ==  1) Nc = Nc + occ_num
-      if(cvp(1:1) == "c") call o%SetHoleParticleValence(0)
-      if(cvp(1:1) == "v") call o%SetHoleParticleValence(2)
-      if(cvp(1:1) == "p") call o%SetHoleParticleValence(1)
+      if(cvp(1:1) == "c") call o%SetCoreValenceOutside(0)
+      if(cvp(1:1) == "v") call o%SetCoreValenceOutside(1)
+      if(cvp(1:1) == "o") call o%SetCoreValenceOutside(2)
     end do
 999 close(runit)
     A = Z + N
@@ -370,9 +367,9 @@ contains
 
     do idx = 1, this%sps%norbs
       o => this%sps%orb(idx)
-      if(o%ph == 0) cycle
-      if(o%ph == 2) cycle
-      call o%SetHoleParticleValence(1)
+      if(o%GetCoreValenceOutside() == 0) cycle
+      if(o%GetCoreValenceOutside() == 1) cycle
+      call o%SetCoreValenceOutside(2)
     end do
   end subroutine GetConfFromFile
 
@@ -407,7 +404,7 @@ contains
         idxp = this%sps%nljz2idx(ns,l,j,-1)
         o => this%sps%GetOrbit(idxp)
 
-        call o%SetHoleParticleValence(0)
+        call o%SetCoreValenceOutside(0)
         if(Z - zz < 0) then
           write(*,"(a, i4)") "Error, proton core configuration has to be close:", Z
           stop
@@ -428,7 +425,7 @@ contains
         idxn = this%sps%nljz2idx(ns,l,j, 1)
         o => this%sps%GetOrbit(idxn)
 
-        call o%SetHoleParticleValence(0)
+        call o%SetCoreValenceOutside(0)
         if(N - nn < 0) then
           write(*,"(a, i4)") "Error, neutron core configuration has to be close:", N
           stop
@@ -494,10 +491,9 @@ contains
       if(v_orbits(1) == "" .or. v_orbits(1) == "none") then
         do l = 1, this%sps%norbs
           o => this%sps%orb(l)
-          if(o%ph == 0) cycle
-          if(abs(1.d0 - o%occ) > 1.d-8 .and. abs(o%occ) > 1.d-8) then
-            write(*,"(a)") "Error: no valence orbits and fractional occupation"
-            stop
+          if(o%GetCoreValenceOutside() == 0) cycle
+          if(abs(1.d0 - o%GetOccupation()) > 1.d-8 .and. abs(o%GetOccupation()) > 1.d-8) then
+            write(*,"(a,i4)") "Warning: no valence orbits and fractional occupation orbit index ", l
           end if
         end do
       end if
@@ -509,29 +505,29 @@ contains
         if(vlabel == "" .or. vlabel == "none") cycle
         idx = this%sps%GetIndexFromLabel(vlabel)
         o => this%sps%orb(idx)
-        if(o%ph == 0) then
+        if(o%GetCoreValenceOutside() == 0) then
           write(*,"(2a)") "Error: conflict occurs core and valence orbit ", trim(vlabel)
           stop
         end if
-        call o%SetHoleParticleValence(2)
+        call o%SetCoreValenceOutside(1)
       end do
     end if
 
     do l = 1, this%sps%norbs
       o => this%sps%orb(l)
-      if(o%ph == 0) cycle
-      if(o%ph == 2) cycle
-      call o%SetHoleParticleValence(1)
+      if(o%GetCoreValenceOutside() == 0) cycle
+      if(o%GetCoreValenceOutside() == 1) cycle
+      call o%SetCoreValenceOutside(2)
     end do
 
 #ifdef ModelSpaceDebug
     write(*,'(a)') "In AssignCoreValence:"
-    write(*,'(a)') "   n,  l,  j, tz, cpv,   occupation"
+    write(*,'(a)') "   n,  l,  j, tz, cvo,   occupation"
     do l = 1, this%sps%norbs
       o => this%sps%orb(l)
       if(o%ph == 0) vlabel = "c"
-      if(o%ph == 2) vlabel = "v"
-      if(o%ph == 1) vlabel = "p"
+      if(o%ph == 1) vlabel = "v"
+      if(o%ph == 2) vlabel = "o"
       write(*,'(4i4,a5,f14.6)') o%n, o%l, o%j, o%z, vlabel, this%NOcoef(l)
     end do
 #endif
@@ -540,13 +536,16 @@ contains
   subroutine GetParticleHoleOrbits(this)
     ! This should be called after obtaining NOCoef array
     class(MSpace), intent(inout) :: this
+    type(SingleParticleOrbit), pointer :: o => null()
     integer :: n_h, n_p, i
 
+    if(allocated(this%holes)) deallocate(this%holes)
+    if(allocated(this%particles)) deallocate(this%particles)
     n_h = 0
     n_p = 0
     do i = 1, this%sps%norbs
-      if(abs(1.d0 - this%NOCoef(i)) < 1.d-6) n_h = n_h + 1
-      if(abs(1.d0 - this%NOCoef(i)) > 1.d-6) n_p = n_p + 1
+      if(abs(this%NOCoef(i)) > 1.d-6) n_h = n_h + 1
+      if(abs(this%NOCoef(i)) < 1.d-6) n_p = n_p + 1
     end do
     this%nh = n_h
     this%np = n_p
@@ -557,14 +556,17 @@ contains
     n_h = 0
     n_p = 0
     do i = 1, this%sps%norbs
-      if(abs(1.d0 - this%NOCoef(i)) < 1.d-6) then
+      o => this%sps%GetOrbit(i)
+      if(abs(this%NOCoef(i)) > 1.d-6) then
         n_h = n_h + 1
         this%holes(n_h) = i
+        call o%SetHoleParticle(0)
       end if
 
-      if(abs(1.d0 - this%NOCoef(i)) > 1.d-6) then
+      if(abs(this%NOCoef(i)) < 1.d-6) then
         n_p = n_p + 1
         this%particles(n_p) = i
+        call o%SetHoleParticle(1)
       end if
     end do
 
@@ -651,7 +653,7 @@ contains
     integer :: i
     do i = 1, this%sps%norbs
       o => this%sps%GetOrbit(i)
-      if(o%ph == 1) cycle
+      if(o%GetCoreValenceOutside() == 2) cycle
       this%e_fermi = max(this%e_fermi, o%e)
     end do
   end subroutine SetEFermi

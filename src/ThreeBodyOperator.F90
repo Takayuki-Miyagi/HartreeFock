@@ -706,7 +706,7 @@ contains
             vsum = 0.d0
             do ih = 1, two%sps%norbs
               oh => two%sps%GetOrbit(ih)
-              if(oh%occ < 1.d-6) cycle
+              if(oh%GetOccupation() < 1.d-6) cycle
               jh = oh%j
               eh = oh%e
               if(e1+e2+eh > this%thr%e3max) cycle
@@ -727,7 +727,7 @@ contains
 
                 end do
               end do
-              vsum = vsum + v * oh%occ
+              vsum = vsum + v * oh%GetOccupation()
             end do
             r%MatCh(chbra,chket)%m(bra,ket) = vsum * fact / sqrt( dble( (2*J12+1) * (2*J34+1) ) )
             r%MatCh(chket,chbra)%m(ket,bra) = r%MatCh(chbra,chket)%m(bra,ket) * &

@@ -66,7 +66,9 @@ module HartreeFock
     real(8) :: e3  ! 3n int. term
     real(8) :: ehf ! hf energy
 
+    logical :: dynamic_reference = .false.
     logical :: is_roothaan=.false.
+    type(MSpace), pointer :: ms => null()
     type(OneBodyPart) :: F   ! Fock opeartor
     type(OneBodyPart) :: T   ! kinetic term
     type(OneBodyPart) :: V   ! one-body filed from 2body interaction
@@ -80,9 +82,11 @@ module HartreeFock
     procedure :: fin => FinHFSolver
     procedure :: init => InitHFSolver
     procedure :: solve => SolveHFSolver
+    procedure :: SetDynamicReference
     procedure :: PrintSPEs
     procedure :: DiagonalizeFockMatrix
     procedure :: SetOccupationMatrix
+    procedure :: SetDynamicalOccupation
     procedure :: UpdateDensityMatrix
     procedure :: UpdateDensityMatrixFromCoef
     procedure :: UpdateFockMatrix
@@ -109,6 +113,7 @@ contains
     !call this%S%fin()
     call this%V2%FinMonopole()
     call this%V3%FinMonopole()
+    this%ms => null()
   end subroutine FinHFSolver
 
   subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,norm_kernel)
@@ -123,6 +128,7 @@ contains
     integer :: ch, ndim
 
     ms => hamil%ms
+    this%ms => ms
     if(hamil%is_normal_ordered) then
       write(*,'(a)') "Hamiltonian has to be normal ordered w.r.t the vacuum."
       return
@@ -184,8 +190,9 @@ contains
   subroutine SolveHFSolver(this)
     use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
-    integer :: iter
+    integer :: iter, i
     real(8) :: ti
+    type(SingleParticleOrbit), pointer :: o=>null()
 
     ti = omp_get_wtime()
     write(*,'(2x,a,9x,a,10x,a,9x,a,7x,a,14x,a)') "iter", "zero-body", &
@@ -198,6 +205,7 @@ contains
     do iter = 1, this%n_iter_max
 
       call this%DiagonalizeFockMatrix()
+      if(iter > 5 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
       call this%UpdateDensityMatrix()
       call this%UpdateFockMatrix()
 
@@ -214,6 +222,31 @@ contains
         write(*,'(es14.6)') this%diff
       end if
     end do
+
+    if(this%dynamic_reference) then
+      do i = 1, this%ms%sps%norbs
+        this%ms%NOCoef(i) = this%Occ%GetOBME(i,i)
+        if(abs(this%ms%NOCoef(i)) < 1.d-8) cycle
+        if(abs(1.d0 - this%ms%NOCoef(i)) < 1.d-8) cycle
+        write(*,"(a)") "# Using partial occupation"
+      end do
+
+      do i = 1, this%ms%sps%norbs ! print hole states
+        o => this%ms%sps%GetOrbit(i)
+        call o%SetOccupation(this%ms%NOcoef(i))
+      end do
+
+      call this%ms%GetParticleHoleOrbits()
+      call this%ms%SetEFermi()
+      write(*,'(2a)') " Target Nuclide is ", trim(this%ms%Nucl)
+      write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
+      do i = 1, this%ms%sps%norbs ! print hole states
+        o => this%ms%sps%GetOrbit(i)
+        if(o%GetHoleParticle() /= 0) cycle
+        write(*,'(a10,5i4,f14.6)') '     hole:', i, o%n, o%l, o%j, o%z, o%GetOccupation()
+      end do
+      call this%ms%InitSubSpace()
+    end if
 
     call timer%Add("Hartree-Fock iteration",omp_get_wtime() - ti)
   end subroutine SolveHFSolver
@@ -1089,7 +1122,7 @@ contains
         call sol_gen%init(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
         call sol_gen%DiagSym(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
         this%C%MatCh(ch,ch)%DMat = sol%vec
-        call sol%fin()
+        call sol_gen%fin()
       end do
       return
     end if
@@ -1116,6 +1149,107 @@ contains
       end do
     end do
   end subroutine SetOccupationMatrix
+
+  subroutine SetDynamicalOccupation(this)
+    class(HFSolver), intent(inout) :: this
+    type(OneBodySpace), pointer :: one => null()
+    integer, allocatable :: i2orbit_p(:), i2orbit_n(:)
+    real(8), allocatable :: spe(:)
+    type(SingleParticleOrbit), pointer :: oi => null()
+    type(OneBodyPart) :: diag
+    integer :: i, j, k_p, k_n, ch, Z, N
+    real(8) :: emin_p, emin_n
+    type(EigenSolSymD) :: sol
+    type(GenEigenSolSymD) :: sol_gen
+
+    call this%Occ%fin()
+    call this%Occ%init(this%ms%one, .true., 'Occ',     0, 1, 0)
+    diag = this%F
+    if(this%is_roothaan) then
+      do ch = 1, this%F%one%NChan
+        call sol_gen%init(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
+        call sol_gen%DiagSym(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
+        call diag%MatCh(ch,ch)%DiagMat(sol%eig)
+        call sol_gen%fin()
+      end do
+    end if
+
+    if(.not. this%is_roothaan) then
+      do ch = 1, this%F%one%NChan
+        call sol%init(this%F%MatCh(ch,ch)%DMat)
+        call sol%DiagSym(this%F%MatCh(ch,ch)%DMat)
+        call diag%MatCh(ch,ch)%DiagMat(sol%eig)
+        call sol%fin()
+      end do
+    end if
+
+    one => this%F%one
+    allocate(i2orbit_p(one%sps%norbs/2))
+    allocate(i2orbit_n(one%sps%norbs/2))
+    allocate(spe(one%sps%norbs))
+    do i = 1, one%sps%norbs
+      oi => one%sps%GetOrbit(i)
+      spe(i) = Diag%GetOBME(i,i)
+    end do
+
+    do j = 1, one%sps%norbs/2
+      k_p = 0; k_n = 0
+      emin_p = 1.d300; emin_n = 1.d300
+      do i = 1, one%sps%norbs
+        oi => one%sps%GetOrbit(i)
+        if(oi%z ==-1 .and. emin_p > spe(i) ) then
+          k_p = i
+          emin_p = spe(i)
+        end if
+
+        if(oi%z == 1 .and. emin_n > spe(i) ) then
+          k_n = i
+          emin_n = spe(i)
+        end if
+      end do
+      spe(k_p) = 1.d300
+      spe(k_n) = 1.d300
+      i2orbit_p(j) = k_p
+      i2orbit_n(j) = k_n
+    end do
+
+
+    Z = 0
+    do j = 1, one%sps%norbs/2
+      i = i2orbit_p(j)
+      oi => one%sps%GetOrbit(i)
+      Z = Z + (oi%j + 1)
+      if(Z < this%ms%Z) then
+        call this%Occ%SetOBME(i,i,1.d0); cycle
+      end if
+      if(Z == this%ms%Z) then
+        call this%Occ%SetOBME(i,i,1.d0); exit
+      end if
+      if(Z > this%ms%Z) then
+        call this%Occ%SetOBME(i,i,dble(this%ms%Z-Z+(oi%j+1)) / dble(oi%j+1)); exit
+      end if
+    end do
+    N = 0
+    do j = 1, one%sps%norbs/2
+      i = i2orbit_n(j)
+      oi => one%sps%GetOrbit(i)
+      N = N + (oi%j + 1)
+      if(N < this%ms%N) then
+        call this%Occ%SetOBME(i,i,1.d0); cycle
+      end if
+      if(N == this%ms%N) then
+        call this%Occ%SetOBME(i,i,1.d0); exit
+      end if
+      if(N > this%ms%N) then
+        call this%Occ%SetOBME(i,i,dble(this%ms%N-N+(oi%j+1)) / dble(oi%j+1)); exit
+      end if
+    end do
+
+    call diag%fin()
+    deallocate(i2orbit_p)
+    deallocate(i2orbit_n)
+    deallocate(spe)
+  end subroutine SetDynamicalOccupation
 
   subroutine UpdateDensityMatrix(this)
     class(HFSolver), intent(inout) :: this
@@ -1207,13 +1341,12 @@ contains
       this%diff = max(maxval(abs(this%F%MatCh(ch1,ch1)%m - Fold%MatCh(ch1,ch1)%m)), this%diff)
     end do
     call Fold%fin()
-
   end subroutine UpdateFockMatrix
 
-  subroutine PrintSPEs(this,ms,iunit)
+  subroutine PrintSPEs(this,iunit)
     class(HFSolver), intent(in) :: this
-    type(MSpace), intent(in) :: ms
     integer, intent(in) :: iunit
+    type(MSpace), pointer :: ms
     integer :: e, g, j, l, n, iop, ion
     integer :: i, io, ch, z
     type(OneBodyPart) :: F_HF
@@ -1221,6 +1354,7 @@ contains
     character(40) :: char_spe, sp_label, ph_proton, ph_neutron
     character(256) :: line
 
+    ms => this%ms
     F_HF = this%F
     do ch = 1, ms%one%NChan
       F_HF%MatCh(ch,ch)%DMat = this%C%MatCh(ch,ch)%DMat%T() * &
@@ -1228,7 +1362,7 @@ contains
     end do
 
     write(iunit,'(a)') "#  Hartree-Fock single-particle energies (spe)"
-    write(iunit,'(a)') "#    Orbit:                 proton spe               neutron spe"
+    write(iunit,'(a)') "#    Orbit:                 proton spe     Occ               neutron spe     Occ"
 
     do e = 0, ms%sps%emax
       do g = 2*e+1, -2*e+1, -4
@@ -1243,15 +1377,16 @@ contains
         on => ms%sps%GetOrbit(ion)
         sp_label = trim(ms%sps%GetLabelFromIndex(iop))
         ph_proton = "hole"
-        if(op%ph == 1) ph_proton = "particle"
+        if(op%GetHoleParticle() == 1) ph_proton = "particle"
         ph_neutron = "hole"
-        if(on%ph == 1) ph_neutron = "particle"
-        write(line,"(a,a8,a,a12,f14.6,a12,f14.6)") "# ", trim(sp_label(2:)), ": ", trim(ph_proton), F_HF%GetOBME(iop,iop), &
-            & trim(ph_neutron), F_HF%GetOBME(ion, ion)
+        if(on%GetHoleParticle() == 1) ph_neutron = "particle"
+        write(line,"(a,a8,a,a12,f14.6,f8.4,a12,f14.6,f8.4)") "# ", trim(sp_label(2:)), ": ", &
+            & trim(ph_proton), F_HF%GetOBME(iop,iop), &
+            & this%Occ%GetOBME(iop,iop), trim(ph_neutron), &
+            & F_HF%GetOBME(ion, ion), this%Occ%GetOBME(ion,ion)
         write(iunit,"(a)") trim(line)
       end do
     end do
-
 
     !do i = 1, size(ms%holes)
     !  io = ms%holes(i)
@@ -1268,6 +1403,15 @@ contains
     !end do
     call F_HF%fin()
   end subroutine PrintSPEs
+
+  subroutine SetDynamicReference(this, dynamic_reference)
+    class(HFSolver), intent(inout) :: this
+    logical, intent(in) :: dynamic_reference
+    this%dynamic_reference = dynamic_reference
+    if(this%dynamic_reference) then
+      write(*,"(a)") "# The occupation is dynamically changed during HF iteration"
+    end if
+  end subroutine SetDynamicReference
 
   subroutine FinMonopole(this)
     class(Monopole), intent(inout) :: this

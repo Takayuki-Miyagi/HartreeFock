@@ -175,11 +175,11 @@ contains
       o => ms%sps%GetOrbit(idx)
       call o%SetOccupation(ms%NOcoef(idx))
       if(ms%NOcoef(idx) < 1.d-6) then
-        call o%SetHoleParticleValence(1)
+        call o%SetCoreValenceOutside(2)
       elseif(abs(1.d0 - ms%NOCoef(idx)) < 1.d-6) then
-        call o%SetHoleParticleValence(0)
+        call o%SetCoreValenceOutside(0)
       else
-        call o%SetHoleParticleValence(2)
+        call o%SetCoreValenceOutside(1)
       end if
     end do
     write(*,"(a,i4,2a)") "# number of electrons ", N_e, " from ", trim(f)

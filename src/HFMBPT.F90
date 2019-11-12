@@ -224,11 +224,11 @@ contains
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
       do ab = 1, ch_two%n_pp_state
-        a = ch_two%n2spi1(ch_two%pps(ab))
-        b = ch_two%n2spi2(ch_two%pps(ab))
+        a = ch_two%n2spi1(ch_two%pp_s(ab))
+        b = ch_two%n2spi2(ch_two%pp_s(ab))
         do ij = 1, ch_two%n_hh_state
-          i = ch_two%n2spi1(ch_two%hhs(ij))
-          j = ch_two%n2spi2(ch_two%hhs(ij))
+          i = ch_two%n2spi1(ch_two%hh_s(ij))
+          j = ch_two%n2spi2(ch_two%hh_s(ij))
 
           v = v + h%two%GetTwBME(i,j,a,b,J2)**2 / &
               & get_denominator2(h,i,j,a,b)
@@ -544,17 +544,17 @@ contains
     vsum = 0.d0
     do h2 = 1, sps%norbs
       oh2 => sps%GetOrbit(h2)
-      if(oh2%occ < 1.d-6) cycle
+      if(oh2%GetOccupation() < 1.d-6) cycle
       do p4 = 1, sps%norbs
         op4 => sps%GetOrbit(p4)
-        if(op4%occ > 1.d-6) cycle
+        if(op4%GetOccupation() > 1.d-6) cycle
 
         do h1 = 1, sps%norbs
           oh1 => sps%GetOrbit(h1)
-          if(oh1%occ < 1.d-6) cycle
+          if(oh1%GetOccupation() < 1.d-6) cycle
           do p3 = 1, sps%norbs
             op3 => sps%GetOrbit(p3)
-            if(op3%occ > 1.d-6) cycle
+            if(op3%GetOccupation() > 1.d-6) cycle
             norm = 1.d0
             if(h1==h2) norm = norm * sqrt(2.d0)
             if(p3==p4) norm = norm * sqrt(2.d0)
@@ -639,17 +639,17 @@ contains
     vsum = 0.d0
     do h1 = 1, sps%norbs
       oh1 => sps%GetOrbit(h1)
-      if(oh1%occ < 1.d-6) cycle
+      if(oh1%GetOccupation() < 1.d-6) cycle
       do h2 = 1, sps%norbs
         oh2 => sps%GetOrbit(h2)
-        if(oh2%occ < 1.d-6) cycle
+        if(oh2%GetOccupation() < 1.d-6) cycle
         do h3 = 1, sps%norbs
           oh3 => sps%GetOrbit(h3)
-          if(oh3%occ < 1.d-6) cycle
+          if(oh3%GetOccupation() < 1.d-6) cycle
 
           do p3 = 1, sps%norbs
             op3 => sps%GetOrbit(p3)
-            if(op3%occ > 1.d-6) cycle
+            if(op3%GetOccupation() > 1.d-6) cycle
 
             norm = 1.d0
             if(h1==h2) norm = norm * sqrt(2.d0)
@@ -734,19 +734,19 @@ contains
     vsum = 0.d0
     do h3 = 1, sps%norbs
       oh3 => sps%GetOrbit(h3)
-      if(oh3%occ < 1.d-6) cycle
+      if(oh3%GetOccupation() < 1.d-6) cycle
 
       do p1 = 1, sps%norbs
         op1 => sps%GetOrbit(p1)
-        if(op1%occ > 1.d-6) cycle
+        if(op1%GetOccupation() > 1.d-6) cycle
 
         do p2 = 1, sps%norbs
           op2 => sps%GetOrbit(p2)
-          if(op2%occ > 1.d-6) cycle
+          if(op2%GetOccupation() > 1.d-6) cycle
 
           do p3 = 1, sps%norbs
             op3 => sps%GetOrbit(p3)
-            if(op3%occ > 1.d-6) cycle
+            if(op3%GetOccupation() > 1.d-6) cycle
 
             norm = 1.d0
             if(p1==p2) norm = norm * sqrt(2.d0)
@@ -841,11 +841,11 @@ contains
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j,denom) reduction(+:v)
       do ab = 1, ch_two%n_pp_state
-        a = ch_two%n2spi1(ch_two%pps(ab))
-        b = ch_two%n2spi2(ch_two%pps(ab))
+        a = ch_two%n2spi1(ch_two%pp_s(ab))
+        b = ch_two%n2spi2(ch_two%pp_s(ab))
         do ij = 1, ch_two%n_hh_state
-          i = ch_two%n2spi1(ch_two%hhs(ij))
-          j = ch_two%n2spi2(ch_two%hhs(ij))
+          i = ch_two%n2spi1(ch_two%hh_s(ij))
+          j = ch_two%n2spi2(ch_two%hh_s(ij))
           denom = 1.d0 / get_denominator2(h,i,j,a,b)
 
           v = v + v_pphh_1%two%GetTwBME(i,j,a,b,J2) * &
@@ -1018,7 +1018,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
 
     iket = 0
@@ -1027,7 +1027,7 @@ contains
       b = ch_ket%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)*abs(ob%occ) > 1.d-6) iket = iket+1
+      if(abs(oa%GetOccupation())*abs(ob%GetOccupation()) > 1.d-6) iket = iket+1
     end do
 
     call M%ini(ibra,iket)
@@ -1037,7 +1037,7 @@ contains
       b = ch_bra%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6) cycle
       ibra = ibra + 1
       iket = 0
       do ket = 1, ch_ket%n_state
@@ -1045,7 +1045,7 @@ contains
         d = ch_ket%n2spi2(ket)
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oc%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         iket = iket + 1
         M%m(ibra,iket) = opch%m(bra,ket) / get_denominator2(h,c,d,a,b)
       end do
@@ -1075,7 +1075,8 @@ contains
       b = ch_cc%n2spi2(bra)
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) > 1.d-6 .and. abs(oa%occ)*abs(ob%occ) < 1.d-6) ibra = ibra+1
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) > 1.d-6 .and. &
+          & abs(oa%GetOccupation())*abs(ob%GetOccupation()) < 1.d-6) ibra = ibra+1
     end do
     call Mat%zeros(ibra,ibra)
     if(ibra < 1) return
@@ -1085,7 +1086,8 @@ contains
       b = ch_cc%n2spi2(bra) ! h
       oa => sps%GetOrbit(a)
       ob => sps%GetOrbit(b)
-      if(abs(oa%occ)+abs(ob%occ) < 1.d-6 .or. abs(oa%occ)*abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation())+abs(ob%GetOccupation()) < 1.d-6 .or. &
+          & abs(oa%GetOccupation())*abs(oa%GetOccupation()) > 1.d-6) cycle
       ibra = ibra+1
       iket = 0
       do ket = 1, ch_cc%n_state
@@ -1093,11 +1095,12 @@ contains
         d = ch_cc%n2spi2(ket) ! h
         oc => sps%GetOrbit(c)
         od => sps%GetOrbit(d)
-        if(abs(oc%occ)+abs(od%occ) < 1.d-6 .or. abs(oc%occ)*abs(od%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation())+abs(od%GetOccupation()) < 1.d-6 .or. &
+            & abs(oc%GetOccupation())*abs(od%GetOccupation()) > 1.d-6) cycle
         iket = iket+1
         if(oa%z+oc%z /= ob%z+od%z) cycle
-        if(abs(oa%occ)+abs(oc%occ) > 1.d-6) cycle
-        if(abs(ob%occ)*abs(od%occ) < 1.d-6) cycle
+        if(abs(oa%GetOccupation())+abs(oc%GetOccupation()) > 1.d-6) cycle
+        if(abs(ob%GetOccupation())*abs(od%GetOccupation()) < 1.d-6) cycle
         norm = 1.d0
         if(a==c) norm = norm*sqrt(2.d0)
         if(b==d) norm = norm*sqrt(2.d0)
@@ -1123,14 +1126,14 @@ contains
     lowest_particle = 100.d0
     do a = 1, norbs
       oa => ms%sps%orb(a)
-      if( oa%ph /= 1 ) cycle
+      if( oa%GetHoleParticle() /= 1 ) cycle
       lowest_particle = min(lowest_particle, h%one%GetOBME(a,a))
     end do
 
     highest_hole = -100.d0
     do a = 1, norbs
       oa => ms%sps%orb(a)
-      if( oa%ph /= 0 ) cycle
+      if( oa%GetHoleParticle() /= 0 ) cycle
       highest_hole = max(highest_hole, h%one%GetOBME(a,a))
     end do
     this%energy_gap = lowest_particle - highest_hole
@@ -1139,10 +1142,10 @@ contains
     max_denom1b = 0.d0
     do a = 1, norbs
       oa => ms%sps%orb(a)
-      if( oa%ph /= 1 ) cycle
+      if( oa%GetHoleParticle() /= 1 ) cycle
       do i = 1, norbs
       oi => ms%sps%orb(i)
-      if( oi%ph /= 0 ) cycle
+      if( oi%GetHoleParticle() /= 0 ) cycle
         max_denom1b = max(max_denom1b, h%one%GetOBME(i,a) / abs(get_denominator1(h,i,a)))
       end do
     end do
@@ -1158,13 +1161,13 @@ contains
       do ab = 1, n
         a = ms%two%jpz(ch)%n2spi1(ab)
         b = ms%two%jpz(ch)%n2spi2(ab)
-        if( ms%sps%orb(a)%ph /= 1 ) cycle
-        if( ms%sps%orb(b)%ph /= 1 ) cycle
+        if( ms%sps%orb(a)%GetHoleParticle() /= 1 ) cycle
+        if( ms%sps%orb(b)%GetHoleParticle() /= 1 ) cycle
         do ij = 1, n
           i = ms%two%jpz(ch)%n2spi1(ij)
           j = ms%two%jpz(ch)%n2spi2(ij)
-          if( ms%sps%orb(i)%ph /= 0 ) cycle
-          if( ms%sps%orb(j)%ph /= 0 ) cycle
+          if( ms%sps%orb(i)%GetHoleParticle() /= 0 ) cycle
+          if( ms%sps%orb(j)%GetHoleParticle() /= 0 ) cycle
           max_val = max(max_val, &
               & abs(h%two%GetTwBME(i,j,a,b,J2)) / abs(get_denominator2(h,i,j,a,b)))
         end do
@@ -1279,11 +1282,11 @@ contains
       !$omp parallel
       !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
       do ab = 1, ch_two%n_pp_state
-        a = ch_two%n2spi1(ch_two%pps(ab))
-        b = ch_two%n2spi2(ch_two%pps(ab))
+        a = ch_two%n2spi1(ch_two%pp_s(ab))
+        b = ch_two%n2spi2(ch_two%pp_s(ab))
         do ij = 1, ch_two%n_hh_state
-          i = ch_two%n2spi1(ch_two%hhs(ij))
-          j = ch_two%n2spi2(ch_two%hhs(ij))
+          i = ch_two%n2spi1(ch_two%hh_s(ij))
+          j = ch_two%n2spi2(ch_two%hh_s(ij))
 
           v = v + h%two%GetTwBME(i,j,a,b,J2) * &
               &   s%two%GetTwBME(a,b,i,j,J2) / &
@@ -1367,16 +1370,16 @@ contains
       v = 0.d0
       do b = 1, ms%sps%norbs
         ob => ms%sps%GetOrbit(b)
-        if(abs(ob%occ) > 1.d-6) cycle
+        if(abs(ob%GetOccupation()) > 1.d-6) cycle
         do c = 1, ms%sps%norbs
           oc => ms%sps%GetOrbit(c)
-          if(abs(oc%occ) > 1.d-6) cycle
+          if(abs(oc%GetOccupation()) > 1.d-6) cycle
           if(ob%j /= oc%j) cycle
           if(ob%l /= oc%l) cycle
           if(ob%z /= oc%z) cycle
           do a = 1, ms%sps%norbs
             oa => ms%sps%GetOrbit(a)
-            if(abs(oa%occ) > 1.d-6) cycle
+            if(abs(oa%GetOccupation()) > 1.d-6) cycle
 
             bra = ch_two%spis2n(a,b)
             ket = ch_two%spis2n(a,c)
@@ -1439,16 +1442,16 @@ contains
       v = 0.d0
       do j = 1, ms%sps%norbs
         oj => ms%sps%GetOrbit(j)
-        if(abs(oj%occ) < 1.d-6) cycle
+        if(abs(oj%GetOccupation()) < 1.d-6) cycle
         do k = 1, ms%sps%norbs
           ok => ms%sps%GetOrbit(k)
-          if(abs(ok%occ) < 1.d-6) cycle
+          if(abs(ok%GetOccupation()) < 1.d-6) cycle
           if(oj%j /= ok%j) cycle
           if(oj%l /= ok%l) cycle
           if(oj%z /= ok%z) cycle
           do i = 1, ms%sps%norbs
             oi => ms%sps%GetOrbit(i)
-            if(abs(oi%occ) < 1.d-6) cycle
+            if(abs(oi%GetOccupation()) < 1.d-6) cycle
 
             bra = ch_two%spis2n(i,j)
             ket = ch_two%spis2n(i,k)
@@ -1517,16 +1520,16 @@ contains
       v = 0.d0
       do c = 1, ms%sps%norbs
         oc => ms%sps%GetOrbit(c)
-        if(abs(oc%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation()) > 1.d-6) cycle
         do i = 1, ms%sps%norbs
           oi => ms%sps%GetOrbit(i)
-          if(abs(oi%occ) < 1.d-6) cycle
+          if(abs(oi%GetOccupation()) < 1.d-6) cycle
           if(oc%j /= oi%j) cycle
           if(oc%l /= oi%l) cycle
           if(oc%z /= oi%z) cycle
           do j = 1, ms%sps%norbs
             oj => ms%sps%GetOrbit(i)
-            if(abs(oj%occ) < 1.d-6) cycle
+            if(abs(oj%GetOccupation()) < 1.d-6) cycle
 
             bra = ch_two%spis2n(i,j)
             ket = ch_two%spis2n(c,j)
@@ -1543,17 +1546,17 @@ contains
 
       do a = 1, ms%sps%norbs
         oa => ms%sps%GetOrbit(a)
-        if(abs(oa%occ) > 1.d-6) cycle
+        if(abs(oa%GetOccupation()) > 1.d-6) cycle
         do k = 1, ms%sps%norbs
           ok => ms%sps%GetOrbit(k)
-          if(abs(ok%occ) < 1.d-6) cycle
+          if(abs(ok%GetOccupation()) < 1.d-6) cycle
           if(oa%j /= ok%j) cycle
           if(oa%l /= ok%l) cycle
           if(oa%z /= ok%z) cycle
 
           do b = 1, ms%sps%norbs
             ob => ms%sps%GetOrbit(b)
-            if(abs(ob%occ) > 1.d-6) cycle
+            if(abs(ob%GetOccupation()) > 1.d-6) cycle
 
             bra = ch_two%spis2n(a,b)
             ket = ch_two%spis2n(k,b)
@@ -1921,10 +1924,10 @@ contains
     if(oa%l /= ob%l) cycle
     if(oa%z /= ob%z) cycle
     me = 0.d0
-    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) > 1.d-6) me = me + density_matrix_element_hh(a, b, hamil)
-    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) > 1.d-6) me = me + density_matrix_element_ph(a, b, hamil)
-    if(abs(oa%occ) > 1.d-6 .and. abs(ob%occ) < 1.d-6) me = me + density_matrix_element_ph(b, a, hamil)
-    if(abs(oa%occ) < 1.d-6 .and. abs(ob%occ) < 1.d-6) me = me + density_matrix_element_pp(a, b, hamil)
+    if(abs(oa%GetOccupation()) > 1.d-6 .and. abs(ob%GetOccupation()) > 1.d-6) me = me + density_matrix_element_hh(a, b, hamil)
+    if(abs(oa%GetOccupation()) < 1.d-6 .and. abs(ob%GetOccupation()) > 1.d-6) me = me + density_matrix_element_ph(a, b, hamil)
+    if(abs(oa%GetOccupation()) > 1.d-6 .and. abs(ob%GetOccupation()) < 1.d-6) me = me + density_matrix_element_ph(b, a, hamil)
+    if(abs(oa%GetOccupation()) < 1.d-6 .and. abs(ob%GetOccupation()) < 1.d-6) me = me + density_matrix_element_pp(a, b, hamil)
     call this%rho_HF%SetOBME(a,b,me)
     call this%rho_HF%SetOBME(b,a,me)
     end do
@@ -1961,13 +1964,13 @@ contains
     r = 0.d0
     do c = 1, sps%norbs
       oc => sps%GetOrbit(c)
-      if(abs(oc%occ) > 1.d-6) cycle
+      if(abs(oc%GetOccupation()) > 1.d-6) cycle
       do i = 1, sps%norbs
         oi => sps%GetOrbit(i)
-        if(abs(oi%occ) < 1.d-6) cycle
+        if(abs(oi%GetOccupation()) < 1.d-6) cycle
         do j = 1, sps%norbs
           oj => sps%GetOrbit(j)
-          if(abs(oj%occ) < 1.d-6) cycle
+          if(abs(oj%GetOccupation()) < 1.d-6) cycle
 
           if((-1)**(oa%l+oc%l+oi%l+oj%l) == -1) cycle
           if(oa%z+oc%z /= oi%z+oj%z) cycle
@@ -2015,15 +2018,15 @@ contains
     r = 0.d0
     do a = 1, sps%norbs
       oa => sps%GetOrbit(a)
-      if(abs(oa%occ) > 1.d-6) cycle
+      if(abs(oa%GetOccupation()) > 1.d-6) cycle
 
       do b = 1, sps%norbs
         ob => sps%GetOrbit(b)
-        if(abs(ob%occ) > 1.d-6) cycle
+        if(abs(ob%GetOccupation()) > 1.d-6) cycle
 
         do k = 1, sps%norbs
           ok => sps%GetOrbit(k)
-          if(abs(ok%occ) < 1.d-6) cycle
+          if(abs(ok%GetOccupation()) < 1.d-6) cycle
 
           if((-1)**(oa%l+ob%l+oi%l+ok%l) == -1) cycle
           if(oa%z + ob%z /= oi%z + ok%z) cycle
@@ -2052,7 +2055,7 @@ contains
       end do
     end do
     r = - 0.5d0 * r / dble(oi%j+1)
-    if(i == j) r = r + oi%occ
+    if(i == j) r = r + oi%GetOccupation()
   end function density_matrix_element_hh
 
   function density_matrix_element_ph(a, i, hamil) result(r)
@@ -2072,13 +2075,13 @@ contains
     r = 0.d0
     do b = 1, sps%norbs
       ob => sps%GetOrbit(b)
-      if(abs(ob%occ) > 1.d-6) cycle
+      if(abs(ob%GetOccupation()) > 1.d-6) cycle
       do c = 1, sps%norbs
         oc => sps%GetOrbit(c)
-        if(abs(oc%occ) > 1.d-6) cycle
+        if(abs(oc%GetOccupation()) > 1.d-6) cycle
         do j = 1, sps%norbs
           oj => sps%GetOrbit(j)
-          if(abs(oj%occ) < 1.d-6) cycle
+          if(abs(oj%GetOccupation()) < 1.d-6) cycle
           if((-1)**(oa%l+oj%l+ob%l+oc%l) == -1) cycle
           if(oa%z+oj%z /= ob%z+oc%z) cycle
           e_ai = get_denominator1(hamil, i, a)
@@ -2104,13 +2107,13 @@ contains
 
     do b = 1, sps%norbs
       ob => sps%GetOrbit(b)
-      if(abs(ob%occ) > 1.d-6) cycle
+      if(abs(ob%GetOccupation()) > 1.d-6) cycle
       do j = 1, sps%norbs
         oj => sps%GetOrbit(j)
-        if(abs(oj%occ) < 1.d-6) cycle
+        if(abs(oj%GetOccupation()) < 1.d-6) cycle
         do k = 1, sps%norbs
           ok => sps%GetOrbit(k)
-          if(abs(ok%occ) < 1.d-6) cycle
+          if(abs(ok%GetOccupation()) < 1.d-6) cycle
 
           if((-1)**(oa%l+ob%l+oj%l+ok%l) == -1) cycle
           if(oa%z + ob%z /= oj%z + ok%z) cycle
@@ -2768,10 +2771,10 @@ contains
             op2 => sps%GetOrbit(p2)
             op3 => sps%GetOrbit(p3)
             op4 => sps%GetOrbit(p4)
-            if(abs(op1%occ) > 1.d-6) cycle
-            if(abs(op2%occ) > 1.d-6) cycle
-            if(abs(op3%occ) > 1.d-6) cycle
-            if(abs(op4%occ) > 1.d-6) cycle
+            if(abs(op1%GetOccupation()) > 1.d-6) cycle
+            if(abs(op2%GetOccupation()) > 1.d-6) cycle
+            if(abs(op3%GetOccupation()) > 1.d-6) cycle
+            if(abs(op4%GetOccupation()) > 1.d-6) cycle
 
             do h1 = 1, sps%norbs
               do h2 = 1, sps%norbs
@@ -2781,10 +2784,10 @@ contains
                     oh2 => sps%GetOrbit(h2)
                     oh3 => sps%GetOrbit(h3)
                     oh4 => sps%GetOrbit(h4)
-                    if(abs(oh1%occ) < 1.d-6) cycle
-                    if(abs(oh2%occ) < 1.d-6) cycle
-                    if(abs(oh3%occ) < 1.d-6) cycle
-                    if(abs(oh4%occ) < 1.d-6) cycle
+                    if(abs(oh1%GetOccupation()) < 1.d-6) cycle
+                    if(abs(oh2%GetOccupation()) < 1.d-6) cycle
+                    if(abs(oh3%GetOccupation()) < 1.d-6) cycle
+                    if(abs(oh4%GetOccupation()) < 1.d-6) cycle
 
                     if((-1)**(op1%l+op2%l+oh1%l+oh2%l) == -1) cycle
                     if((-1)**(op3%l+oh2%l+op1%l+oh4%l) == -1) cycle

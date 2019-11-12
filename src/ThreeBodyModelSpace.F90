@@ -54,16 +54,16 @@ module ThreeBodyModelSpace
     integer :: p = 0
     integer :: z = 100
     integer :: n_state = 0
-    integer :: n_hhp_state = 0 ! hole-hole-particle     (not relevant for decoupling)
-    integer :: n_hpv_state = 0 ! hole-particle-valence  (not relevant for decoupling)
-    integer :: n_hpp_state = 0 ! hole-particle-particle (not relevant for decoupling)
-    integer :: n_hhh_state = 0 ! hole-hole-hole
-    integer :: n_hhv_state = 0 ! hole-hole-valence
-    integer :: n_hvv_state = 0 ! hole-valence-valence
+    integer :: n_cco_state = 0 ! hole-hole-particle     (not relevant for decoupling)
+    integer :: n_cov_state = 0 ! hole-particle-valence  (not relevant for decoupling)
+    integer :: n_coo_state = 0 ! hole-particle-particle (not relevant for decoupling)
+    integer :: n_ccc_state = 0 ! hole-hole-hole
+    integer :: n_ccv_state = 0 ! hole-hole-valence
+    integer :: n_cvv_state = 0 ! hole-valence-valence
     integer :: n_vvv_state = 0 ! valence-valence-valence
-    integer :: n_pvv_state = 0 ! particle-valence-valence
-    integer :: n_ppv_state = 0 ! particle-particle-valence
-    integer :: n_ppp_state = 0 ! particle-particle-particle
+    integer :: n_ovv_state = 0 ! particle-valence-valence
+    integer :: n_oov_state = 0 ! particle-particle-valence
+    integer :: n_ooo_state = 0 ! particle-particle-particle
     integer :: n_idx = 0
     type(AdditionalQN), allocatable :: idx(:)
     integer, allocatable :: n2spi1(:)
@@ -189,6 +189,8 @@ contains
       integer, allocatable :: spis2nidx(:,:,:)
     end type spis2n
     type(spis2n), allocatable :: ch(:)
+
+    if(allocated(this%jpz)) call this%fin()
 
     this%sps => sps
     allocate(this%jpz2ch(1:2*min(e3max,3*sps%lmax)+3,-1:1,-3:3))
@@ -318,6 +320,7 @@ contains
     integer :: i1, i2, i3
     type(SingleParticleOrbit), pointer :: o1, o2, o3
     integer :: ni, nj, idx, i, cnt, loop, cnt_sub
+    integer :: cvo1, cvo2, cvo3
     integer, allocatable :: nni(:), nnj(:)
 
     this%j = j
@@ -377,42 +380,47 @@ contains
           if(o1%e + o2%e > e2max) cycle
           do i3 = 1, i2
             o3 => sps%GetOrbit(i3)
-            if( loop == 1 .and. .not. (o1%ph == 0 .and. o2%ph == 0 .and. o3%ph == 1)) cycle ! hhp
-            if( loop == 2 .and. .not. (o1%ph == 0 .and. o2%ph == 1 .and. o3%ph == 0)) cycle ! hph
-            if( loop == 3 .and. .not. (o1%ph == 1 .and. o2%ph == 0 .and. o3%ph == 0)) cycle ! phh
 
-            if( loop == 4 .and. .not. (o1%ph == 0 .and. o2%ph == 1 .and. o3%ph == 2)) cycle ! hpv
-            if( loop == 5 .and. .not. (o1%ph == 1 .and. o2%ph == 2 .and. o3%ph == 0)) cycle ! pvh
-            if( loop == 6 .and. .not. (o1%ph == 2 .and. o2%ph == 0 .and. o3%ph == 1)) cycle ! vhp
-            if( loop == 7 .and. .not. (o1%ph == 1 .and. o2%ph == 0 .and. o3%ph == 2)) cycle ! phv
-            if( loop == 8 .and. .not. (o1%ph == 2 .and. o2%ph == 1 .and. o3%ph == 0)) cycle ! vph
-            if( loop == 9 .and. .not. (o1%ph == 0 .and. o2%ph == 2 .and. o3%ph == 1)) cycle ! hvp
+            cvo1 = o1%GetCoreValenceOutside()
+            cvo2 = o2%GetCoreValenceOutside()
+            cvo3 = o3%GetCoreValenceOutside()
 
-            if( loop ==10 .and. .not. (o1%ph == 0 .and. o2%ph == 1 .and. o3%ph == 1)) cycle ! hpp
-            if( loop ==11 .and. .not. (o1%ph == 1 .and. o2%ph == 1 .and. o3%ph == 0)) cycle ! pph
-            if( loop ==12 .and. .not. (o1%ph == 1 .and. o2%ph == 0 .and. o3%ph == 1)) cycle ! php
+            if( loop == 1 .and. .not. (cvo1 == 0 .and. cvo2 == 0 .and. cvo3 == 2)) cycle ! cco
+            if( loop == 2 .and. .not. (cvo1 == 0 .and. cvo2 == 2 .and. cvo3 == 0)) cycle ! coc
+            if( loop == 3 .and. .not. (cvo1 == 2 .and. cvo2 == 0 .and. cvo3 == 0)) cycle ! occ
 
-            if( loop ==13 .and. .not. (o1%ph == 0 .and. o2%ph == 0 .and. o3%ph == 0)) cycle ! hhh
+            if( loop == 4 .and. .not. (cvo1 == 0 .and. cvo2 == 2 .and. cvo3 == 1)) cycle ! cov
+            if( loop == 5 .and. .not. (cvo1 == 2 .and. cvo2 == 1 .and. cvo3 == 0)) cycle ! ovc
+            if( loop == 6 .and. .not. (cvo1 == 1 .and. cvo2 == 0 .and. cvo3 == 2)) cycle ! vco
+            if( loop == 7 .and. .not. (cvo1 == 2 .and. cvo2 == 0 .and. cvo3 == 1)) cycle ! ocv
+            if( loop == 8 .and. .not. (cvo1 == 1 .and. cvo2 == 2 .and. cvo3 == 0)) cycle ! voc
+            if( loop == 9 .and. .not. (cvo1 == 0 .and. cvo2 == 1 .and. cvo3 == 2)) cycle ! cvo
 
-            if( loop ==14 .and. .not. (o1%ph == 0 .and. o2%ph == 0 .and. o3%ph == 2)) cycle ! hhv
-            if( loop ==15 .and. .not. (o1%ph == 2 .and. o2%ph == 0 .and. o3%ph == 0)) cycle ! vhh
-            if( loop ==16 .and. .not. (o1%ph == 0 .and. o2%ph == 2 .and. o3%ph == 0)) cycle ! hvh
+            if( loop ==10 .and. .not. (cvo1 == 0 .and. cvo2 == 2 .and. cvo3 == 2)) cycle ! coo
+            if( loop ==11 .and. .not. (cvo1 == 2 .and. cvo2 == 2 .and. cvo3 == 0)) cycle ! ooc
+            if( loop ==12 .and. .not. (cvo1 == 2 .and. cvo2 == 0 .and. cvo3 == 2)) cycle ! oco
 
-            if( loop ==17 .and. .not. (o1%ph == 0 .and. o2%ph == 2 .and. o3%ph == 2)) cycle ! hvv
-            if( loop ==18 .and. .not. (o1%ph == 2 .and. o2%ph == 2 .and. o3%ph == 0)) cycle ! vvh
-            if( loop ==19 .and. .not. (o1%ph == 2 .and. o2%ph == 0 .and. o3%ph == 2)) cycle ! vhv
+            if( loop ==13 .and. .not. (cvo1 == 0 .and. cvo2 == 0 .and. cvo3 == 0)) cycle ! ccc
 
-            if( loop ==20 .and. .not. (o1%ph == 2 .and. o2%ph == 2 .and. o3%ph == 2)) cycle ! vvv
+            if( loop ==14 .and. .not. (cvo1 == 0 .and. cvo2 == 0 .and. cvo3 == 1)) cycle ! ccv
+            if( loop ==15 .and. .not. (cvo1 == 1 .and. cvo2 == 0 .and. cvo3 == 0)) cycle ! vcc
+            if( loop ==16 .and. .not. (cvo1 == 0 .and. cvo2 == 1 .and. cvo3 == 0)) cycle ! cvc
 
-            if( loop ==21 .and. .not. (o1%ph == 1 .and. o2%ph == 2 .and. o3%ph == 2)) cycle ! pvv
-            if( loop ==22 .and. .not. (o1%ph == 2 .and. o2%ph == 2 .and. o3%ph == 1)) cycle ! vvp
-            if( loop ==23 .and. .not. (o1%ph == 2 .and. o2%ph == 1 .and. o3%ph == 2)) cycle ! vpv
+            if( loop ==17 .and. .not. (cvo1 == 0 .and. cvo2 == 1 .and. cvo3 == 1)) cycle ! cvv
+            if( loop ==18 .and. .not. (cvo1 == 1 .and. cvo2 == 1 .and. cvo3 == 0)) cycle ! vvc
+            if( loop ==19 .and. .not. (cvo1 == 1 .and. cvo2 == 0 .and. cvo3 == 1)) cycle ! vcv
 
-            if( loop ==24 .and. .not. (o1%ph == 1 .and. o2%ph == 1 .and. o3%ph == 2)) cycle ! ppv
-            if( loop ==25 .and. .not. (o1%ph == 2 .and. o2%ph == 1 .and. o3%ph == 1)) cycle ! vpp
-            if( loop ==26 .and. .not. (o1%ph == 1 .and. o2%ph == 2 .and. o3%ph == 1)) cycle ! pvp
+            if( loop ==20 .and. .not. (cvo1 == 1 .and. cvo2 == 1 .and. cvo3 == 1)) cycle ! vvv
 
-            if( loop ==27 .and. .not. (o1%ph == 1 .and. o2%ph == 1 .and. o3%ph == 1)) cycle ! ppp
+            if( loop ==21 .and. .not. (cvo1 == 2 .and. cvo2 == 1 .and. cvo3 == 1)) cycle ! ovv
+            if( loop ==22 .and. .not. (cvo1 == 1 .and. cvo2 == 1 .and. cvo3 == 2)) cycle ! vvo
+            if( loop ==23 .and. .not. (cvo1 == 1 .and. cvo2 == 2 .and. cvo3 == 1)) cycle ! vov
+
+            if( loop ==24 .and. .not. (cvo1 == 2 .and. cvo2 == 2 .and. cvo3 == 1)) cycle ! oov
+            if( loop ==25 .and. .not. (cvo1 == 1 .and. cvo2 == 2 .and. cvo3 == 2)) cycle ! voo
+            if( loop ==26 .and. .not. (cvo1 == 2 .and. cvo2 == 1 .and. cvo3 == 2)) cycle ! ovo
+
+            if( loop ==27 .and. .not. (cvo1 == 2 .and. cvo2 == 2 .and. cvo3 == 2)) cycle ! ooo
             if(o1%e + o3%e > e2max) cycle
             if(o2%e + o3%e > e2max) cycle
             if(o1%e + o2%e + o3%e > e3max) cycle
@@ -436,16 +444,16 @@ contains
           end do
         end do
       end do
-      if(1 <= loop .and. loop <= 3) this%n_hhp_state = this%n_hhp_state + cnt_sub
-      if(4 <= loop .and. loop <= 9) this%n_hpv_state = this%n_hpv_state + cnt_sub
-      if(10<= loop .and. loop <=12) this%n_hpp_state = this%n_hpp_state + cnt_sub
-      if(loop == 13) this%n_hhh_state = cnt_sub
-      if(14<= loop .and. loop <=16) this%n_hhv_state = this%n_hhv_state + cnt_sub
-      if(17<= loop .and. loop <=19) this%n_hvv_state = this%n_hvv_state + cnt_sub
+      if(1 <= loop .and. loop <= 3) this%n_cco_state = this%n_cco_state + cnt_sub
+      if(4 <= loop .and. loop <= 9) this%n_cov_state = this%n_cov_state + cnt_sub
+      if(10<= loop .and. loop <=12) this%n_coo_state = this%n_coo_state + cnt_sub
+      if(loop == 13) this%n_ccc_state = cnt_sub
+      if(14<= loop .and. loop <=16) this%n_ccv_state = this%n_ccv_state + cnt_sub
+      if(17<= loop .and. loop <=19) this%n_cvv_state = this%n_cvv_state + cnt_sub
       if(loop == 20) this%n_vvv_state = cnt_sub
-      if(21<= loop .and. loop <=23) this%n_pvv_state = this%n_pvv_state + cnt_sub
-      if(24<= loop .and. loop <=26) this%n_ppv_state = this%n_ppv_state + cnt_sub
-      if(loop == 27) this%n_ppp_state = cnt_sub
+      if(21<= loop .and. loop <=23) this%n_ovv_state = this%n_ovv_state + cnt_sub
+      if(24<= loop .and. loop <=26) this%n_oov_state = this%n_oov_state + cnt_sub
+      if(loop == 27) this%n_ooo_state = cnt_sub
     end do
 #ifdef ModelSpaceDebug
     write(*,'(a,i3,a,i3,a,i3,a,i6)') "Three-body channel: J=", j, ", P=", p, ", Tz=", z, ", # of states=", this%n_state
@@ -737,6 +745,8 @@ contains
       integer, allocatable :: spis2nidx(:,:,:)
     end type spis2n
     type(spis2n), allocatable :: ch(:)
+
+    if(allocated(this%jpt)) call this%fin()
 
     this%sps => sps
     this%isps => isps

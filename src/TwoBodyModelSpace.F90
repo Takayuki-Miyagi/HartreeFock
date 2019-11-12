@@ -25,22 +25,28 @@ module TwoBodyModelSpace
     integer :: p = 0
     integer :: z = 100
     integer :: n_state = 0
-    integer :: n_hp_state = 0 ! hole-particle (not relevant)
-    integer :: n_hh_state = 0 ! hole-hole
-    integer :: n_hv_state = 0 ! hole-valence
+    integer :: n_co_state = 0 ! core-outsidee (not relevant)
+    integer :: n_cc_state = 0 ! core-core
+    integer :: n_cv_state = 0 ! core-valence
     integer :: n_vv_state = 0 ! valence-valence
-    integer :: n_vp_state = 0 ! valence-particle
+    integer :: n_vo_state = 0 ! valence-outside
+    integer :: n_oo_state = 0 ! outside-outside
+    integer :: n_hh_state = 0 ! hole-hole
+    integer :: n_ph_state = 0 ! particle-hole
     integer :: n_pp_state = 0 ! particle-particle
     integer, allocatable :: n2spi1(:)
     integer, allocatable :: n2spi2(:)
     integer, allocatable :: spis2n(:,:)
     integer, allocatable :: iphase(:,:)
-    integer, allocatable :: hps(:)
-    integer, allocatable :: hhs(:)
-    integer, allocatable :: hvs(:)
-    integer, allocatable :: vvs(:)
-    integer, allocatable :: vps(:)
-    integer, allocatable :: pps(:)
+    integer, allocatable :: co_s(:)
+    integer, allocatable :: cc_s(:)
+    integer, allocatable :: cv_s(:)
+    integer, allocatable :: vv_s(:)
+    integer, allocatable :: vo_s(:)
+    integer, allocatable :: oo_s(:)
+    integer, allocatable :: hh_s(:)
+    integer, allocatable :: ph_s(:)
+    integer, allocatable :: pp_s(:)
   contains
     procedure :: InitTwoBodyChannel
     procedure :: FinTwoBodyChannel
@@ -130,6 +136,8 @@ contains
     integer :: i1, i2
     type(SingleParticleOrbit), pointer :: o1, o2
     integer, allocatable :: jj(:), pp(:), zz(:), nn(:)
+
+    if(allocated(this%jpz)) call this%fin()
 
     this%sps => sps
     allocate(this%jpz2ch(0:min(2*sps%lmax,e2max)+1,-1:1,-1:1))
@@ -232,6 +240,15 @@ contains
     deallocate(this%n2spi2)
     deallocate(this%spis2n)
     deallocate(this%iphase)
+    deallocate(this%co_s)
+    deallocate(this%cc_s)
+    deallocate(this%cv_s)
+    deallocate(this%vv_s)
+    deallocate(this%vo_s)
+    deallocate(this%oo_s)
+    deallocate(this%hh_s)
+    deallocate(this%ph_s)
+    deallocate(this%pp_s)
   end subroutine FinTwoBodyChannel
 
   subroutine InitTwoBodyChannel(this, j, p, z, n, sps, e2max)
@@ -261,15 +278,15 @@ contains
         do i2 = 1, i1
           o2 => sps%GetOrbit(i2)
 
-          if(loop == 1 .and. .not. (o1%ph == 0 .and. o2%ph == 1)) cycle ! hp states
-          if(loop == 2 .and. .not. (o1%ph == 1 .and. o2%ph == 0)) cycle ! ph states
-          if(loop == 3 .and. .not. (o1%ph == 0 .and. o2%ph == 0)) cycle ! hh states
-          if(loop == 4 .and. .not. (o1%ph == 0 .and. o2%ph == 2)) cycle ! hv states
-          if(loop == 5 .and. .not. (o1%ph == 2 .and. o2%ph == 0)) cycle ! vh states
-          if(loop == 6 .and. .not. (o1%ph == 2 .and. o2%ph == 2)) cycle ! vv states
-          if(loop == 7 .and. .not. (o1%ph == 2 .and. o2%ph == 1)) cycle ! vp states
-          if(loop == 8 .and. .not. (o1%ph == 1 .and. o2%ph == 2)) cycle ! pv states
-          if(loop == 9 .and. .not. (o1%ph == 1 .and. o2%ph == 1)) cycle ! pp states
+          if(loop == 1 .and. .not. (o1%GetCoreValenceOutside() == 0 .and. o2%GetCoreValenceOutside() == 2)) cycle ! co states
+          if(loop == 2 .and. .not. (o1%GetCoreValenceOutside() == 2 .and. o2%GetCoreValenceOutside() == 0)) cycle ! oc states
+          if(loop == 3 .and. .not. (o1%GetCoreValenceOutside() == 0 .and. o2%GetCoreValenceOutside() == 0)) cycle ! cc states
+          if(loop == 4 .and. .not. (o1%GetCoreValenceOutside() == 0 .and. o2%GetCoreValenceOutside() == 1)) cycle ! cv states
+          if(loop == 5 .and. .not. (o1%GetCoreValenceOutside() == 1 .and. o2%GetCoreValenceOutside() == 0)) cycle ! vc states
+          if(loop == 6 .and. .not. (o1%GetCoreValenceOutside() == 1 .and. o2%GetCoreValenceOutside() == 1)) cycle ! vv states
+          if(loop == 7 .and. .not. (o1%GetCoreValenceOutside() == 2 .and. o2%GetCoreValenceOutside() == 1)) cycle ! vo states
+          if(loop == 8 .and. .not. (o1%GetCoreValenceOutside() == 1 .and. o2%GetCoreValenceOutside() == 2)) cycle ! ov states
+          if(loop == 9 .and. .not. (o1%GetCoreValenceOutside() == 2 .and. o2%GetCoreValenceOutside() == 2)) cycle ! oo states
 
           if(o1%e + o2%e > e2max) cycle
           if(triag(o1%j, o2%j, 2*j)) cycle
@@ -277,7 +294,7 @@ contains
           if(o1%z + o2%z /= 2*z) cycle
           if(i1 == i2 .and. mod(j,2) == 1) cycle
           a = i1; b = i2
-          if( o1%occ > o2%occ ) then
+          if( o1%GetOccupation() > o2%GetOccupation() ) then
             a = i2; b = i1 ! hp -> ph
           end if
           cnt = cnt + 1
@@ -290,38 +307,43 @@ contains
           this%iphase(b,a) = -(-1) ** ((o1%j+o2%j)/2 - j)
         end do
       end do
-      if(1 <= loop .and. loop <= 2) this%n_hp_state = this%n_hp_state + cnt_sub
-      if(loop == 3) this%n_hh_state = cnt_sub
-      if(4 <= loop .and. loop <= 5) this%n_hv_state = this%n_hv_state + cnt_sub
+      if(1 <= loop .and. loop <= 2) this%n_co_state = this%n_co_state + cnt_sub
+      if(loop == 3) this%n_cc_state = cnt_sub
+      if(4 <= loop .and. loop <= 5) this%n_cv_state = this%n_cv_state + cnt_sub
       if(loop == 6) this%n_vv_state = cnt_sub
-      if(7 <= loop .and. loop <= 8) this%n_vp_state = this%n_vp_state + cnt_sub
-      if(loop == 9) this%n_pp_state = cnt_sub
+      if(7 <= loop .and. loop <= 8) this%n_vo_state = this%n_vo_state + cnt_sub
+      if(loop == 9) this%n_oo_state = cnt_sub
     end do
 
-    allocate(this%hps(this%n_hp_state))
-    allocate(this%hhs(this%n_hh_state))
-    allocate(this%hvs(this%n_hv_state))
-    allocate(this%vvs(this%n_vv_state))
-    allocate(this%vps(this%n_vp_state))
-    allocate(this%pps(this%n_pp_state))
+    allocate(this%co_s(this%n_co_state))
+    allocate(this%cc_s(this%n_cc_state))
+    allocate(this%cv_s(this%n_cv_state))
+    allocate(this%vv_s(this%n_vv_state))
+    allocate(this%vo_s(this%n_vo_state))
+    allocate(this%oo_s(this%n_oo_state))
 
     cnt = 0
+    cnt_sub = 0
     do loop = 1, 9
-      cnt_sub = 0
+      if(loop==3) cnt_sub = 0
+      if(loop==4) cnt_sub = 0
+      if(loop==6) cnt_sub = 0
+      if(loop==7) cnt_sub = 0
+      if(loop==9) cnt_sub = 0
       do i1 = 1, sps%norbs
         o1 => sps%GetOrbit(i1)
         do i2 = 1, i1
           o2 => sps%GetOrbit(i2)
 
-          if(loop == 1 .and. .not. (o1%ph == 0 .and. o2%ph == 1)) cycle ! hp states
-          if(loop == 2 .and. .not. (o1%ph == 1 .and. o2%ph == 0)) cycle ! ph states
-          if(loop == 3 .and. .not. (o1%ph == 0 .and. o2%ph == 0)) cycle ! hh states
-          if(loop == 4 .and. .not. (o1%ph == 0 .and. o2%ph == 2)) cycle ! hv states
-          if(loop == 5 .and. .not. (o1%ph == 2 .and. o2%ph == 0)) cycle ! vh states
-          if(loop == 6 .and. .not. (o1%ph == 2 .and. o2%ph == 2)) cycle ! vv states
-          if(loop == 7 .and. .not. (o1%ph == 2 .and. o2%ph == 1)) cycle ! vp states
-          if(loop == 8 .and. .not. (o1%ph == 1 .and. o2%ph == 2)) cycle ! pv states
-          if(loop == 9 .and. .not. (o1%ph == 1 .and. o2%ph == 1)) cycle ! pp states
+          if(loop == 1 .and. .not. (o1%GetCoreValenceOutside() == 0 .and. o2%GetCoreValenceOutside() == 2)) cycle ! co states
+          if(loop == 2 .and. .not. (o1%GetCoreValenceOutside() == 2 .and. o2%GetCoreValenceOutside() == 0)) cycle ! oc states
+          if(loop == 3 .and. .not. (o1%GetCoreValenceOutside() == 0 .and. o2%GetCoreValenceOutside() == 0)) cycle ! cc states
+          if(loop == 4 .and. .not. (o1%GetCoreValenceOutside() == 0 .and. o2%GetCoreValenceOutside() == 1)) cycle ! cv states
+          if(loop == 5 .and. .not. (o1%GetCoreValenceOutside() == 1 .and. o2%GetCoreValenceOutside() == 0)) cycle ! vc states
+          if(loop == 6 .and. .not. (o1%GetCoreValenceOutside() == 1 .and. o2%GetCoreValenceOutside() == 1)) cycle ! vv states
+          if(loop == 7 .and. .not. (o1%GetCoreValenceOutside() == 2 .and. o2%GetCoreValenceOutside() == 1)) cycle ! vo states
+          if(loop == 8 .and. .not. (o1%GetCoreValenceOutside() == 1 .and. o2%GetCoreValenceOutside() == 2)) cycle ! ov states
+          if(loop == 9 .and. .not. (o1%GetCoreValenceOutside() == 2 .and. o2%GetCoreValenceOutside() == 2)) cycle ! oo states
 
           if(o1%e + o2%e > e2max) cycle
           if(triag(o1%j, o2%j, 2*j)) cycle
@@ -331,12 +353,66 @@ contains
 
           cnt = cnt + 1
           cnt_sub = cnt_sub + 1
-          if(1 <= loop .and. loop <= 2) this%hps(cnt_sub) = cnt
-          if(loop == 3) this%hhs(cnt_sub) = cnt
-          if(4 <= loop .and. loop <= 5) this%hvs(cnt_sub) = cnt
-          if(6 == loop) this%vvs(cnt_sub) = cnt
-          if(7 <= loop .and. loop <= 8) this%vps(cnt_sub) = cnt
-          if(loop == 9) this%pps(cnt_sub) = cnt
+          if(1 <= loop .and. loop <= 2) this%co_s(cnt_sub) = cnt
+          if(loop == 3) this%cc_s(cnt_sub) = cnt
+          if(4 <= loop .and. loop <= 5) this%cv_s(cnt_sub) = cnt
+          if(6 == loop) this%vv_s(cnt_sub) = cnt
+          if(7 <= loop .and. loop <= 8) this%vo_s(cnt_sub) = cnt
+          if(loop == 9) this%oo_s(cnt_sub) = cnt
+        end do
+      end do
+    end do
+
+    cnt = 0
+    do loop = 1, 3
+      cnt_sub = 0
+      do i1 = 1, sps%norbs
+        o1 => sps%GetOrbit(i1)
+        do i2 = 1, i1
+          o2 => sps%GetOrbit(i2)
+
+          if(loop == 1 .and. o1%GetHoleParticle() + o2%GetHoleParticle() /= 0) cycle ! hh states
+          if(loop == 2 .and. o1%GetHoleParticle() + o2%GetHoleParticle() /= 1) cycle ! ph states
+          if(loop == 3 .and. o1%GetHoleParticle() + o2%GetHoleParticle() /= 2) cycle ! pp states
+
+          if(o1%e + o2%e > e2max) cycle
+          if(triag(o1%j, o2%j, 2*j)) cycle
+          if((-1) ** (o1%l+o2%l) /= p) cycle
+          if(o1%z + o2%z /= 2*z) cycle
+          if(i1 == i2 .and. mod(j,2) == 1) cycle
+
+          cnt_sub = cnt_sub + 1
+        end do
+      end do
+      if(loop==1) this%n_hh_state = cnt_sub
+      if(loop==2) this%n_ph_state = cnt_sub
+      if(loop==3) this%n_pp_state = cnt_sub
+    end do
+    allocate(this%hh_s(this%n_hh_state))
+    allocate(this%ph_s(this%n_ph_state))
+    allocate(this%pp_s(this%n_pp_state))
+
+    do loop = 1, 3
+      cnt_sub = 0
+      do i1 = 1, sps%norbs
+        o1 => sps%GetOrbit(i1)
+        do i2 = 1, i1
+          o2 => sps%GetOrbit(i2)
+
+          if(loop == 1 .and. o1%GetHoleParticle() + o2%GetHoleParticle() /= 0) cycle ! hh states
+          if(loop == 2 .and. o1%GetHoleParticle() + o2%GetHoleParticle() /= 1) cycle ! ph states
+          if(loop == 3 .and. o1%GetHoleParticle() + o2%GetHoleParticle() /= 2) cycle ! pp states
+
+          if(o1%e + o2%e > e2max) cycle
+          if(triag(o1%j, o2%j, 2*j)) cycle
+          if((-1) ** (o1%l+o2%l) /= p) cycle
+          if(o1%z + o2%z /= 2*z) cycle
+          if(i1 == i2 .and. mod(j,2) == 1) cycle
+
+          cnt_sub = cnt_sub + 1
+          if(loop==1) this%hh_s(cnt_sub) = this%spis2n(i1,i2)
+          if(loop==2) this%ph_s(cnt_sub) = this%spis2n(i1,i2)
+          if(loop==3) this%pp_s(cnt_sub) = this%spis2n(i1,i2)
         end do
       end do
     end do
@@ -365,6 +441,8 @@ contains
     integer :: i1, i2
     type(SingleParticleOrbit), pointer :: o1, o2
     integer, allocatable :: jj(:), pp(:), zz(:), nn(:)
+
+    if(allocated(this%jpz)) call this%fin()
 
     this%sps => sps
     allocate(this%jpz2ch(0:min(2*sps%lmax,e2max)+1,-1:1,0:1))
@@ -496,7 +574,7 @@ contains
         if(abs(o1%z + o2%z) /= 2*z) cycle
 
         a = i1; b = i2
-        if( o1%occ > o2%occ ) then
+        if( o1%GetOccupation() > o2%GetOccupation() ) then
           a = i2; b = i1 ! hp -> ph
         end if
         cnt = cnt + 1
