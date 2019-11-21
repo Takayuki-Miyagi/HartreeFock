@@ -894,6 +894,7 @@ contains
     type(DMat) :: m1, m2, m3
     real(8) :: v, vsum, ti, r
 
+    r = 0.d0
     ti = omp_get_wtime()
     ms => h%ms
     sps => ms%sps
@@ -905,7 +906,7 @@ contains
       m3 = m2 * m1%t()
     end do
 
-    r = vsum
+    !r = vsum
     call timer%Add("Fourth order MBPT F7",omp_get_wtime()-ti)
   end function energy_fourth_F7
 

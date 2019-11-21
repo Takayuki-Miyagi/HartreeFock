@@ -94,6 +94,7 @@ contains
     integer :: is, ie, idxdir
 
     idxdir = len_trim(dir)
+    comm = ""
     is = 1; ie = is + len('if [ ! -d ')
     write(comm(is:ie), '(a)') 'if [ ! -d '
     is = ie + 1; ie = is + idxdir

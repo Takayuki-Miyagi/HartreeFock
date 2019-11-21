@@ -125,7 +125,7 @@ def get_item(params, Op="hamil"):
         if(line[0] == "#"): continue
         try:
             data = line.split()
-            if(data != Op): continue
+            if(data[0] != Op): continue
             return (float(data[1]), float(data[2]), float(data[3]), float(data[4]))
         except:
             return None

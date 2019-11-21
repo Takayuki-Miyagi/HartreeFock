@@ -525,9 +525,9 @@ contains
     write(*,'(a)') "   n,  l,  j, tz, cvo,   occupation"
     do l = 1, this%sps%norbs
       o => this%sps%orb(l)
-      if(o%ph == 0) vlabel = "c"
-      if(o%ph == 1) vlabel = "v"
-      if(o%ph == 2) vlabel = "o"
+      if(o%GetCoreValenceOutside() == 0) vlabel = "c"
+      if(o%GetCoreValenceOutside() == 1) vlabel = "v"
+      if(o%GetCoreValenceOutside() == 2) vlabel = "o"
       write(*,'(4i4,a5,f14.6)') o%n, o%l, o%j, o%z, vlabel, this%NOcoef(l)
     end do
 #endif

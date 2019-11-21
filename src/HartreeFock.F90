@@ -61,7 +61,7 @@ module HartreeFock
     character(len=:), allocatable :: Method
     integer :: niter_history = 1
     real(8) :: alpha = 1.d0
-    real(8) :: tol = 1.d-8
+    real(8) :: tol = 1.d-10
     real(8) :: diff
     real(8) :: e0  ! cm term
     real(8) :: e1  ! kinetic term

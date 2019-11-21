@@ -23,6 +23,7 @@ contains
     if(.not. p%is_MBPTEnergy) then
       open(wunit, file = p%summary_file, action='write',status='replace')
       call p%PrintInputParameters(wunit)
+      call print_single_particle_energies(HF,wunit)
       write(wunit,'(a,6x,a,9x,a,9x,a,13x,a)') &
           & "# Operator", "HF energy", "2nd order", "3rd order", "Total"
       write(wunit,'(a,4f18.8)') 'hamil: ', HF%ehf, 0.d0, 0.d0, HF%ehf
@@ -34,6 +35,7 @@ contains
       call PT%calc(H)
       open(wunit, file = p%summary_file, action='write',status='replace')
       call p%PrintInputParameters(wunit)
+      call print_single_particle_energies(HF,wunit)
       write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
       write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
       write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
@@ -76,7 +78,9 @@ contains
 
     open(runit, file=f, action='read',iostat=io)
     if(io /= 0) then
+      write(*,*)
       write(*,'(2a)') 'File open error: ', trim(f)
+      write(*,*)
       return
     end if
     call skip_comment(runit,'#')
@@ -86,7 +90,7 @@ contains
     ms%sps%norbs = lines
     allocate(ms%sps%orb(lines))
     do line = 1, lines
-      read(runit,*) idx, n, l, j, e, z
+      read(runit,*) idx, n, l, j, z, e
       call ms%sps%orb(line)%set(n,l,j,z,idx,e)
     end do
 
@@ -184,5 +188,37 @@ contains
     end do
     write(*,"(a,i4,2a)") "# number of electrons ", N_e, " from ", trim(f)
   end subroutine GetElectronConfFromFile
+
+  subroutine print_single_particle_energies(HF, iunit)
+    type(HFSolver), intent(in) :: HF
+    integer, intent(in) :: iunit
+    type(MSpace), pointer :: ms
+    type(OneBodyPart) :: F_HF
+    type(SingleParticleOrbit), pointer :: oi
+    character(40) :: char_spe, sp_label, ph
+    character(256) :: line
+    integer :: ch, i
+
+    ms => HF%ms
+    F_HF = HF%F
+    do ch = 1, ms%one%NChan
+      F_HF%MatCh(ch,ch)%DMat = HF%C%MatCh(ch,ch)%DMat%T() * &
+          &  HF%F%MatCh(ch,ch)%DMat * HF%C%MatCh(ch,ch)%DMat
+    end do
+    write(iunit,'(a)') "#  Hartree-Fock single-particle energies (spe)"
+    write(iunit,'(a)') "#    Orbit:                        spe     Occ"
+    do i = 1, ms%sps%norbs
+      oi => ms%sps%GetOrbit(i)
+      sp_label = trim(ms%sps%GetLabelFromIndex(i))
+      ph = "hole"
+      if(oi%GetHoleParticle() == 1) ph = "particle"
+      write(line,"(a,a8,a,a12,f14.6,f8.4)") "# ", trim(sp_label(2:)), ": ", &
+          & trim(ph), F_HF%GetOBME(i,i), &
+          & HF%Occ%GetOBME(i,i)
+      write(iunit,"(a)") trim(line)
+    end do
+    call F_HF%fin()
+
+  end subroutine print_single_particle_energies
 
 end module Atomic
