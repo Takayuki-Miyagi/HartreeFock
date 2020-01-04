@@ -336,9 +336,11 @@ contains
     integer, intent(in) :: A, Z, N
     type(TwoBodyChannel), pointer :: chbra, chket
     integer :: bra, ket, ia, ib, ic, id
+    character(256) :: op
 
     chbra => this%ch_bra
     chket => this%ch_ket
+    op = trim(optr)
 
     !$omp parallel
     !$omp do private(bra,ia,ib,ket,ic,id)
@@ -349,7 +351,7 @@ contains
         ic = chket%n2spi1(ket)
         id = chket%n2spi2(ket)
 
-        this%m(bra,ket) = mat_elm(sps,optr,hw,A,Z,N,&
+        this%m(bra,ket) = mat_elm(sps,op,hw,A,Z,N,&
             & ia,ib,ic,id,chbra%J,chket%J)
       end do
     end do

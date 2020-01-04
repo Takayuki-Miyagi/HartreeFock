@@ -350,10 +350,8 @@ contains
     type(TwoBodyChannel), pointer :: ch_two
     type(Orbits), pointer :: sps
     integer :: ch, J, n, bra, ket, a, b, c, d, e, f, JJJ
-    integer :: ea, eb, ec, ed
-    integer :: je, le, ze, ee
-    integer :: jf, lf, zf, ef
-    real(8) :: ph, ti
+    integer :: je
+    real(8) :: ph, ti, rho
     type(DMat) :: UT, V2, V3
 
     ti = omp_get_wtime()
@@ -375,19 +373,14 @@ contains
       V2 = H%two%MatCh(ch,ch)%DMat
 
       !$omp parallel
-      !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
-      !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef,JJJ)
+      !$omp do private(bra,a,b,ph,ket,c,d,e,je,f,rho,JJJ)
       do bra = 1, n
         a = ch_two%n2spi1(bra)
         b = ch_two%n2spi2(bra)
-        ea = sps%orb(a)%e
-        eb = sps%orb(b)%e
         ph = (-1.d0)**((sps%orb(a)%j+sps%orb(b)%j)/2-J)
         do ket = 1, n
           c = ch_two%n2spi1(ket)
           d = ch_two%n2spi2(ket)
-          ec = sps%orb(c)%e
-          ed = sps%orb(d)%e
 
           UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
@@ -399,22 +392,12 @@ contains
           if(H%rank==2 .or. .not. H%ms%is_three_body_jt) cycle
           do e = 1, sps%norbs
             je = sps%orb(e)%j
-            le = sps%orb(e)%l
-            ze = sps%orb(e)%z
-            ee = sps%orb(e)%e
-            if(ea+eb+ee > ms%e3max) cycle
             do f = 1, ms%sps%norbs
-              jf = sps%orb(f)%j
-              lf = sps%orb(f)%l
-              zf = sps%orb(f)%z
-              ef = sps%orb(f)%e
-              if(je /= jf) cycle
-              if(le /= lf) cycle
-              if(ze /= zf) cycle
-              if(ec+ed+ef > ms%e3max) cycle
+              rho = HF%rho%GetOBME(e,f)
+              if(abs(rho) < 1.d-8) cycle
 
               do JJJ = abs(2*J-je), (2*J+je), 2
-                V3%m(bra,ket) = V3%m(bra,ket) + HF%rho%GetOBME(e,f) * &
+                V3%m(bra,ket) = V3%m(bra,ket) + rho * &
                     & dble(JJJ+1) * H%thr21%GetThBME(a,b,e,J,c,d,f,J,JJJ)
               end do
 
@@ -447,10 +430,7 @@ contains
     type(TwoBodyChannel), pointer :: ch_two
     type(Orbits), pointer :: sps
     integer :: ch, J, n, bra, ket, a, b, c, d, e, f
-    integer :: ea, eb, ec, ed
-    integer :: je, le, ze, ee
-    integer :: jf, lf, zf, ef
-    real(8) :: ph, ti
+    real(8) :: ph, ti, rho
     type(DMat) :: UT, V2, V3
 
     ti = omp_get_wtime()
@@ -472,19 +452,14 @@ contains
       V2 = H%two%MatCh(ch,ch)%DMat
 
       !$omp parallel
-      !$omp do private(bra,a,b,ea,eb,ph,ket,c,d,ec,ed,&
-      !$omp &  e,je,le,ze,ee,f,jf,lf,zf,ef)
+      !$omp do private(bra,a,b,ph,ket,c,d,e,f,rho)
       do bra = 1, n
         a = ch_two%n2spi1(bra)
         b = ch_two%n2spi2(bra)
-        ea = sps%orb(a)%e
-        eb = sps%orb(b)%e
         ph = (-1.d0)**((sps%orb(a)%j+sps%orb(b)%j)/2-J)
         do ket = 1, n
           c = ch_two%n2spi1(ket)
           d = ch_two%n2spi2(ket)
-          ec = sps%orb(c)%e
-          ed = sps%orb(d)%e
 
           UT%m(bra,ket) = HF%C%GetOBME(a,c) * HF%C%GetOBME(b,d)
           if(a/=b) UT%m(bra,ket) = UT%m(bra,ket) - ph * &
@@ -495,22 +470,11 @@ contains
           if(ket > bra) cycle
           if(H%rank==2) cycle
           do e = 1, sps%norbs
-            je = sps%orb(e)%j
-            le = sps%orb(e)%l
-            ze = sps%orb(e)%z
-            ee = sps%orb(e)%e
-            if(ea+eb+ee > ms%e3max) cycle
             do f = 1, ms%sps%norbs
-              jf = sps%orb(f)%j
-              lf = sps%orb(f)%l
-              zf = sps%orb(f)%z
-              ef = sps%orb(f)%e
-              if(je /= jf) cycle
-              if(le /= lf) cycle
-              if(ze /= zf) cycle
-              if(ec+ed+ef > ms%e3max) cycle
+              rho = HF%rho%GetOBME(e,f)
+              if(abs(rho) < 1.d-8) cycle
 
-              V3%m(bra,ket) = V3%m(bra,ket) + HF%rho%GetOBME(e,f) * &
+              V3%m(bra,ket) = V3%m(bra,ket) + rho * &
                   & H%thr21_no2b%GetNO2BThBME(a,b,e,c,d,f,J)
 
             end do
