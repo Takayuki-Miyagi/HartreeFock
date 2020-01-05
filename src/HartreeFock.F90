@@ -451,8 +451,9 @@ contains
       call V3%zeros(n,n)
       V2 = H%two%MatCh(ch,ch)%DMat
 
+      ti = omp_get_wtime()
       !$omp parallel
-      !$omp do private(bra,a,b,ph,ket,c,d,e,f,rho)
+      !$omp do private(bra,a,b,ph,ket,c,d)
       do bra = 1, n
         a = ch_two%n2spi1(bra)
         b = ch_two%n2spi2(bra)
@@ -466,27 +467,40 @@ contains
               & HF%C%GetOBME(a,d) * HF%C%GetOBME(b,c)
           if(a==b) UT%m(bra,ket) = UT%m(bra,ket) * dsqrt(2.d0)
           if(c==d) UT%m(bra,ket) = UT%m(bra,ket) / dsqrt(2.d0)
-
-          if(ket > bra) cycle
-          if(H%rank==2) cycle
-          do e = 1, sps%norbs
-            do f = 1, ms%sps%norbs
-              rho = HF%rho%GetOBME(e,f)
-              if(abs(rho) < 1.d-8) cycle
-
-              V3%m(bra,ket) = V3%m(bra,ket) + rho * &
-                  & H%thr21_no2b%GetNO2BThBME(a,b,e,c,d,f,J)
-
-            end do
-          end do
-          V3%m(bra,ket) = V3%m(bra,ket) / dble(2*J+1)
-          if(a==b) V3%m(bra,ket) = V3%m(bra,ket) / dsqrt(2.d0)
-          if(c==d) V3%m(bra,ket) = V3%m(bra,ket) / dsqrt(2.d0)
-          V3%m(ket,bra) = V3%m(bra,ket)
         end do
       end do
       !$omp end do
       !$omp end parallel
+      write(*,"(a,i4,a,f12.6,a)") "ch: ", ch, ", set U: ", omp_get_wtime() - ti, " sec"
+      ti = omp_get_wtime()
+
+      if( H%rank>2 ) then
+        !$omp parallel
+        !$omp do private(bra,a,b,ket,c,d,e,f,rho) schedule(dynamic)
+        do bra = 1, n
+          a = ch_two%n2spi1(bra)
+          b = ch_two%n2spi2(bra)
+          do ket = 1, bra
+            c = ch_two%n2spi1(ket)
+            d = ch_two%n2spi2(ket)
+            do e = 1, sps%norbs
+              do f = 1, ms%sps%norbs
+                rho = HF%rho%GetOBME(e,f)
+                if(abs(rho) < 1.d-8) cycle
+                V3%m(bra,ket) = V3%m(bra,ket) + rho * &
+                    & H%thr21_no2b%GetNO2BThBME(a,b,e,c,d,f,J)
+              end do
+            end do
+            V3%m(bra,ket) = V3%m(bra,ket) / dble(2*J+1)
+            if(a==b) V3%m(bra,ket) = V3%m(bra,ket) / dsqrt(2.d0)
+            if(c==d) V3%m(bra,ket) = V3%m(bra,ket) / dsqrt(2.d0)
+            V3%m(ket,bra) = V3%m(bra,ket)
+          end do
+        end do
+        !$omp end do
+        !$omp end parallel
+      end if
+      write(*,"(a,i4,a,f12.6,a)") "ch: ", ch, ", set V3: ", omp_get_wtime() - ti, " sec"
       op%two%MatCh(ch,ch)%DMat = UT%T() * (V2+V3) * UT
       call UT%fin()
       call V2%fin()
