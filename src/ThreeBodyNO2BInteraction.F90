@@ -899,7 +899,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
           P123 = (-1) ** (l1+l2+l3)
 
-          do i4 = 1, spsf%norbs
+          do i4 = 1, i1
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
             e4 = spsf%orb(i4)%e
@@ -995,7 +995,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-          do i4 = 1, spsf%norbs
+          do i4 = 1, i1
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1140,7 +1140,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-          do i4 = 1, spsf%norbs
+          do i4 = 1, i1
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1295,7 +1295,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-          do i4 = 1, spsf%norbs
+          do i4 = 1, i1
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1341,9 +1341,11 @@ contains
                               err = gzip_readline(fp, buffer, len(buffer))
                               read(buffer,*) v((n-1)*10+1 : n*10)
                             end do
-                            if(nelms-total_cnt-10*n - ((nelms-total_cnt-10*n)/10)*10 > 0) then
-                              write(*,*) nelms, total_cnt
-                              read(buffer,*) v(((nelms-total_cnt-10*n)/10)*10+1 : nelms)
+                            n = mod( int(nelms-total_cnt, kind(n) ), 10)
+                            if( n > 0 ) then
+                              buffer = ""
+                              err = gzip_readline(fp, buffer, len(buffer))
+                              read(buffer,*) v(nelms-n+1 : nelms)
                             end if
                           end if
                         end if
