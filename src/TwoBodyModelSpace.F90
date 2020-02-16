@@ -1,5 +1,6 @@
 module TwoBodyModelSpace
   use omp_lib
+  use myfort
   use SingleParticleState
   implicit none
 
@@ -128,7 +129,6 @@ contains
   end subroutine FinTwoBodySpace
 
   subroutine InitTwoBodySpace(this, sps, e2max)
-    use MyLibrary, only: triag
     class(TwoBodySpace), intent(inout) :: this
     type(Orbits), target, intent(in) :: sps
     integer, intent(in) :: e2max
@@ -252,7 +252,6 @@ contains
   end subroutine FinTwoBodyChannel
 
   subroutine InitTwoBodyChannel(this, j, p, z, n, sps, e2max)
-    use MyLibrary, only: triag
     class(TwoBodyChannel), intent(inout) :: this
     integer, intent(in) :: j, p, z, n, e2max
     type(Orbits), intent(in), target :: sps
@@ -433,7 +432,6 @@ contains
   end subroutine FinCrossCoupledTwoBodySpace
 
   subroutine InitCrossCoupledTwoBodySpace(this, sps, e2max)
-    use MyLibrary, only: triag
     class(CrossCoupledTwoBodySpace), intent(inout) :: this
     type(Orbits), target, intent(in) :: sps
     integer, intent(in) :: e2max
@@ -546,7 +544,6 @@ contains
   end subroutine FinCrossCoupledTwoBodyChannel
 
   subroutine InitCrossCoupledTwoBodyChannel(this, j, p, z, n, sps, e2max)
-    use MyLibrary, only: triag
     class(CrossCoupledTwoBodyChannel), intent(inout) :: this
     integer, intent(in) :: j, p, z, n, e2max
     type(Orbits), intent(in), target :: sps

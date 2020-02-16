@@ -1,4 +1,5 @@
 module HFInput
+  use myfort
   implicit none
 
   public :: InputParameters
@@ -64,7 +65,6 @@ module HFInput
   end type InputParameters
 contains
   subroutine InitInputParameters(this, inputfile)
-    use ClassSys, only: sys
     class(InputParameters), intent(inout) :: this
     character(*), intent(in) :: inputfile
     integer :: emax=6

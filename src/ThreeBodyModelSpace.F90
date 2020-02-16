@@ -1,5 +1,6 @@
 module ThreeBodyModelSpace
   use omp_lib
+  use myfort
   use SingleParticleState
   implicit none
 
@@ -473,8 +474,6 @@ contains
   end subroutine FinAdditionalQN
 
   subroutine InitAdditionalQN(this, sps, i1, i2, i3, j, nni, nnj)
-    use LinAlgLib
-    use MyLibrary, only: triag
     class(AdditionalQN), intent(inout) :: this
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, j, nni, nnj
@@ -564,7 +563,6 @@ contains
   end function FindIndexFromABCJ
 
   subroutine CntDim(sps, i1, i2, i3, j, ni, nj)
-    use MyLibrary, only: triag
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, j
     integer, intent(out) :: ni, nj
@@ -681,7 +679,6 @@ contains
   end function A3drct
 
   real(8) function A3exc1(sps, i1, i2, i3, j12, i4, i5, i6, j45, j) result(e)
-    use MyLibrary, only: sjs
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
@@ -699,7 +696,6 @@ contains
   end function A3exc1
 
   real(8) function A3exc2(sps, i1, i2, i3, j12, i4, i5, i6, j45, j) result(e)
-    use MyLibrary, only: sjs
     type(Orbits), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, i4, i5, i6
     integer, intent(in) :: j12, j45, j
@@ -730,7 +726,6 @@ contains
   end subroutine FinNonOrthIsospinThreeBodySpace
 
   subroutine InitNonOrthIsospinThreeBodySpace(this, sps, isps, e2max, e3max)
-    use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodySpace), intent(inout) :: this
     type(Orbits), target, intent(in) :: sps
     type(OrbitsIsospin), target, intent(in) :: isps
@@ -908,7 +903,6 @@ contains
   end subroutine FinNonOrthIsospinThreeBodyChannel
 
   subroutine InitNonOrthIsospinThreeBodyChannel(this,j,p,t,n,nidx,spis2idx,sps,e2max,e3max)
-    use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
     integer, intent(in) :: j, p, t, n, nidx, spis2idx(:,:,:), e2max, e3max
     type(OrbitsIsospin), intent(in), target :: sps
@@ -1016,7 +1010,6 @@ contains
   end subroutine InitNonOrthIsospinThreeBodyChannel
 
   subroutine SetSortingIndices(this,j,p,t,sps,e2max,e3max)
-    use MyLibrary, only: triag
     class(NonOrthIsospinThreeBodyChannel), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     integer, intent(in) :: j, p, t, e2max, e3max
@@ -1160,7 +1153,6 @@ contains
 
   subroutine init_sort_index(this, sps, i1, i2, i3, a, b, c, &
         &    n_recouple, j, t, NOIAQN)
-    use MyLibrary, only: triag, sjs, hat
     class(sort_index), intent(inout) :: this
     type(OrbitsIsospin), intent(in) :: sps
     integer, intent(in) :: i1, i2, i3, a, b, c, n_recouple, j, t
@@ -1225,16 +1217,16 @@ contains
 #ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & real((-1.d0) ** ((jb + jc) / 2 + j12 + jab + t12 + tab) * &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab, t,  1, 2 * t12))
 #else
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & (-1.d0) ** ((jb + jc) / 2 + j12 + jab + t12 + tab) * &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab, t,  1, 2 * t12)
 #endif
                   this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
@@ -1250,16 +1242,16 @@ contains
 #ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = real(&
                       & - (-1.d0) ** ((jb + jc) / 2 + j12 + t12) * &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab,  1, t, 2 * t12))
 #else
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & - (-1.d0) ** ((jb + jc) / 2 + j12 + t12) * &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab,  1, t, 2 * t12)
 #endif
                   this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
@@ -1285,16 +1277,16 @@ contains
 #ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = real(&
                       & - (-1.d0) ** ((ja + jb) / 2 + jab+ tab) * &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab, t, 1, 2 * t12))
 #else
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & - (-1.d0) ** ((ja + jb) / 2 + jab+ tab) * &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, j, jc, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab, t, 1, 2 * t12)
 #endif
                   this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)
@@ -1310,16 +1302,16 @@ contains
 #ifdef single_precision_three_body_file
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & real(- &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab,  1, t, 2 * t12))
 #else
                   this%jt(j12,t12)%TrnsCoef(n) = &
                       & - &
-                      & hat(2 * jab) * hat(2 * j12) * &
+                      & sqrt(dble(2*jab+1) * dble(2*j12+1)) * &
                       & sjs(ja, jb, 2 * jab, jc, j, 2 * j12) * &
-                      & hat(2 * tab) * hat(2 * t12) * &
+                      & sqrt(dble(2*tab+1) * dble(2*t12+1)) * &
                       & sjs( 1,  1, 2 * tab,  1, t, 2 * t12)
 #endif
                   this%jt(j12,t12)%idx2num(n) = NOIAQN%JT2n(jab, tab)

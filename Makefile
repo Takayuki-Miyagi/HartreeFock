@@ -9,14 +9,14 @@ TARGET=HartreeFock
 INSTLDIR=$(HOME)/bin
 EXEDIR=$(PWD)/exe
 MODDIR = mod
-MODDIR = src
 MPI=off
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
   elif hostname|grep -q cedar; then echo cedar; \
   else echo other; fi)
 HOST=$(strip $(Host))
-DEBUG_MODE=off
+DEBUG_MODE=on
+compact_no2b=on
 
 OS = Linux
 ifneq (,$(findstring arwin,$(shell uname)))
@@ -48,6 +48,9 @@ ifeq ($(strip $(HOST)),other)
   FFLAGS+= -fopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
   #FFLAGS+= -ff2c # for dot product (LinAlgf90)
+  ifeq ($(compact_no2b),on)
+    FFLAGS+= -Dcompact_no2b
+  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-Wall -pedantic -fbounds-check -O -Wuninitialized -fbacktrace
     #FDFLAGS+=-ffpe-trap=invalid,zero,overflow # Note: gsl larguerre signal
@@ -66,6 +69,9 @@ ifeq ($(strip $(HOST)),apt)
   FFLAGS=-O3 -heap-arrays -static
   FFLAGS+= -openmp
   FFLAGS+= -Dsingle_precision_three_body_file
+  ifeq ($(compact_no2b),on)
+    FFLAGS+= -Dcompact_no2b
+  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
   endif
@@ -81,6 +87,9 @@ ifeq ($(strip $(HOST)),oak)
   FFLAGS=-O3 -heap-arrays
   FFLAGS+= -qopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
+  ifeq ($(compact_no2b),on)
+    FFLAGS+= -Dcompact_no2b
+  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
   endif
@@ -95,13 +104,16 @@ ifeq ($(strip $(HOST)),cedar)
   FFLAGS=-O3 -heap-arrays
   FFLAGS+= -qopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
+  ifeq ($(compact_no2b),on)
+    FFLAGS+= -Dcompact_no2b
+  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
   endif
 endif
 
 ifeq ($(DEBUG_MODE),on)
-  DFLAGS+=-DModelSpaceDebug
+  #DFLAGS+=-DModelSpaceDebug
   #DFLAGS+=-DTwoBodyOperatorDebug
 endif
 
@@ -112,8 +124,7 @@ endif
 #--------------------------------------------------
 
 SRCDIR = src
-SRCDIR_LinAlg = submodule/LinAlgf90/src
-SRCDIR_Iter = submodule/Iteration/src
+SRCDIR_myfort = submodule/myfort/src
 SRCDIR_HF = main
 DEPDIR = .
 OBJDIR = obj
@@ -133,21 +144,16 @@ OBJF95:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95))))
 SRCS= $(SRCC) $(SRCF77) $(SRCF90) $(SRCF95)
 OBJS= $(OBJC) $(OBJF77) $(OBJF90) $(OBJF95)
 
-SRCC_LinAlg:=$(wildcard $(SRCDIR_LinAlg)/*.c)
-SRCF77_LinAlg:=$(wildcard $(SRCDIR_LinAlg)/*.f)
-SRCF90_LinAlg:=$(wildcard $(SRCDIR_LinAlg)/*.f90)
-SRCF95_LinAlg:=$(wildcard $(SRCDIR_LinAlg)/*.F90)
-OBJC_LinAlg:=$(addprefix $(OBJDIR)/, $(patsubst %c, %o, $(notdir $(SRCC_LinAlg))))
-OBJF77_LinAlg:=$(addprefix $(OBJDIR)/, $(patsubst %f, %o, $(notdir $(SRCF77_LinAlg))))
-OBJF90_LinAlg:=$(addprefix $(OBJDIR)/, $(patsubst %f90, %o, $(notdir $(SRCF90_LinAlg))))
-OBJF95_LinAlg:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_LinAlg))))
-SRCS_LinAlg= $(SRCC_LinAlg) $(SRCF77_LinAlg) $(SRCF90_LinAlg) $(SRCF95_LinAlg)
-OBJS_LinAlg= $(OBJC_LinAlg) $(OBJF77_LinAlg) $(OBJF90_LinAlg) $(OBJF95_LinAlg)
-
-SRCF95_Iter:=$(wildcard $(SRCDIR_Iter)/*.F90)
-OBJF95_Iter:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_Iter))))
-SRCS_Iter= $(SRCF95_Iter)
-OBJS_Iter= $(OBJF95_Iter)
+SRCC_myfort:=$(wildcard $(SRCDIR_myfort)/*.c)
+SRCF77_myfort:=$(wildcard $(SRCDIR_myfort)/*.f)
+SRCF90_myfort:=$(wildcard $(SRCDIR_myfort)/*.f90)
+SRCF95_myfort:=$(wildcard $(SRCDIR_myfort)/*.F90)
+OBJC_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %c, %o, $(notdir $(SRCC_myfort))))
+OBJF77_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %f, %o, $(notdir $(SRCF77_myfort))))
+OBJF90_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %f90, %o, $(notdir $(SRCF90_myfort))))
+OBJF95_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_myfort))))
+SRCS_myfort= $(SRCC_myfort) $(SRCF77_myfort) $(SRCF90_myfort) $(SRCF95_myfort)
+OBJS_myfort= $(OBJC_myfort) $(OBJF77_myfort) $(OBJF90_myfort) $(OBJF95_myfort)
 
 SRCC_HF:=$(wildcard $(SRCDIR_HF)/*.c)
 SRCF77_HF:=$(wildcard $(SRCDIR_HF)/*.f)
@@ -161,8 +167,8 @@ SRCS_HF= $(SRCC_HF) $(SRCF77_HF) $(SRCF90_HF) $(SRCF95_HF)
 OBJS_HF= $(OBJC_HF) $(OBJF77_HF) $(OBJF90_HF) $(OBJF95_HF)
 
 
-SRCS_ALL = $(SRCS) $(SRCS_LinAlg) $(SRCS_Iter) $(SRCS_HF)
-OBJS_ALL = $(OBJS) $(OBJS_LinAlg) $(OBJS_Iter) $(OBJS_HF)
+SRCS_ALL = $(SRCS) $(SRCS_myfort) $(SRCS_HF)
+OBJS_ALL = $(OBJS) $(OBJS_myfort) $(OBJS_HF)
 
 MODOUT=
 ifeq ($(strip $(HOST)),other)
@@ -208,16 +214,13 @@ $(OBJDIR)/%.o:$(SRCDIR)/%.f90
 $(OBJDIR)/%.o:$(SRCDIR)/%.F90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 
-$(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.c
+$(OBJDIR)/%.o:$(SRCDIR_myfort)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
-$(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.f
+$(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f
 	$(FC) $(FFLAGS) $(MODOUT) -o $@ -c $<
-$(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.f90
+$(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
-$(OBJDIR)/%.o:$(SRCDIR_LinAlg)/%.F90
-	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
-
-$(OBJDIR)/%.o:$(SRCDIR_Iter)/%.F90
+$(OBJDIR)/%.o:$(SRCDIR_myfort)/%.F90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 
 $(OBJDIR)/%.o:$(SRCDIR_HF)/%.c
@@ -252,8 +255,8 @@ install:
 
 clean:
 	rm -f $(TARGET).exe
-	rm -f $(MODDIR)/*.mod
-	rm -f $(OBJS_ALL)
+	rm -rf $(OBJDIR)
+	rm -rf $(MODDIR)
 
 #--------------------------------------------------
 -include $(wildcard $(DEPDIR)/*.d)

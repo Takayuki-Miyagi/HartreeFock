@@ -1,10 +1,9 @@
 module HartreeFock
   use omp_lib
-  use LinAlgLib
+  use myfort
   use Operators
   use ThreeBodyMonInteraction
   use ThreeBodyNO2BInteraction
-  use Iteration, only: Optimizer
   implicit none
 
   public :: HFSolver
@@ -61,7 +60,7 @@ module HartreeFock
     character(len=:), allocatable :: Method
     integer :: niter_history = 1
     real(8) :: alpha = 1.d0
-    real(8) :: tol = 1.d-10
+    real(8) :: tol = 1.d-12
     real(8) :: diff
     real(8) :: e0  ! cm term
     real(8) :: e1  ! kinetic term
@@ -122,7 +121,6 @@ contains
   end subroutine FinHFSolver
 
   subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,norm_kernel)
-    use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
     type(Ops), intent(in) :: hamil
     integer, intent(in), optional :: n_iter_max
@@ -164,14 +162,11 @@ contains
     this%T = hamil%one
 
     ti = omp_get_wtime()
-    call timer%cmemory()
     call this%V2%InitMonopole2(hamil%two)
-    call timer%countup_memory('Monople 2Body int.')
     call timer%Add("Construct Monopole 2Body int.", omp_get_wtime() - ti)
 
     if(this%rank == 3) then
       ti = omp_get_wtime()
-      call timer%cmemory()
 
       if(.not. hamil%thr21_mon%zero) call this%V3%InitMonopole3FromMon(hamil%thr21_mon)
       if(.not. hamil%thr21_no2b%zero) call this%V3%InitMonopole3FromNO2B(hamil%thr21_no2b)
@@ -179,7 +174,6 @@ contains
         if(hamil%ms%is_three_body_jt) call this%V3%InitMonopole3(hamil%thr21)
         if(hamil%ms%is_three_body) call this%V3%InitMonopole3_i(hamil%thr)
       end if
-      call timer%countup_memory('Monople 3Body int.')
       call timer%Add("Construct Monopole 3Body int.", omp_get_wtime() - ti)
     end if
 
@@ -193,7 +187,6 @@ contains
   end subroutine InitHFSolver
 
   subroutine SolveHFSolver(this)
-    use Profiler, only: timer
     class(HFSolver), intent(inout) :: this
     integer :: iter, i
     real(8) :: ti
@@ -342,7 +335,6 @@ contains
   end function BasisTransform
 
   function BasisTransNO2BHamiltonian(HF,H) result(op)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: H
     type(Ops) :: op
@@ -439,7 +431,6 @@ contains
   end function BasisTransNO2BHamiltonian
 
   function BasisTransNO2BHamiltonianFromNO2B(HF,H) result(op)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: H
     type(Ops) :: op
@@ -533,7 +524,6 @@ contains
   end function BasisTransNO2BHamiltonianFromNO2B
 
   function BasisTransNO2BScalar(HF,Opr) result(op)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: Opr
     type(Ops) :: op
@@ -647,7 +637,6 @@ contains
   end function BasisTransNO2BScalar
 
   function BasisTransNO2BScalarFromNO2B(HF,opr) result(op)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: opr
     type(Ops) :: op
@@ -762,7 +751,6 @@ contains
   end function BasisTransNO2BScalarFromNO2B
 
   function BasisTransNO2BTensor(HF,Opr) result(op)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: Opr
     type(Ops) :: op
@@ -858,7 +846,6 @@ contains
   end function BasisTransNO2BTensor
 
   function BasisTransScalar(HF,Op) result(Opnew)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: Op
     type(Ops) :: Opnew
@@ -943,7 +930,6 @@ contains
   end function BasisTransScalar
 
   function BasisTransTensor(HF,Op) result(Opnew)
-    use Profiler, only: timer
     class(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: Op
     type(Ops) :: opnew
@@ -1605,7 +1591,6 @@ contains
   end subroutine InitMonopole2
 
   subroutine InitMonopole3(this, v3n)
-    use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
     type(ThreeBodyForce), intent(in) :: v3n
     type(NonOrthIsospinThreeBodySpace), pointer :: ms
@@ -1800,7 +1785,6 @@ contains
   end subroutine InitMonopole3
 
   subroutine InitMonopole3_i(this, v3n)
-    use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
     type(ThreeBodyPart), intent(in) :: v3n
     type(ThreeBodySpace), pointer :: ms
@@ -1982,7 +1966,6 @@ contains
   end subroutine InitMonopole3_i
 
   subroutine InitMonopole3FromMon(this, v3n)
-    use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
     type(ThreeBodyMonForce), intent(in), target :: v3n
     type(ThreeBodyMonSpace), pointer :: ms
@@ -2154,7 +2137,6 @@ contains
   end subroutine InitMonopole3FromMon
 
   subroutine InitMonopole3FromNO2B(this, v3n)
-    use MyLibrary, only: triag
     class(Monopole), intent(inout) :: this
     type(ThreeBodyNO2BForce), intent(in), target :: v3n
     type(ThreeBodyNO2BSpace), pointer :: ms
@@ -2368,7 +2350,6 @@ contains
 end module HartreeFock
 
 !program test
-!  use Profiler, only: timer
 !  use Operators
 !  use HartreeFock
 !

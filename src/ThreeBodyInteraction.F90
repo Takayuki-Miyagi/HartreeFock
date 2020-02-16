@@ -1,6 +1,6 @@
 module ThreeBodyInteraction
   use omp_lib
-  use Profiler, only: timer
+  use myfort
   use SingleParticleState
   use ThreeBodyModelSpace
   implicit none
@@ -87,7 +87,6 @@ module ThreeBodyInteraction
 
 contains
   subroutine InitThreeBodyForce(this, thr)
-    use MyLibrary, only: triag, dcg
     class(ThreeBodyForce), intent(inout) :: this
     type(NonOrthIsospinThreeBodySpace), target, intent(in) :: thr
     integer :: ch, n_state
@@ -194,7 +193,6 @@ contains
   end function ScaleThreeBodyForce
 
   function GetThBME_pn(this,i1,i2,i3,J12,i4,i5,i6,J45,J) result(r)
-    use MyLibrary, only: dcg
     class(ThreeBodyForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: J12,J45,J
@@ -305,8 +303,6 @@ contains
   end function GetThBME_Isospin
 
   subroutine PrintThreeBodyForce(this, wunit)
-    use ClassSys, only: sys
-    use LinAlgLib
     class(ThreeBodyForce), intent(in) :: this
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
@@ -329,7 +325,6 @@ contains
 
   ! only Three-body interaction
   function NormalOrderingFrom3To2(this, two) result(r)
-    use MyLibrary, only: triag, sjs
     use TwoBodyOperator
     class(ThreeBodyForce), intent(in) :: this
     type(TwoBodySpace), intent(in) :: two
@@ -411,7 +406,6 @@ contains
   !
   !
   subroutine Set3BodyReadFile(this, file_3n)
-    use ClassSys, only: sys
     class(Read3BodyFiles), intent(inout) :: this
     character(*), intent(in), optional :: file_3n
     type(sys) :: s
@@ -460,7 +454,6 @@ contains
   end subroutine ReadIsospinThreeBodyFile
 
   subroutine ReadScalar3BFile(this,thr)
-    use ClassSys, only: sys
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(sys) :: s
@@ -569,7 +562,6 @@ contains
 
   subroutine read_scalar_me3j_gzip(this,thr)
     use, intrinsic :: iso_c_binding
-    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
@@ -947,7 +939,6 @@ contains
   !
 
   subroutine ReadTensor3BFile(this,thr)
-    use ClassSys, only: sys
     class(Read3BodyFiles), intent(in) :: this
     type(ThreeBodyForce), intent(inout) :: thr
     type(sys) :: s

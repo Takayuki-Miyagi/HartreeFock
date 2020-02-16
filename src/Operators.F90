@@ -1,6 +1,6 @@
 module Operators
   use omp_lib
-  use ClassSys, only: sys
+  use myfort
   use ModelSpace
   use OneBodyOperator
   use TwoBodyOperator
@@ -104,7 +104,6 @@ contains
   end subroutine InitOpsFromString
 
   subroutine InitOps(this, jr, pr, zr, optr, ms, rank, type_3bme)
-    use Profiler, only: timer
     class(Ops), intent(inout) :: this
     integer, intent(in) :: jr, pr, zr, rank
     character(*), intent(in) :: optr
@@ -114,7 +113,6 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
-    call timer%cmemory()
 
     type_thbme = 'full'
     if(present(type_3bme)) type_thbme = type_3bme
@@ -151,12 +149,10 @@ contains
       return
     end select
 
-    call timer%countup_memory(trim(optr))
     call timer%Add('Construct '//trim(optr), omp_get_wtime()-ti)
   end subroutine InitOps
 
   subroutine CopyOps(a, b)
-    use Profiler, only: timer
     class(Ops), intent(inout) :: a
     type(Ops), intent(in) :: b
     real(8) :: ti
@@ -349,7 +345,6 @@ contains
   end subroutine SetOperatorFromFile
 
   subroutine SetOperator(this)
-    use Profiler, only: timer
     class(Ops), intent(inout), target :: this
     real(8) :: ti
 
@@ -406,7 +401,6 @@ contains
     integer :: bra, ket, ibra, iket
     real(8) :: ti
     ti = omp_get_wtime()
-    call timer%cmemory()
 
     sps => op%ms%sps
     sps_new => ms_new%sps
@@ -518,7 +512,6 @@ contains
       end do
     end do
 
-    call timer%countup_memory(trim(op_new%oprtr))
     call timer%Add('Truncate Operator '//trim(op_new%oprtr), omp_get_wtime()-ti)
   end function Truncate
 
@@ -647,7 +640,6 @@ contains
 end module Operators
 
 !program test
-!  use Profiler, only: timer
 !  use ModelSpace, only: MSpace
 !  use Operators
 !

@@ -1,5 +1,5 @@
 module DefineOperators
-  use ClassSys, only: sys
+  use myfort
   implicit none
 contains
   subroutine GetOperatorRank(optr, jr, pr, zr)
@@ -49,7 +49,6 @@ contains
   end subroutine GetOperatorRank
 
   recursive function one_body_element(optr, ia, ib, hw, A, Z, N) result(r)
-    use MyLibrary, only: hc, amp, amn
     real(8) :: r
     character(*), intent(in) :: optr
     real(8), intent(in) :: hw
@@ -161,7 +160,6 @@ contains
   end function one_body_element
 
   recursive function two_body_element(optr, ia, ib, ic, id, Jab, Jcd, hw, A, Z, N) result(r)
-    use MyLibrary, only: hc, amp, amn
     real(8) :: r
     character(*), intent(in) :: optr
     real(8), intent(in) :: hw
@@ -243,7 +241,6 @@ contains
   !  (1/2) * m * omega**2 * r_{i} \cdot r_{j} / hw
   !
   function r_dot_r(a, b, c, d, J) result(r)
-    use MyLibrary, only: sjs
     integer, intent(in) :: a(4), b(4), c(4), d(4), J
     real(8) :: r
     integer :: ja, jb, jc, jd
@@ -278,7 +275,6 @@ contains
   !  (1/2m) * p_{i} \cdot p_{j} / hw
   !
   function p_dot_p(a, b, c, d, J) result(r)
-    use MyLibrary, only: sjs
     integer, intent(in) :: a(4), b(4), c(4), d(4), J
     real(8) :: r
     integer :: ea, eb, ec, ed
@@ -312,7 +308,6 @@ contains
 
   ! < a || r || b >
   function red_r_j(a, b) result(r)
-    use MyLibrary, only: red_r_l, sjs
     real(8) :: r
     integer, intent(in) :: a(4), b(4)
     integer :: na, la, ja, za
@@ -338,7 +333,6 @@ contains
 
   ! < a || \nabra || b >
   function red_nab_j(a, b) result(r)
-    use MyLibrary, only: red_nab_l, sjs
     real(8) :: r
     integer, intent(in) :: a(4), b(4)
     integer :: na, la, ja, za
@@ -361,5 +355,35 @@ contains
     r = (-1.d0) ** ((3+2*la+jb)/2) * dsqrt(dble(ja + 1) * dble(jb + 1)) * &
         &  sjs(ja, 2, jb, 2 * lb, 1, 2 * la) * red_nab_l(na, la, nb, lb)
   end function red_nab_j
+
+    real(8) function red_r_l(n1, l1, n2, l2) result(rl)
+    integer, intent(in) :: n1, l1, n2, l2
+    if (n1 == n2 .and. l1 == l2-1) then
+      rl = -dsqrt(dble(l2)*(dble(n2 + l2) + 0.5d0))
+    elseif (n1 == n2-1 .and. l1 == l2+1) then
+      rl = -dsqrt(dble(l2 + 1)*dble(n2))
+    elseif (n1 == n2+1 .and. l1 == l2-1) then
+      rl = dsqrt(dble(l2)*(dble(n2  + 1)))
+    elseif (n1 == n2 .and. l1==l2+1) then
+      rl = dsqrt(dble(l2+1)*(dble(n2 +l2)+1.5d0))
+    else
+      rl = 0.d0
+    end if
+  end function red_r_l
+
+  real(8) function red_nab_l(n1, l1, n2, l2) result(nl)
+    integer, intent(in) :: n1, l1, n2, l2
+    if(n1 == n2 .and. l1 == l2+1) then
+      nl = -dsqrt(dble(l2 + 1)*(dble(n2 + l2) + 1.5d0))
+    elseif(n1 == n2-1 .and. l1 == l2+1) then
+      nl = -dsqrt(dble(l2 + 1)*dble(n2))
+    elseif(n1 == n2 .and. l1 == l2-1) then
+      nl = -dsqrt(dble(l2)*(dble(n2 + l2) + 0.5d0))
+    elseif(n1 == n2+1 .and. l1==l2-1) then
+      nl = -dsqrt(dble(l2)*dble(n2 + 1))
+    else
+      nl = 0.d0
+    end if
+  end function red_nab_l
 
 end module DefineOperators

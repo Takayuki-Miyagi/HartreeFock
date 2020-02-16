@@ -1,6 +1,6 @@
 module ThreeBodyOperator
   use omp_lib
-  use LinAlgLib
+  use myfort
   use ThreeBodyModelSpace
   use OneBodyOperator
   use TwoBodyOperator
@@ -84,7 +84,6 @@ module ThreeBodyOperator
   end type ThreeBodyPart
 contains
   subroutine FinThreeBodyPart(this)
-    use MyLibrary, only: triag
     class(ThreeBodyPart), intent(inout) :: this
     integer :: chbra, chket
 
@@ -100,7 +99,6 @@ contains
   end subroutine FinThreeBodyPart
 
   subroutine InitThreeBodyPart(this, thr, Scalar, oprtr, jr, pr, zr)
-    use MyLibrary, only: triag
     class(ThreeBodyPart), intent(inout) :: this
     type(ThreeBodySpace), target, intent(in) :: thr
     logical, intent(in) :: Scalar
@@ -153,7 +151,6 @@ contains
   end subroutine SetThreeBodyPartFromOneBody
 
   function GetThBME_i_scalar(this,a,b,c,ibra,d,e,f,iket,J) result(r)
-    use MyLibrary, only: triag
     class(ThreeBodyPart), intent(in) :: this
     integer, intent(in) :: a, b, c, ibra, d, e, f, iket, J
     real(8) :: r
@@ -183,7 +180,6 @@ contains
   end function GetThBME_i_scalar
 
   function GetThBME_i_tensor(this,a,b,c,ibra,d,e,f,iket,Jbra,Jket) result(r)
-    use MyLibrary, only: triag
     class(ThreeBodyPart), intent(in) :: this
     integer, intent(in) :: a, b, c, ibra, d, e, f, iket, Jbra, Jket
     real(8) :: r
@@ -267,7 +263,6 @@ contains
   end function GetThBME_J_scalar
 
   function GetThBME_J_tensor(this, a, b, c, Jab, d, e, f, Jde, Jbra, Jket) result(r)
-    use MyLibrary, only: triag
     class(ThreeBodyPart), intent(in) :: this
     integer, intent(in) :: a, b, c, Jab, d, e, f, Jde, Jbra, Jket
     real(8) :: r
@@ -638,7 +633,6 @@ contains
   end subroutine SetThreeBodyPartChannel
 
   subroutine PrintThreeBodyPart(this, wunit)
-    use ClassSys, only: sys
     class(ThreeBodyPart), intent(in) :: this
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
@@ -666,7 +660,6 @@ contains
   end subroutine PrintThreeBodyPart
 
   function NormalOrderingFrom3To2(this, two) result(r)
-    use MyLibrary, only: triag, sjs
     class(ThreeBodyPart), intent(in) :: this
     type(TwoBodySpace), intent(in) :: two
     type(TwoBodyPart) :: r

@@ -6,6 +6,7 @@
 !
 module ModelSpace
   use omp_lib
+  use myfort
   use SingleParticleState
   use OneBodyModelSpace
   use TwoBodyModelSpace
@@ -106,7 +107,6 @@ contains
 
   subroutine InitMSpace(this, Nucl, Core, valence_orbits, filename, &
         & hw, emax, e2max, e3max, lmax, beta, is_three_body_jt, is_three_body)
-    use ClassSys, only: sys
     class(MSpace), intent(inout) :: this
     character(*), intent(in), optional :: Core, Nucl, valence_orbits, filename
     real(8), intent(in), optional :: hw, beta
@@ -157,8 +157,6 @@ contains
 
   subroutine InitMSpaceFromAZN(this, Nucl, Core, valence_orbits, hw, emax, e2max, e3max, &
         & lmax, beta, is_three_body_jt, is_three_body)
-    use Profiler, only: timer
-    use ClassSys, only: sys
     class(MSpace), intent(inout), target :: this
     character(*), intent(in), optional :: valence_orbits
     real(8), intent(in), optional :: hw
@@ -173,7 +171,6 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
-    call timer%cmemory()
     write(*,*)
     write(*,'(a)') "### Model-space constructor ###"
 
@@ -227,14 +224,11 @@ contains
     write(*,*)
     call this%InitSubSpace()
     write(*,*)
-    call timer%countup_memory("Model Space")
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromAZN
 
   subroutine InitMSpaceFromFile(this, filename, hw, emax, e2max, e3max, &
         & lmax, beta, is_three_body_jt, is_three_body)
-    use Profiler, only: timer
-    use ClassSys, only: sys
     class(MSpace), intent(inout), target :: this
     character(*), intent(in) :: filename
     real(8), intent(in), optional :: hw
@@ -248,7 +242,6 @@ contains
     real(8) :: ti
 
     ti = omp_get_wtime()
-    call timer%cmemory()
     write(*,*)
     write(*,'(a)') "### Model-space constructor ###"
     this%is_constructed = .true.
@@ -299,8 +292,6 @@ contains
     write(*,*)
     call this%InitSubSpace()
     write(*,*)
-
-    call timer%countup_memory("Model Space")
     call timer%Add('Construct Model Space', omp_get_wtime()-ti)
   end subroutine InitMSpaceFromFile
 
@@ -326,7 +317,6 @@ contains
   end subroutine InitSubSpace
 
   subroutine GetConfFromFile(this, filename, Ac, Zc, Nc, A, Z, N)
-    use MyLibrary, only: skip_comment
     class(MSpace), intent(inout), target :: this
     character(*), intent(in) :: filename
     character(20) :: cvp
@@ -334,6 +324,7 @@ contains
     integer :: nn, ll, jj, zz, idx, occ_num
     integer :: runit=20
     type(SingleParticleOrbit), pointer :: o
+    type(sys) :: s
 
     Z = 0
     N = 0
@@ -342,7 +333,7 @@ contains
     allocate(this%NOCoef(this%sps%norbs))
     this%NOCoef(:) = 0.d0
     open(runit, file=filename, status='old', action='read')
-    call skip_comment(runit, '!')
+    call s%skip_comments(runit, '!')
     do
       read(runit,*,end=999) nn, ll, jj, zz, cvp, occ_num
       idx = this%sps%nljz2idx(nn,ll,jj,zz)
@@ -375,7 +366,6 @@ contains
 
   subroutine AssignCoreValence(this, valence_orbits)
     ! This should be called after obtaining A, Z, N
-    use ClassSys, only: sys
     class(MSpace), intent(inout), target :: this
     character(*), intent(in), optional :: valence_orbits
     character(256), allocatable :: v_orbits(:)
@@ -681,7 +671,6 @@ end module ModelSpace
 
 ! main for test
 !program main
-!  use Profiler, only: timer
 !  use ModelSpace, only: MSpace
 !  type(MSpace) :: ms
 !

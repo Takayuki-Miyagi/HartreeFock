@@ -1,4 +1,5 @@
 module Atomic
+  use myfort
   use HFInput
   use ModelSpace
   use Operators
@@ -55,7 +56,6 @@ contains
   end subroutine atomic_case
 
   subroutine read_hamil_from_snt(ms, h, f, conffile)
-    use MyLibrary, only: skip_comment
     type(Ops), intent(inout) :: h
     type(MSpace), intent(inout), target :: ms
     character(*), intent(in) :: f, conffile
@@ -67,6 +67,7 @@ contains
     integer :: nmin, lmin, jmin
     type(SingleParticleOrbit), pointer :: o
     real(8) :: me, kin, pot, ti
+    type(sys) :: s
 
     ti = omp_get_wtime()
     h%oprtr = "hamil"
@@ -83,9 +84,9 @@ contains
       write(*,*)
       return
     end if
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*) porbs, norbs, pc, nc
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     lines = porbs+norbs
     ms%sps%norbs = lines
     allocate(ms%sps%orb(lines))
@@ -130,17 +131,17 @@ contains
     call h%one%init(ms%one, .true., "hamil", 0, 1, 0)
     call h%two%init(ms%two, .true., "hamil", 0, 1, 0)
 
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*) lines
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     do line = 1, lines
       read(runit,*) a, b, kin, pot ! one-body part
       call h%one%SetOBME(a, b, kin-dble(N_e)*pot)
     end do
 
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*) lines
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     do line = 1, lines
       read(runit,*) a, b, c, d, J, me
 #ifdef TwoBodyOperatorDebug
@@ -153,19 +154,19 @@ contains
   end subroutine read_hamil_from_snt
 
   subroutine GetElectronConfFromFile(ms, f, N_e)
-    use MyLibrary, only: skip_comment
     type(MSpace), intent(inout) :: ms
     character(*), intent(in) :: f
     integer, intent(inout) :: N_e
     integer :: runit=20
     integer :: nn, ll, jj, idx, occ_num
     type(SingleParticleOrbit), pointer :: o
+    type(sys) :: s
 
     N_e = 0
     allocate(ms%NOCoef(ms%sps%norbs))
     ms%NOCoef(:) = 0.d0
     open(runit, file=f, status='old', action='read')
-    call skip_comment(runit, '!')
+    call s%skip_comments(runit, '!')
     do
       read(runit,*,end=999) nn, ll, jj, occ_num
       idx = ms%sps%nljz2idx(nn,ll,jj,-1)

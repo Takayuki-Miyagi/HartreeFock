@@ -1,37 +1,39 @@
-obj/ClassSys.o : src/ClassSys.f90 
-obj/MyLibrary.o : src/MyLibrary.f90 obj/ClassSys.o 
-obj/DefineOperators.o : src/DefineOperators.F90 obj/MyLibrary.o obj/ClassSys.o 
-obj/HFMBPT.o : src/HFMBPT.F90 obj/MyLibrary.o obj/Profiler.o obj/HartreeFock.o obj/StoreCouplings.o obj/Operators.o obj/ModelSpace.o 
-obj/HartreeFock.o : src/HartreeFock.F90 obj/MyLibrary.o obj/Profiler.o obj/Iteration.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/LinAlgLib.o 
-obj/MPIFunction.o : src/MPIFunction.F90 
-obj/ModelSpace.o : src/ModelSpace.F90 obj/MyLibrary.o obj/Profiler.o obj/ClassSys.o obj/ThreeBodyModelSpace.o obj/TwoBodyModelSpace.o obj/OneBodyModelSpace.o obj/SingleParticleState.o 
+obj/DefineOperators.o : src/DefineOperators.F90 obj/myfort.o 
+obj/HFMBPT.o : src/HFMBPT.F90 obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/myfort.o 
+obj/HartreeFock.o : src/HartreeFock.F90 obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/myfort.o 
+obj/ModelSpace.o : src/ModelSpace.F90 obj/ThreeBodyModelSpace.o obj/TwoBodyModelSpace.o obj/OneBodyModelSpace.o obj/SingleParticleState.o obj/myfort.o 
 obj/OneBodyModelSpace.o : src/OneBodyModelSpace.F90 obj/SingleParticleState.o 
-obj/OneBodyOperator.o : src/OneBodyOperator.F90 obj/ClassSys.o obj/DefineOperators.o obj/MyLibrary.o obj/OneBodyModelSpace.o obj/LinAlgLib.o 
-obj/Operators.o : src/Operators.F90 obj/Profiler.o obj/DefineOperators.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/ThreeBodyInteraction.o obj/ThreeBodyOperator.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ModelSpace.o obj/ClassSys.o 
-obj/Profiler.o : src/Profiler.F90 obj/MPIFunction.o obj/ClassSys.o 
-obj/SingleParticleState.o : src/SingleParticleState.F90 obj/ClassSys.o 
-obj/StoreCouplings.o : src/StoreCouplings.F90 obj/MyLibrary.o obj/Profiler.o 
-obj/ThreeBodyInteraction.o : src/ThreeBodyInteraction.F90 obj/TwoBodyOperator.o obj/LinAlgLib.o obj/ClassSys.o obj/MyLibrary.o obj/ThreeBodyModelSpace.o obj/SingleParticleState.o obj/Profiler.o 
-obj/ThreeBodyModelSpace.o : src/ThreeBodyModelSpace.F90 obj/MyLibrary.o obj/LinAlgLib.o obj/SingleParticleState.o 
-obj/ThreeBodyMonInteraction.o : src/ThreeBodyMonInteraction.F90 obj/ClassSys.o obj/MyLibrary.o obj/SingleParticleState.o obj/Profiler.o 
-obj/ThreeBodyNO2BInteraction.o : src/ThreeBodyNO2BInteraction.F90 obj/ClassSys.o obj/MyLibrary.o obj/SingleParticleState.o obj/Profiler.o 
-obj/ThreeBodyOperator.o : src/ThreeBodyOperator.F90 obj/ClassSys.o obj/ThreeBodyInteraction.o obj/MyLibrary.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ThreeBodyModelSpace.o obj/LinAlgLib.o 
-obj/TwoBodyModelSpace.o : src/TwoBodyModelSpace.F90 obj/MyLibrary.o obj/SingleParticleState.o 
-obj/TwoBodyOperator.o : src/TwoBodyOperator.F90 obj/Profiler.o obj/ClassSys.o obj/DefineOperators.o obj/MyLibrary.o obj/OneBodyOperator.o obj/TwoBodyModelSpace.o obj/LinAlgLib.o 
-obj/LinAlgLib.o : submodule/LinAlgf90/src/LinAlgLib.f90 obj/MatVecComplex.o obj/MatVecDouble.o obj/MatVecSingle.o obj/MatrixComplex.o obj/MatrixDouble.o obj/MatrixSingle.o obj/VectorComplex.o obj/VectorDouble.o obj/VectorSingle.o obj/SingleDoubleComplex.o obj/LinAlgParameters.o 
-obj/LinAlgParameters.o : submodule/LinAlgf90/src/LinAlgParameters.f90 
-obj/MatVecComplex.o : submodule/LinAlgf90/src/MatVecComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o obj/LinAlgParameters.o 
-obj/MatVecDouble.o : submodule/LinAlgf90/src/MatVecDouble.f90 obj/MatrixDouble.o obj/VectorDouble.o obj/LinAlgParameters.o 
-obj/MatVecSingle.o : submodule/LinAlgf90/src/MatVecSingle.f90 obj/MatrixSingle.o obj/VectorSingle.o obj/LinAlgParameters.o 
-obj/MatrixComplex.o : submodule/LinAlgf90/src/MatrixComplex.f90 obj/VectorComplex.o obj/LinAlgParameters.o 
-obj/MatrixDouble.o : submodule/LinAlgf90/src/MatrixDouble.f90 obj/VectorDouble.o obj/LinAlgParameters.o 
-obj/MatrixSingle.o : submodule/LinAlgf90/src/MatrixSingle.f90 obj/VectorSingle.o obj/LinAlgParameters.o 
-obj/SingleDoubleComplex.o : submodule/LinAlgf90/src/SingleDoubleComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o obj/MatrixDouble.o obj/VectorDouble.o obj/MatrixSingle.o obj/VectorSingle.o 
-obj/VectorComplex.o : submodule/LinAlgf90/src/VectorComplex.f90 obj/LinAlgParameters.o 
-obj/VectorDouble.o : submodule/LinAlgf90/src/VectorDouble.f90 obj/LinAlgParameters.o 
-obj/VectorSingle.o : submodule/LinAlgf90/src/VectorSingle.f90 obj/LinAlgParameters.o 
-obj/Iteration.o : submodule/Iteration/src/Iteration.F90 obj/LinAlgLib.o 
-obj/Atomic.o : main/Atomic.F90 obj/MyLibrary.o obj/HFMBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o 
-obj/HFInput.o : main/HFInput.F90 obj/ClassSys.o 
-obj/HFMain.o : main/HFMain.F90 obj/Atomic.o obj/WriteOperator.o obj/HFMBPT.o obj/HartreeFock.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/Profiler.o obj/ClassSys.o 
-obj/WriteOperator.o : main/WriteOperator.F90 obj/Profiler.o obj/ClassSys.o obj/Operators.o obj/HFInput.o 
+obj/OneBodyOperator.o : src/OneBodyOperator.F90 obj/DefineOperators.o obj/OneBodyModelSpace.o obj/myfort.o 
+obj/Operators.o : src/Operators.F90 obj/DefineOperators.o obj/ThreeBodyNO2BInteraction.o obj/ThreeBodyMonInteraction.o obj/ThreeBodyInteraction.o obj/ThreeBodyOperator.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ModelSpace.o obj/myfort.o 
+obj/SingleParticleState.o : src/SingleParticleState.F90 obj/myfort.o 
+obj/ThreeBodyInteraction.o : src/ThreeBodyInteraction.F90 obj/TwoBodyOperator.o obj/ThreeBodyModelSpace.o obj/SingleParticleState.o obj/myfort.o 
+obj/ThreeBodyModelSpace.o : src/ThreeBodyModelSpace.F90 obj/SingleParticleState.o obj/myfort.o 
+obj/ThreeBodyMonInteraction.o : src/ThreeBodyMonInteraction.F90 obj/SingleParticleState.o obj/myfort.o 
+obj/ThreeBodyNO2BInteraction.o : src/ThreeBodyNO2BInteraction.F90 obj/SingleParticleState.o obj/myfort.o 
+obj/ThreeBodyOperator.o : src/ThreeBodyOperator.F90 obj/ThreeBodyInteraction.o obj/TwoBodyOperator.o obj/OneBodyOperator.o obj/ThreeBodyModelSpace.o obj/myfort.o 
+obj/TwoBodyModelSpace.o : src/TwoBodyModelSpace.F90 obj/SingleParticleState.o obj/myfort.o 
+obj/TwoBodyOperator.o : src/TwoBodyOperator.F90 obj/DefineOperators.o obj/OneBodyOperator.o obj/TwoBodyModelSpace.o obj/myfort.o 
+obj/angular_momentum_couplings.o : submodule/myfort/src/angular_momentum_couplings.f90 obj/functions_from_c.o obj/general.o 
+obj/functions_from_c.o : submodule/myfort/src/functions_from_c.f90 
+obj/general.o : submodule/myfort/src/general.f90 
+obj/iteration_methods.o : submodule/myfort/src/iteration_methods.f90 obj/linear_algebra.o 
+obj/linear_algebra.o : submodule/myfort/src/linear_algebra.f90 obj/mat_vec_complex.o obj/mat_vec_double.o obj/mat_vec_single.o obj/matrix_complex.o obj/matrix_double.o obj/matrix_single.o obj/vector_complex.o obj/vector_double.o obj/vector_single.o obj/sngl_dble_cmplx.o obj/general.o 
+obj/mat_vec_complex.o : submodule/myfort/src/mat_vec_complex.f90 obj/matrix_complex.o obj/vector_complex.o obj/general.o 
+obj/mat_vec_double.o : submodule/myfort/src/mat_vec_double.f90 obj/matrix_double.o obj/vector_double.o obj/general.o 
+obj/mat_vec_single.o : submodule/myfort/src/mat_vec_single.f90 obj/matrix_single.o obj/vector_single.o obj/general.o 
+obj/matrix_complex.o : submodule/myfort/src/matrix_complex.f90 obj/vector_complex.o obj/general.o 
+obj/matrix_double.o : submodule/myfort/src/matrix_double.f90 obj/vector_double.o obj/general.o 
+obj/matrix_single.o : submodule/myfort/src/matrix_single.f90 obj/vector_single.o obj/general.o 
+obj/myfort.o : submodule/myfort/src/myfort.f90 obj/iteration_methods.o obj/linear_algebra.o obj/wave_functions.o obj/profiler.o obj/physics_constants.o obj/general.o obj/store_couplings.o obj/angular_momentum_couplings.o obj/functions_from_c.o 
+obj/physics_constants.o : submodule/myfort/src/physics_constants.f90 obj/general.o 
+obj/profiler.o : submodule/myfort/src/profiler.f90 obj/general.o 
+obj/sngl_dble_cmplx.o : submodule/myfort/src/sngl_dble_cmplx.f90 obj/matrix_complex.o obj/vector_complex.o obj/matrix_double.o obj/vector_double.o obj/matrix_single.o obj/vector_single.o 
+obj/store_couplings.o : submodule/myfort/src/store_couplings.f90 obj/angular_momentum_couplings.o obj/functions_from_c.o obj/profiler.o obj/general.o 
+obj/vector_complex.o : submodule/myfort/src/vector_complex.f90 obj/general.o 
+obj/vector_double.o : submodule/myfort/src/vector_double.f90 obj/general.o 
+obj/vector_single.o : submodule/myfort/src/vector_single.f90 obj/general.o 
+obj/wave_functions.o : submodule/myfort/src/wave_functions.f90 obj/general.o obj/physics_constants.o obj/functions_from_c.o 
+obj/Atomic.o : main/Atomic.F90 obj/HFMBPT.o obj/HartreeFock.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o 
+obj/HFInput.o : main/HFInput.F90 obj/myfort.o 
+obj/HFMain.o : main/HFMain.F90 obj/Atomic.o obj/WriteOperator.o obj/HFMBPT.o obj/HartreeFock.o obj/ThreeBodyMonInteraction.o obj/Operators.o obj/ModelSpace.o obj/HFInput.o obj/myfort.o 
+obj/WriteOperator.o : main/WriteOperator.F90 obj/profiler.o obj/Operators.o obj/HFInput.o 

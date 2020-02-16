@@ -1,6 +1,6 @@
 module TwoBodyOperator
   use omp_lib
-  use LinAlgLib
+  use myfort
   use TwoBodyModelSpace
   use OneBodyOperator
   implicit none
@@ -169,7 +169,6 @@ module TwoBodyOperator
 contains
 
   subroutine FinTwoBodyPart(this)
-    use MyLibrary, only: triag
     class(TwoBodyPart), intent(inout) :: this
     integer :: chbra, chket
 
@@ -185,7 +184,6 @@ contains
   end subroutine FinTwoBodyPart
 
   subroutine InitTwoBodyPart(this, two, Scalar, oprtr, jr, pr, zr)
-    use MyLibrary, only: triag
     class(TwoBodyPart), intent(inout) :: this
     type(TwoBodySpace), target, intent(in) :: two
     logical, intent(in) :: Scalar
@@ -383,7 +381,6 @@ contains
   end function mat_elm
 
   subroutine PrintTwoBodyPart(this, wunit)
-    use ClassSys, only: sys
     class(TwoBodyPart), intent(in) :: this
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
@@ -411,7 +408,6 @@ contains
   end subroutine PrintTwoBodyPart
 
   function GetTwBME_tensor(this,i1,i2,i3,i4,J12,J34) result(r)
-    use MyLibrary, only: triag
     real(8) :: r
     class(TwoBodyPart), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,J12,J34
@@ -462,7 +458,6 @@ contains
   end function GetTwBME_tensor
 
   function GetTwBME_scalar(this,i1,i2,i3,i4,J) result(r)
-    use MyLibrary, only: triag
     real(8) :: r
     class(TwoBodyPart), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,J
@@ -551,7 +546,6 @@ contains
   end function GetTwBMEMon
 
   subroutine SetTwBME_tensor(this,i1,i2,i3,i4,J12,J34,me)
-    use MyLibrary, only: triag
     class(TwoBodyPart), intent(inout) :: this
     integer, intent(in) :: i1,i2,i3,i4,J12,J34
     real(8), intent(in) :: me
@@ -646,7 +640,6 @@ contains
   end subroutine SetTwBME_scalar
 
   subroutine AddToTwBME_tensor(this,i1,i2,i3,i4,J12,J34,me)
-    use MyLibrary, only: triag
     class(TwoBodyPart), intent(inout) :: this
     integer, intent(in) :: i1,i2,i3,i4,J12,J34
     real(8), intent(in) :: me
@@ -776,7 +769,6 @@ contains
   end subroutine SetTwoBodyPartChannelFromOneBody
 
   subroutine SetTwoBodyPartChannelFromOneBodyScalar(two, one)
-    use Profiler, only: timer
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
     class(TwoBodyChannel), pointer :: ch_bra, ch_ket
@@ -820,7 +812,6 @@ contains
   end subroutine SetTwoBodyPartChannelFromOneBodyScalar
 
   subroutine SetTwoBodyChannelFromOneBodyTrans(two, one)
-    use Profiler, only: timer
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
     class(TwoBodyChannel), pointer :: ch_bra, ch_ket
@@ -862,8 +853,6 @@ contains
   end subroutine SetTwoBodyChannelFromOneBodyTrans
 
   subroutine SetTwoBodyPartChannelFromOneBodyTensor(two, one)
-    use MyLibrary, only: sjs
-    use Profiler, only: timer
     class(TwoBodyPartChannel), intent(inout) :: two
     type(OneBodyPart), intent(in) :: one
     class(TwoBodyChannel), pointer :: ch_bra, ch_ket
@@ -1430,7 +1419,6 @@ contains
     !  _________________
     !  <ph:J| V |p'h':J> = \sum_{J'} [J'] {jh  jp' J'} <hp':J'|V|h'p:J'>
     !                                     {jh' jp  J }
-    use MyLibrary, only: sjs
     class(TwoBodyPart), intent(in) :: op
     type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
     type(Orbits), pointer :: sps
@@ -1485,7 +1473,6 @@ contains
     !  _________________
     !  <ph:J| V |p'h':J> = \sum_{J'} [J'] {jp  jh' J'} <ph':J'|V|p'h:J'>
     !                                     {jp' jh  J }
-    use MyLibrary, only: sjs
     class(TwoBodyPart), intent(in) :: op
     type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
     type(Orbits), pointer :: sps
@@ -1598,7 +1585,6 @@ contains
 !    !  __________________
 !    !  <ph:J| V |h'h'':J> = \sum_{J'} [J'] {jp   jh'  J'} <ph':J'|V|hh'':J'> / f_h - f_p
 !    !                                      {jh'' jh   J }
-!    use MyLibrary, only: sjs
 !    class(TwoBodyPart), intent(in) :: op
 !    type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
 !    type(OneBodyPart), intent(in), optional :: f
@@ -1669,7 +1655,6 @@ contains
 !    !  __________________
 !    !  <pp':J| V |p''h:J> = \sum_{J'} [J'] {jp   jp''  J'} <pp'':J'|V|p'h:J'> / f_h - f_p''
 !    !                                      {jh   jp'   J }
-!    use MyLibrary, only: sjs
 !    class(TwoBodyPart), intent(in) :: op
 !    type(CrossCoupledTwoBodyChannel), intent(in) :: ch_cc
 !    type(OneBodyPart), intent(in), optional :: f
@@ -1737,7 +1722,6 @@ contains
 
   ! Only for Scalar
   function GetCrossCoupledME1423(this, a, b, c, d, J) result(r)
-    use MyLibrary, only: sjs
     class(TwoBodyPart), intent(in) :: this
     integer, intent(in) :: a, b, c, d, J
     real(8) :: r
@@ -1765,7 +1749,6 @@ contains
 
   ! Only for Scalar
   function GetCrossCoupledME1324(this, a, b, c, d, J) result(r)
-    use MyLibrary, only: sjs
     class(TwoBodyPart), intent(in) :: this
     integer, intent(in) :: a, b, c, d, J
     real(8) :: r
@@ -1792,7 +1775,6 @@ contains
   end function GetCrossCoupledME1324
 
   function NormalOrderingFrom2To1(this, one) result(r)
-    use MyLibrary, only: sjs, triag
     class(TwoBodyPart), intent(in) :: this
     type(OneBodySpace), intent(in) :: one
     type(OneBodyPart) :: r
@@ -1802,8 +1784,6 @@ contains
   end function NormalOrderingFrom2To1
 
   function ScalarNormalOrderingFrom2To1(this, one) result(r)
-    use MyLibrary, only: sjs, triag
-    use Profiler, only: timer
     type(TwoBodyPart), intent(in) :: this
     type(OneBodySpace), intent(in) :: one
     type(OneBodyPart) :: r
@@ -1857,8 +1837,6 @@ contains
   end function ScalarNormalOrderingFrom2To1
 
   function TensorNormalOrderingFrom2To1(this, one) result(r)
-    use MyLibrary, only: sjs, triag
-    use Profiler, only: timer
     type(TwoBodyPart), intent(in) :: this
     type(OneBodySpace), intent(in) :: one
     type(OneBodyPart) :: r
@@ -1952,7 +1930,6 @@ contains
   !
   !
   subroutine Set2BodyReadFile(this, file_nn)
-    use ClassSys, only: sys
     class(Read2BodyFiles), intent(inout) :: this
     character(*), intent(in), optional :: file_nn
     type(sys) :: s
@@ -1979,7 +1956,6 @@ contains
   end subroutine Set2BodyFileBoundaries
 
   subroutine ReadTwoBodyFile(this, V)
-    use Profiler, only: timer
     class(Read2BodyFiles), intent(in) :: this
     class(TwoBodyPart), intent(inout) :: v
     real(8) :: ti
@@ -2000,7 +1976,6 @@ contains
   end subroutine ReadTwoBodyFile
 
   subroutine ReadScalar2BFile(this,two)
-    use ClassSys, only: sys
     class(Read2BodyFiles), intent(in) :: this
     type(TwoBodyPart), intent(inout) :: two
     type(sys) :: s
@@ -2044,7 +2019,6 @@ contains
   end subroutine ReadScalar2BFile
 
   subroutine read_scalar_me2j_ascii(this,two)
-    use ClassSys, only: sys
     class(Read2BodyFiles), intent(in) :: this
     type(TwoBodyPart), intent(inout) :: two
     type(TwoBodySpace), pointer :: ms
@@ -2350,7 +2324,6 @@ contains
   end function count_scalar_me2j
 
   subroutine get_vector_me2j_formatted(ut,v)
-    use ClassSys, only: sys
     integer, intent(in) :: ut
     real(8), intent(inout) :: v(:)
     integer(8) :: nelm, lines, i
@@ -2379,8 +2352,6 @@ contains
 
   subroutine get_vector_me2j_gz(f,v)
     use, intrinsic :: iso_c_binding
-    use ClassSys, only: sys
-    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     character(*), intent(in) :: f
     real(8), intent(inout) :: v(:)
     integer(8) :: nelm, line, lines, cnt
@@ -2497,12 +2468,12 @@ contains
   end subroutine read_scalar_myg_bin
 
   subroutine read_scalar_snt_ascii(this,two)
-    use MyLibrary, only: skip_comment
     class(Read2BodyFiles), intent(in) :: this
     type(TwoBodyPart), intent(inout) :: two
     type(TwoBodySpace), pointer :: ms
     type(Orbits), pointer :: sps
     type(SingleParticleOrbit), allocatable :: ssnt(:)
+    type(sys) :: s
     integer :: a, b, c, d, J, idx, n, l, z
     integer :: ia, ib, ic, id
     integer :: runit=22, io
@@ -2517,7 +2488,7 @@ contains
       write(*,'(2a)') 'File open error: ', trim(this%file_nn)
       return
     end if
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*) porbs, norbs, pc, nc
     lines = porbs+norbs
     allocate(ssnt(lines))
@@ -2526,19 +2497,19 @@ contains
       call ssnt(line)%set(n,l,j,z,idx)
     end do
 
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*)  me ! zero-body part
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*) lines
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
 
     do line = 1, lines
       read(runit,*) a, b, me ! one-body part
     end do
 
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     read(runit,*) lines
-    call skip_comment(runit,'#')
+    call s%skip_comments(runit,'#')
     do line = 1, lines
       read(runit,*) a, b, c, d, J, me
 #ifdef TwoBodyOperatorDebug
@@ -2555,7 +2526,6 @@ contains
 
   subroutine read_scalar_navratil_ascii_gz(this,two)
     use, intrinsic :: iso_c_binding
-    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     class(Read2BodyFiles), intent(in) :: this
     type(TwoBodyPart), intent(inout) :: two
     type(TwoBodySpace), pointer :: ms
@@ -2694,7 +2664,6 @@ contains
   end subroutine read_scalar_navratil_ascii
 
   subroutine ReadTensor2BFile(this,two)
-    use ClassSys, only: sys
     class(Read2BodyFiles), intent(in) :: this
     type(TwoBodyPart), intent(inout) :: two
     return

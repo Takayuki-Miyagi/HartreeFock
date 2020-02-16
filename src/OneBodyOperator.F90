@@ -1,6 +1,6 @@
 module OneBodyOperator
   use omp_lib
-  use LinAlgLib
+  use myfort
   use OneBodyModelSpace
   implicit none
 
@@ -80,7 +80,6 @@ module OneBodyOperator
 contains
 
   subroutine FinOneBodyPart(this)
-    use MyLibrary, only: triag
     class(OneBodyPart), intent(inout) :: this
     integer :: chbra, chket
 
@@ -96,7 +95,6 @@ contains
   end subroutine FinOneBodyPart
 
   subroutine InitOneBodyPart(this, one, Scalar, oprtr, jr, pr, zr)
-    use MyLibrary, only: triag
     class(OneBodyPart), intent(inout) :: this
     type(OneBodySpace), target, intent(in) :: one
     logical, intent(in) :: Scalar
@@ -324,7 +322,6 @@ contains
   end subroutine SetOBME
 
   subroutine PrintOneBodyPart(this, wunit)
-    use ClassSys, only: sys
     class(OneBodyPart), intent(in) :: this
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
@@ -409,7 +406,6 @@ contains
   end function GetDenominator4
 
   subroutine ReadOneBodyFile(this, filename, emax, lmax)
-    use ClassSys, only: sys
     class(OneBodyPart), intent(inout) :: this
     character(*), intent(in) :: filename
     integer, intent(in) :: emax, lmax

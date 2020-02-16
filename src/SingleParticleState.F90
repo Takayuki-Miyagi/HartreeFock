@@ -1,4 +1,5 @@
 module SingleParticleState
+  use myfort
   implicit none
 
   public :: SingleParticleOrbitIsospin
@@ -371,7 +372,6 @@ contains
   end function GetOrbit
 
   function GetLabelFromIndex(this, idx) result(r)
-    use ClassSys, only: sys
     class(Orbits), intent(in) :: this
     integer, intent(in) :: idx
     character(:), allocatable :: r
@@ -401,7 +401,6 @@ contains
   end function GetLabelFromIndex
 
   function GetLabelFromIndexIsospin(this,idx) result(r)
-    use ClassSys, only: sys
     class(OrbitsIsospin), intent(in) :: this
     integer, intent(in) :: idx
     character(:), allocatable :: r

@@ -1,6 +1,7 @@
 ! Write operators in snt (Tokyo) format
 module WriteOperator
   use omp_lib
+  use myfort
   use HFInput
   use Operators
   implicit none
@@ -30,7 +31,6 @@ contains
   end subroutine InitWriteFiles
 
   subroutine SetFileName(this, outdir, file_format, op)
-    use ClassSys, only: sys
     class(WriteFiles), intent(inout) :: this
     character(*), intent(in) :: outdir
     character(*), intent(in) :: file_format
@@ -46,8 +46,6 @@ contains
   end subroutine SetFileName
 
   subroutine WriteFile(this,p,op)
-    use ClassSys, only: sys
-    use Profiler, only: timer
     class(WriteFiles), intent(inout) :: this
     type(InputParameters), intent(in) :: p
     type(Ops), intent(in) :: op

@@ -1,8 +1,8 @@
 module HFMBPT
   use omp_lib
+  use myfort
   use ModelSpace
   use Operators
-  use StoreCouplings
   use HartreeFock
   implicit none
 
@@ -203,7 +203,6 @@ contains
     !    \/___________\/
     !
     ! \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -358,7 +357,6 @@ contains
     !    \/___________\/
     !
     ! <ij||ab> <ab||cd> <cd||ij> / 8 denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -403,7 +401,6 @@ contains
     !    \/___________\/
     !
     ! <ij||ab> <kl||ij> <ab||kl> / 8 denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -452,8 +449,6 @@ contains
     ! = - \sum_{L} [L] <ij|X|ab>_{L} <kb|X|ic>_{L} <ac|X|kj>_{L} / denominator
     ! <ij|X|ab>_{L} = \sum_{A} [A] {i j A} <ij:A|X|ab:A>
     !                              {a b L}
-    use Profiler, only: timer
-    use MyLibrary, only: triag
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     integer :: ch, J2
@@ -508,7 +503,6 @@ contains
     ! <p1p2:J1||h1h2:J1> <p3h2:J1||p1p2:J1>
     ! <h1p4:J2||h3h4:J2> <h3h4:J2||p3p4:J2> / denominator
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: tbs
@@ -606,8 +600,6 @@ contains
     ! <p1p2:J1||h1h2:J1> <p3h2:J1||p1p2:J1>
     ! <p4p5:J2||p3h3:J2> <h1h3:J2||p4p5:J2> / denominator
     !
-    use Profiler, only: timer
-    use MyLibrary, only: triag
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: tbs
@@ -701,8 +693,6 @@ contains
     ! <p1p2:J1||h1h2:J1> <h1h2:J1||h3p2:J1>
     ! <h3p3:J2||h4h5:J2> <h4h5:J2||p1p3:J2> / denominator
     !
-    use Profiler, only: timer
-    use MyLibrary, only: triag
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: tbs
@@ -795,8 +785,6 @@ contains
     ! <h1h2:J||p1p2:J> <p1p2:J||p3p4:J>
     ! <p3p4:J||h3h4:J> <h3h4:J||h1h2:J> / denominator
     !
-    use Profiler, only: timer
-    use MyLibrary, only: triag
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: tbs
@@ -884,8 +872,6 @@ contains
     ! <h1h2:J1||p1p2:J1> <p3h2:J2||p1h4:J2>
     ! <h1p4:J3||h3p2:J3> <p3p4:J4||h3h4:J4> / denominator
     !
-    use Profiler, only: timer
-    use MyLibrary, only: triag
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(Orbits), pointer :: sps
@@ -930,8 +916,6 @@ contains
 !    ! <h1h2:J||p1p2:J> <p1p2:J||p3p4:J>
 !    ! <p3p4:J||h3h4:J> <h3h4:J||h1h2:J> / denominator
 !    !
-!    use Profiler, only: timer
-!    use MyLibrary, only: triag
 !    type(Ops), intent(in) :: h
 !    type(MSPace), pointer :: ms
 !    type(TwoBodyChannel), pointer :: tbs
@@ -1262,7 +1246,6 @@ contains
     !    \/___________\/
     !
     ! 2 \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -1343,7 +1326,6 @@ contains
     !    \/___________\/
     !
     ! <ab||ij> <ij||ac> <b|x|c> / 2 denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
     integer :: ch, J2, bra, ket
@@ -1415,7 +1397,6 @@ contains
     !    \/___________\/
     !
     ! - <ab||ij> <ik||ab> <j|x|k> / 2 denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     integer :: ch, J2, bra, ket
@@ -1488,7 +1469,6 @@ contains
     !
     ! - <ab||ij> <ij||kb> <a|x|k> / denominator
     ! + <ab||ij> <cj||ab> <c|x|i> / denominator
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSPace), pointer :: ms
     integer :: ch, J2, bra, ket, iph
@@ -1594,7 +1574,6 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -1639,7 +1618,6 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -1686,7 +1664,6 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     integer :: ch, J2, i
@@ -1732,7 +1709,6 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -1778,7 +1754,6 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
@@ -1825,7 +1800,6 @@ contains
     !   \  /         \  /
     !    \/___________\/
     !
-    use Profiler, only: timer
     type(Ops), intent(in) :: h, s
     type(MSpace), pointer :: ms
     integer :: ch, J2, i
@@ -1875,7 +1849,6 @@ contains
   end subroutine FinMBPTDMat
 
   subroutine InitMBPTDMat(this, HF, hamil, EN_denominator_in)
-    use Profiler, only: timer
     class(MBPTDMat), intent(inout) :: this
     type(HFSolver), intent(in) :: HF
     type(Ops), intent(in) :: hamil
@@ -2208,8 +2181,6 @@ contains
 !    ! <p1p2:J1||h1h2:J1> <p3h2:J1||p1p2:J1>
 !    ! <h1p4:J2||h3h4:J2> <h3h4:J2||p3p4:J2> / denominator
 !    !
-!    use Profiler, only: timer
-!    use MyLibrary, only: triag
 !    type(Ops), intent(in) :: h
 !    type(MSPace), pointer :: ms
 !    type(Orbits), pointer :: sps
@@ -2352,8 +2323,6 @@ contains
 !    ! <p1p2:J1||h1h2:J1> <p3h2:J1||p1p2:J1>
 !    ! <p4p5:J2||p3h3:J2> <h1h3:J2||p4p5:J2> / denominator
 !    !
-!    use Profiler, only: timer
-!    use MyLibrary, only: triag
 !    type(Ops), intent(in) :: h
 !    type(MSPace), pointer :: ms
 !    type(Orbits), pointer :: sps
@@ -2491,8 +2460,6 @@ contains
 !    ! <p1p2:J1||h1h2:J1> <h1h2:J1||h3p2:J1>
 !    ! <h3p3:J2||h4h5:J2> <h4h5:J2||p1p3:J2> / denominator
 !    !
-!    use Profiler, only: timer
-!    use MyLibrary, only: triag
 !    type(Ops), intent(in) :: h
 !    type(MSPace), pointer :: ms
 !    type(Orbits), pointer :: sps
@@ -2628,8 +2595,6 @@ contains
 !    ! <h1h2:J||p1p2:J> <p1p2:J||p3p4:J>
 !    ! <p3p4:J||h3h4:J> <h3h4:J||h1h2:J> / denominator
 !    !
-!    use Profiler, only: timer
-!    use MyLibrary, only: triag
 !    type(Ops), intent(in) :: h
 !    type(MSPace), pointer :: ms
 !    type(Orbits), pointer :: sps
@@ -2744,8 +2709,6 @@ contains
     ! <h1h2:J1||p1p2:J1> <p3h2:J2||p1h4:J2>
     ! <h1p4:J3||h3p2:J3> <p3p4:J4||h3h4:J4> / denominator
     !
-    use Profiler, only: timer
-    use MyLibrary, only: triag
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(Orbits), pointer :: sps

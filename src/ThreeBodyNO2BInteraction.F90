@@ -1,6 +1,6 @@
 module ThreeBodyNO2BInteraction
   use omp_lib
-  use Profiler, only: timer
+  use myfort
   use SingleParticleState
   implicit none
 
@@ -198,7 +198,6 @@ contains
   end subroutine FinThreeBodyNO2BSpace
 
   subroutine InitThreeBodyNO2BSpace(this, sps, e2max, e3max)
-    use MyLibrary, only: triag
     class(ThreeBodyNO2BSpace), intent(inout) :: this
     type(OrbitsIsospin), target, intent(in) :: sps
     integer, intent(in) :: e2max, e3max
@@ -337,7 +336,6 @@ contains
   end subroutine FinThreeBodyNO2BSpaceCh
 
   subroutine InitThreeBodyNO2BSpaceCh(this, sps, one, two, t, ch12, ch3, e2max, e3max)
-    use MyLibrary, only: triag
     class(ThreeBodyNO2BSpaceCh), intent(inout) :: this
     type(OrbitsIsospin), intent(in), target :: sps
     type(OneBodyChannels), intent(in) :: one
@@ -417,7 +415,6 @@ contains
   end subroutine InitThreeBodyNO2BSpaceCh
 
   subroutine InitThreeBodyNO2BForce(this, sps, isps, e2max, e3max)
-    use MyLibrary, only: triag, dcg
     class(ThreeBodyNO2BForce), intent(inout) :: this
     type(Orbits), intent(in), target :: sps
     type(OrbitsIsospin), intent(in), target :: isps
@@ -483,7 +480,6 @@ contains
   end subroutine FinThreeBodyNO2BForce
 
   function GetThBMENO2B_pn(this,i1,i2,i3,i4,i5,i6,J) result(r)
-    use MyLibrary, only: dcg
     class(ThreeBodyNO2BForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6,J
     type(Orbits), pointer :: sps
@@ -502,12 +498,6 @@ contains
     o4 => sps%GetOrbit(i4)
     o5 => sps%GetOrbit(i5)
     o6 => sps%GetOrbit(i6)
-    !if(o1%e + o2%e > this%thr%e2max) return
-    !if(o4%e + o5%e > this%thr%e2max) return
-    !if(o1%e + o3%e > this%thr%e2max) return
-    !if(o4%e + o6%e > this%thr%e2max) return
-    !if(o2%e + o3%e > this%thr%e2max) return
-    !if(o5%e + o6%e > this%thr%e2max) return
     if(o1%e + o2%e + o3%e > this%thr%e3max) return
     if(o4%e + o5%e + o6%e > this%thr%e3max) return
     z1 = o1%z; z2 = o2%z; z3 = o3%z
@@ -544,7 +534,7 @@ contains
     type(SingleParticleOrbitIsospin), pointer :: o1,o2,o3,o4,o5,o6
     integer :: ch, bra, ket, ch_t, ch_no2b, iphase
     integer :: ch12, ch3
-    integer :: P123, P456
+    integer :: P12, P45
     integer(8) :: pos, i_max, i_min
     real(8) :: r
 
@@ -559,9 +549,9 @@ contains
     if(o3%j /= o6%j) return
     if(o3%l /= o6%l) return
 
-    P123 = (-1) ** (o1%l+o2%l+o3%l)
-    P456 = (-1) ** (o4%l+o5%l+o6%l)
-    if(P123 * P456 /= 1) then
+    P12 = (-1) ** (o1%l+o2%l)
+    P45 = (-1) ** (o4%l+o5%l)
+    if(P12 * P45 /= 1) then
       write(*,*) 'Warning: in GetThBMEIso_scalar: P'
       return
     end if
@@ -615,7 +605,7 @@ contains
     P123 = (-1) ** (o1%l+o2%l+o3%l)
     P456 = (-1) ** (o4%l+o5%l+o6%l)
     if(P123 * P456 /= 1) then
-      write(*,*) 'Warning: in GetThBMEIso_scalar: P'
+      write(*,*) 'Warning: in SetThBMENO2B: P'
       return
     end if
 
@@ -645,7 +635,6 @@ contains
   !
   !
   subroutine Set3BodyNO2BFile(this, file_3n)
-    use ClassSys, only: sys
     class(Read3BodyNO2B), intent(inout) :: this
     character(*), intent(in), optional :: file_3n
     type(sys) :: s
@@ -693,7 +682,6 @@ contains
   end subroutine ReadThreeBodyNO2B
 
   subroutine ReadFile(this,thr)
-    use ClassSys, only: sys
     class(Read3BodyNO2B), intent(in) :: this
     type(ThreeBodyNO2BForce), intent(inout) :: thr
     type(sys) :: s
@@ -828,39 +816,15 @@ contains
   end subroutine read_scalar_me3j_ascii
 
   subroutine read_scalar_me3j_gzip(this,thr)
-    !use, intrinsic :: iso_c_binding
-    !use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     class(Read3BodyNO2B), intent(in) :: this
     type(ThreeBodyNO2BForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-!#ifdef single_precision_three_body_file
-!    real(4), allocatable :: v(:)
-!#else
-!    real(8), allocatable :: v(:)
-!#endif
     integer(8) :: nelm
-    !integer(8) :: n
-    !character(256) :: header="", buffer=""
-    !type(c_ptr) :: fp, err
 
     write(*,'(a)') "Reading three-body scalar line-by-line from gzip file"
 
     call spsf%init(this%emax3, this%lmax3)
     nelm = count_scalar_3bme(spsf, thr%thr%emax, this%e2max3, this%e3max3)
-    !allocate(v(nelm))
-    !fp = gzip_open(this%file_3n, "rt")
-    !err = gzip_readline(fp, header, len(header))
-    !do n = 1, nelm/10
-    !  err = gzip_readline(fp, buffer, len(buffer))
-    !  read(buffer,*) v((n-1)*10+1 : n*10)
-    !end do
-    !if(nelm - (nelm/10) * 10 > 0) then
-    !  err = gzip_readline(fp, buffer, len(buffer))
-    !  read(buffer,*) v((nelm/10)*10+1 : nelm)
-    !end if
-    !err = gzip_close(fp)
-    !call store_scalar_3bme(thr,v,spsf,this%e2max3,this%e3max3)
-    !deallocate(v)
     call store_scalar_3bme_from_gzip(thr,spsf,&
         & this%e2max3,this%e3max3,this%file_3n,nelm)
 
@@ -898,8 +862,11 @@ contains
           if(e2 + e3 > e2max) cycle
           if(e1 + e2 + e3 > e3max) cycle
           P123 = (-1) ** (l1+l2+l3)
-
+#ifdef compact_no2b_format
           do i4 = 1, i1
+#else
+          do i4 = 1, spsf%norbs
+#endif
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
             e4 = spsf%orb(i4)%e
@@ -967,6 +934,7 @@ contains
     integer :: i4, n4, l4, j4, e4
     integer :: i5, n5, l5, j5, e5
     integer :: i6, n6, l6, j6, e6
+    integer :: ii1, ii2, ii3, ii4, ii5, ii6
     integer :: T12, T45, T, P123, P456, J
     integer :: ch, ch_t, ch_no2b, bra, ket, iphase
 
@@ -979,6 +947,7 @@ contains
       j1 = spsf%orb(i1)%j
       e1 = spsf%orb(i1)%e
       if(e1 > ms%emax) cycle
+      if(l1 > sps%lmax) cycle
       do i2 = 1, i1
         n2 = spsf%orb(i2)%n
         l2 = spsf%orb(i2)%l
@@ -995,7 +964,11 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
+#ifdef compact_no2b_format
           do i4 = 1, i1
+#else
+          do i4 = 1, spsf%norbs
+#endif
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1030,6 +1003,14 @@ contains
                             &min(   (2*T12+1),   (2*T45+1)), 2
                         cnt = cnt + 1
 
+                        if(l1 > sps%lmax) cycle
+                        if(l2 > sps%lmax) cycle
+                        if(l3 > sps%lmax) cycle
+
+                        if(l4 > sps%lmax) cycle
+                        if(l5 > sps%lmax) cycle
+                        if(l6 > sps%lmax) cycle
+
                         if(e1 > ms%emax) cycle
                         if(e2 > ms%emax) cycle
                         if(e3 > ms%emax) cycle
@@ -1048,6 +1029,12 @@ contains
 
                         if(e1 + e2 + e3 > ms%e3max) cycle
                         if(e4 + e5 + e6 > ms%e3max) cycle
+                        ii1 = sps%nlj2idx(n1,l1,j1)
+                        ii2 = sps%nlj2idx(n2,l2,j2)
+                        ii3 = sps%nlj2idx(n3,l3,j3)
+                        ii4 = sps%nlj2idx(n4,l4,j4)
+                        ii5 = sps%nlj2idx(n5,l5,j5)
+                        ii6 = sps%nlj2idx(n6,l6,j6)
 
                         if(i1==i2 .and. mod(J+T12,2)==0) then
                           if(abs(v(cnt)) > 1.d-6) then
@@ -1065,7 +1052,7 @@ contains
                           cycle
                         end if
 
-                        call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
+                        call thr%SetThBMENO2B(ii1,ii2,ii3,T12,ii4,ii5,ii6,T45,J,T,v(cnt))
                       end do
                     end do
                   end do
@@ -1101,6 +1088,7 @@ contains
     integer :: i4, n4, l4, j4, e4
     integer :: i5, n5, l5, j5, e5
     integer :: i6, n6, l6, j6, e6
+    integer :: ii1, ii2, ii3, ii4, ii5, ii6
     integer :: T12, T45, T, P123, P456, J
     integer :: ch, ch_t, ch_no2b, bra, ket, iphase
     integer :: buffer_size=100000000
@@ -1124,6 +1112,7 @@ contains
       j1 = spsf%orb(i1)%j
       e1 = spsf%orb(i1)%e
       if(e1 > ms%emax) cycle
+      if(l1 > sps%lmax) cycle
       do i2 = 1, i1
         n2 = spsf%orb(i2)%n
         l2 = spsf%orb(i2)%l
@@ -1140,7 +1129,11 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
+#ifdef compact_no2b_format
           do i4 = 1, i1
+#else
+          do i4 = 1, spsf%norbs
+#endif
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1185,6 +1178,14 @@ contains
                         cnt = cnt + 1
                         total_cnt = total_cnt + 1
 
+                        if(l1 > sps%lmax) cycle
+                        if(l2 > sps%lmax) cycle
+                        if(l3 > sps%lmax) cycle
+
+                        if(l4 > sps%lmax) cycle
+                        if(l5 > sps%lmax) cycle
+                        if(l6 > sps%lmax) cycle
+
                         if(e1 > ms%emax) cycle
                         if(e2 > ms%emax) cycle
                         if(e3 > ms%emax) cycle
@@ -1203,6 +1204,12 @@ contains
 
                         if(e1 + e2 + e3 > ms%e3max) cycle
                         if(e4 + e5 + e6 > ms%e3max) cycle
+                        ii1 = sps%nlj2idx(n1,l1,j1)
+                        ii2 = sps%nlj2idx(n2,l2,j2)
+                        ii3 = sps%nlj2idx(n3,l3,j3)
+                        ii4 = sps%nlj2idx(n4,l4,j4)
+                        ii5 = sps%nlj2idx(n5,l5,j5)
+                        ii6 = sps%nlj2idx(n6,l6,j6)
 
                         if(i1==i2 .and. mod(J+T12,2)==0) then
                           if(abs(v(cnt)) > 1.d-6) then
@@ -1219,7 +1226,7 @@ contains
                           end if
                           cycle
                         end if
-                        call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
+                        call thr%SetThBMENO2B(ii1,ii2,ii3,T12,ii4,ii5,ii6,T45,J,T,v(cnt))
                       end do
                     end do
                   end do
@@ -1239,7 +1246,6 @@ contains
 
   subroutine store_scalar_3bme_from_gzip(thr,spsf,e2max,e3max,filename,nelms)
     use, intrinsic :: iso_c_binding
-    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     type(ThreeBodyNO2BForce), intent(inout), target :: thr
     type(OrbitsIsospin), intent(in) :: spsf
     integer, intent(in) :: e2max, e3max
@@ -1259,6 +1265,7 @@ contains
     integer :: i4, n4, l4, j4, e4
     integer :: i5, n5, l5, j5, e5
     integer :: i6, n6, l6, j6, e6
+    integer :: ii1, ii2, ii3, ii4, ii5, ii6
     integer :: T12, T45, T, P123, P456, J
     integer :: ch, ch_t, ch_no2b, bra, ket, iphase
     integer :: buffer_size=100000000
@@ -1295,7 +1302,11 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
+#ifdef compact_no2b_format
           do i4 = 1, i1
+#else
+          do i4 = 1, spsf%norbs
+#endif
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1352,6 +1363,14 @@ contains
                         total_cnt = total_cnt + 1
                         cnt = cnt + 1
 
+                        if(l1 > sps%lmax) cycle
+                        if(l2 > sps%lmax) cycle
+                        if(l3 > sps%lmax) cycle
+
+                        if(l4 > sps%lmax) cycle
+                        if(l5 > sps%lmax) cycle
+                        if(l6 > sps%lmax) cycle
+
                         if(e1 > ms%emax) cycle
                         if(e2 > ms%emax) cycle
                         if(e3 > ms%emax) cycle
@@ -1370,6 +1389,12 @@ contains
 
                         if(e1 + e2 + e3 > ms%e3max) cycle
                         if(e4 + e5 + e6 > ms%e3max) cycle
+                        ii1 = sps%nlj2idx(n1,l1,j1)
+                        ii2 = sps%nlj2idx(n2,l2,j2)
+                        ii3 = sps%nlj2idx(n3,l3,j3)
+                        ii4 = sps%nlj2idx(n4,l4,j4)
+                        ii5 = sps%nlj2idx(n5,l5,j5)
+                        ii6 = sps%nlj2idx(n6,l6,j6)
 
                         if(i1==i2 .and. mod(J+T12,2)==0) then
                           if(abs(v(cnt)) > 1.d-6) then
@@ -1386,7 +1411,7 @@ contains
                           end if
                           cycle
                         end if
-                        call thr%SetThBMENO2B(i1,i2,i3,T12,i4,i5,i6,T45,J,T,v(cnt))
+                        call thr%SetThBMENO2B(ii1,ii2,ii3,T12,ii4,ii5,ii6,T45,J,T,v(cnt))
                       end do
                     end do
                   end do

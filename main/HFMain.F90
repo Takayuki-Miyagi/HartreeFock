@@ -1,7 +1,6 @@
 program HFMain
   use omp_lib
-  use ClassSys, only: sys
-  use Profiler, only: timer
+  use myfort
   use HFInput
   use ModelSpace
   use Operators

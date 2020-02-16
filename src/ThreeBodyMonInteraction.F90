@@ -1,6 +1,6 @@
 module ThreeBodyMonInteraction
   use omp_lib
-  use Profiler, only: timer
+  use myfort
   use SingleParticleState
   implicit none
 
@@ -146,7 +146,6 @@ contains
   end subroutine FinThreeBodyMonSpace
 
   subroutine InitThreeBodyMonSpace(this, sps, e2max, e3max)
-    use MyLibrary, only: triag
     class(ThreeBodyMonSpace), intent(inout) :: this
     type(OrbitsIsospin), target, intent(in) :: sps
     integer, intent(in) :: e2max, e3max
@@ -299,7 +298,6 @@ contains
   end subroutine FinThreeBodyMonChannel
 
   subroutine InitThreeBodyMonChannel(this, sps, one, t, ch1, ch2, ch3, e2max, e3max)
-    use MyLibrary, only: triag
     class(ThreeBodyMonChannel), intent(inout) :: this
     type(OrbitsIsospin), target, intent(in) :: sps
     type(OneBodyChannels), intent(in) :: one
@@ -379,7 +377,6 @@ contains
   end subroutine InitThreeBodyMonChannel
 
   subroutine InitThreeBodyMonForce(this, sps, isps, e2max, e3max)
-    use MyLibrary, only: triag, dcg
     class(ThreeBodyMonForce), intent(inout) :: this
     type(Orbits), intent(in), target :: sps
     type(OrbitsIsospin), intent(in), target :: isps
@@ -441,7 +438,6 @@ contains
   end subroutine FinThreeBodyMonForce
 
   function GetThBMEMon_pn(this,i1,i2,i3,i4,i5,i6) result(r)
-    use MyLibrary, only: dcg
     class(ThreeBodyMonForce), intent(in) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     type(Orbits), pointer :: sps
@@ -558,7 +554,6 @@ contains
   !
   !
   subroutine Set3BodyMonopoleFile(this, file_3n)
-    use ClassSys, only: sys
     class(Read3BodyMonopole), intent(inout) :: this
     character(*), intent(in), optional :: file_3n
     type(sys) :: s
@@ -606,7 +601,6 @@ contains
   end subroutine ReadThreeBodyMonopole
 
   subroutine ReadFile(this,thr)
-    use ClassSys, only: sys
     class(Read3BodyMonopole), intent(in) :: this
     type(ThreeBodyMonForce), intent(inout) :: thr
     type(sys) :: s
@@ -715,7 +709,6 @@ contains
 
   subroutine read_scalar_me3j_gzip(this,thr)
     use, intrinsic :: iso_c_binding
-    use MyLibrary, only: gzip_open, gzip_readline, gzip_close
     class(Read3BodyMonopole), intent(in) :: this
     type(ThreeBodyMonForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
