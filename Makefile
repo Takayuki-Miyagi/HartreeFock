@@ -46,10 +46,11 @@ ifeq ($(strip $(HOST)),other)
   FFLAGS=-O3
   CFLAGS=-O3
   FFLAGS+= -fopenmp
-  FFLAGS+= -Dsingle_precision_three_body_file
+  #FFLAGS+= -Dsingle_precision_three_body_file
+  FFLAGS+= -Dhalf_precision_three_body_file
   #FFLAGS+= -ff2c # for dot product (LinAlgf90)
   ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b
+    FFLAGS+= -Dcompact_no2b_format
   endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-Wall -pedantic -fbounds-check -O -Wuninitialized -fbacktrace

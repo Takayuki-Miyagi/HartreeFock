@@ -2,6 +2,7 @@ module ThreeBodyNO2BInteraction
   use omp_lib
   use myfort
   use SingleParticleState
+  use half_precision_floating_points
   implicit none
 
   public :: ThreeBodyNO2BForce
@@ -71,6 +72,8 @@ module ThreeBodyNO2BInteraction
     integer(8) :: nelms=0
 #ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
+#elif half_precision_three_body_file
+    type(my_real16), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
 #endif
@@ -380,8 +383,10 @@ contains
     end do
     this%n_state = cnt
     allocate(this%n2abct(4,this%n_state))
-    allocate(this%abnctab2n(sps%norbs,sps%norbs,0:sps%emax/2,0:1))
-    allocate(this%iphase(sps%norbs,sps%norbs,0:sps%emax/2,0:1))
+    !allocate(this%abnctab2n(sps%norbs,sps%norbs,0:sps%emax/2,0:1))
+    !allocate(this%iphase(sps%norbs,sps%norbs,0:sps%emax/2,0:1))
+    allocate(this%abnctab2n(0:1,0:sps%emax/2,sps%norbs,sps%norbs))
+    allocate(this%iphase(0:1,0:sps%emax/2,sps%norbs,sps%norbs))
     this%abnctab2n(:,:,:,:) = 0
     this%iphase(:,:,:,:) = 0
     cnt = 0
@@ -404,10 +409,14 @@ contains
             if(i1 == i2 .and. mod(j12 + t12, 2) == 0) cycle
             cnt = cnt + 1
             this%n2abct(:,cnt) = [i1,i2,i3,t12]
-            this%abnctab2n(i1,i2,o3%n,t12) = cnt
-            this%abnctab2n(i2,i1,o3%n,t12) = cnt
-            this%iphase(i1,i2,o3%n,t12) = 1
-            this%iphase(i2,i1,o3%n,t12) = (-1)**((o1%j+o2%j)/2+j12+t12)
+            !this%abnctab2n(i1,i2,o3%n,t12) = cnt
+            !this%abnctab2n(i2,i1,o3%n,t12) = cnt
+            !this%iphase(i1,i2,o3%n,t12) = 1
+            !this%iphase(i2,i1,o3%n,t12) = (-1)**((o1%j+o2%j)/2+j12+t12)
+            this%abnctab2n(t12,o3%n,i1,i2) = cnt
+            this%abnctab2n(t12,o3%n,i2,i1) = cnt
+            this%iphase(t12,o3%n,i1,i2) = 1
+            this%iphase(t12,o3%n,i2,i1) = (-1)**((o1%j+o2%j)/2+j12+t12)
           end do
         end do
       end do
@@ -428,6 +437,9 @@ contains
     this%e2max = e2max
     this%e3max = e3max
 
+#ifdef half_precision_three_body_file
+    call set_table_for_half_precision_floating_point()
+#endif
     call this%thr%init(isps, e2max, e3max)
     allocate(this%MatCh(this%thr%NChan))
 
@@ -438,7 +450,7 @@ contains
           & int(n_state+1, kind(this%MatCh(ch)%nelms)) / &
           int(2, kind(this%MatCh(ch)%nelms))
       allocate(this%MatCh(ch)%v(this%MatCh(ch)%nelms))
-#ifdef single_precision_three_body_file
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
       this%MatCh(ch)%v(:) = 0.0
 #else
       this%MatCh(ch)%v(:) = 0.d0
@@ -537,6 +549,7 @@ contains
     integer :: P12, P45
     integer(8) :: pos, i_max, i_min
     real(8) :: r
+    real(4) :: r4
 
     r = 0.d0
     isps => this%isps
@@ -565,22 +578,27 @@ contains
     ch = this%thr%tno2b2ch(ch_t,ch_no2b)
     if(ch == 0) return
 
-    bra = this%thr%chan(ch)%abnctab2n(i1,i2,o3%n,t12)
-    ket = this%thr%chan(ch)%abnctab2n(i4,i5,o6%n,t45)
-    iphase = this%thr%chan(ch)%iphase(i1,i2,o3%n,t12) * &
-        &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
+    !bra = this%thr%chan(ch)%abnctab2n(i1,i2,o3%n,t12)
+    !ket = this%thr%chan(ch)%abnctab2n(i4,i5,o6%n,t45)
+    !iphase = this%thr%chan(ch)%iphase(i1,i2,o3%n,t12) * &
+    !    &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
+    bra = this%thr%chan(ch)%abnctab2n(t12,o3%n,i1,i2)
+    ket = this%thr%chan(ch)%abnctab2n(t45,o6%n,i4,i5)
+    iphase = this%thr%chan(ch)%iphase(t12,o3%n,i1,i2) * &
+        &    this%thr%chan(ch)%iphase(t45,o6%n,i4,i5)
     if(bra * ket == 0) return
     i_max = max(int(bra, kind(pos)), int(ket, kind(pos)))
     i_min = min(int(bra, kind(pos)), int(ket, kind(pos)))
     pos = i_max * (i_max-1) / 2 + i_min
-    r = dble(this%MatCh(ch)%v(pos)) * dble(iphase)
+    r4 = this%MatCh(ch)%v(pos)
+    r = dble(r4) * dble(iphase)
   end function GetThBMENO2B_Isospin
 
   subroutine SetThBMENO2B(this,i1,i2,i3,T12,i4,i5,i6,T45,J,T,me)
     class(ThreeBodyNO2BForce), intent(inout) :: this
     integer, intent(in) :: i1,i2,i3,i4,i5,i6
     integer, intent(in) :: T12,T45,T,J
-#ifdef single_precision_three_body_file
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
     real(4), intent(in) :: me
 #else
     real(8), intent(in) :: me
@@ -618,10 +636,14 @@ contains
     ch = this%thr%tno2b2ch(ch_t,ch_no2b)
     if(ch == 0) return
 
-    bra = this%thr%chan(ch)%abnctab2n(i1,i2,o3%n,t12)
-    ket = this%thr%chan(ch)%abnctab2n(i4,i5,o6%n,t45)
-    iphase = this%thr%chan(ch)%iphase(i1,i2,o3%n,t12) * &
-        &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
+    !bra = this%thr%chan(ch)%abnctab2n(i1,i2,o3%n,t12)
+    !ket = this%thr%chan(ch)%abnctab2n(i4,i5,o6%n,t45)
+    !iphase = this%thr%chan(ch)%iphase(i1,i2,o3%n,t12) * &
+    !    &    this%thr%chan(ch)%iphase(i4,i5,o6%n,t45)
+    bra = this%thr%chan(ch)%abnctab2n(t12,o3%n,i1,i2)
+    ket = this%thr%chan(ch)%abnctab2n(t45,o6%n,i4,i5)
+    iphase = this%thr%chan(ch)%iphase(t12,o3%n,i1,i2) * &
+        &    this%thr%chan(ch)%iphase(t45,o6%n,i4,i5)
     if(bra * ket == 0) return
     i_max = max(int(bra, kind(pos)), int(ket, kind(pos)))
     i_min = min(int(bra, kind(pos)), int(ket, kind(pos)))
@@ -723,7 +745,7 @@ contains
     class(Read3BodyNO2B), intent(in) :: this
     type(ThreeBodyNO2BForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_file
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -784,7 +806,7 @@ contains
     class(Read3BodyNO2B), intent(in) :: this
     type(ThreeBodyNO2BForce), intent(inout) :: thr
     type(OrbitsIsospin) :: spsf
-#ifdef single_precision_three_body_file
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -919,7 +941,7 @@ contains
   subroutine store_scalar_3bme(thr,v,spsf,e2max,e3max)
     type(ThreeBodyNO2BForce), intent(inout), target :: thr
     type(OrbitsIsospin), intent(in) :: spsf
-#ifdef single_precision_three_body_file
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -1076,6 +1098,10 @@ contains
     integer(8), intent(in) :: nelms
 #ifdef single_precision_three_body_file
     real(4), allocatable :: v(:)
+#elif half_precision_three_body_file
+    integer(2), allocatable :: v(:)
+    type(my_real16) :: tmp
+    real(4) :: v123
 #else
     real(8), allocatable :: v(:)
 #endif
@@ -1168,7 +1194,13 @@ contains
                             &min(   (2*T12+1),   (2*T45+1)), 2
                         if(cnt==buffer_size) cnt=0
                         if(cnt==0) then
+#ifdef single_precision_three_body_file
+                          v(:) = 0.0
+#elif half_precision_three_body_file
+                          v(:) = 0
+#else
                           v(:) = 0.d0
+#endif
                           if(nelms - total_cnt >= buffer_size) then
                             read(runit) v(:)
                           else
@@ -1211,22 +1243,42 @@ contains
                         ii5 = sps%nlj2idx(n5,l5,j5)
                         ii6 = sps%nlj2idx(n6,l6,j6)
 
-                        if(i1==i2 .and. mod(J+T12,2)==0) then
+                        if(ii1==ii2 .and. mod(J+T12,2)==0) then
+#ifdef half_precision_three_body_file
+                          if(v(cnt) /= 0 .and. v(cnt) /= -32768) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,i8)") ii1,ii2,ii3,J,T12,ii4,ii5,ii6,J,T45,cnt,v(cnt)
+                          end if
+#else
                           if(abs(v(cnt)) > 1.d-6) then
                             write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
-                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
+                            write(*,"(10i4,i16,f12.6)") ii1,ii2,ii3,J,T12,ii4,ii5,ii6,J,T45,cnt,v(cnt)
                           end if
+#endif
                           cycle
                         end if
 
-                        if(i4==i5 .and. mod(J+T45,2)==0) then
+                        if(ii4==ii5 .and. mod(J+T45,2)==0) then
+#ifdef half_precision_three_body_file
+                          if(v(cnt) /= 0 .and. v(cnt) /= -32768) then
+                            write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
+                            write(*,"(10i4,i16,i8)") ii1,ii2,ii3,J,T12,ii4,ii5,ii6,J,T45,cnt,v(cnt)
+                          end if
+#else
                           if(abs(v(cnt)) > 1.d-6) then
                             write(*,*) "Warning: something wrong, this three-body matrix element has to be zero."
-                            write(*,"(10i4,i16,f12.6)") i1,i2,i3,J,T12,i4,i5,i6,J,T45,cnt,v(cnt)
+                            write(*,"(10i4,i16,f12.6)") ii1,ii2,ii3,J,T12,ii4,ii5,ii6,J,T45,cnt,v(cnt)
                           end if
+#endif
                           cycle
                         end if
+#ifdef half_precision_three_body_file
+                        tmp = v(cnt)
+                        v123 = tmp
+                        call thr%SetThBMENO2B(ii1,ii2,ii3,T12,ii4,ii5,ii6,T45,J,T,v123)
+#else
                         call thr%SetThBMENO2B(ii1,ii2,ii3,T12,ii4,ii5,ii6,T45,J,T,v(cnt))
+#endif
                       end do
                     end do
                   end do
@@ -1251,7 +1303,7 @@ contains
     integer, intent(in) :: e2max, e3max
     character(*), intent(in) :: filename
     integer(8), intent(in) :: nelms
-#ifdef single_precision_three_body_file
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
     real(4), allocatable :: v(:)
 #else
     real(8), allocatable :: v(:)
@@ -1348,7 +1400,7 @@ contains
                               read(buffer,*) v((n-1)*10+1 : n*10)
                             end do
                           else
-                            do n = 1, (nelms-total_cnt)/10
+                            do n = 1, int(nelms-total_cnt/10, kind=kind(n))
                               err = gzip_readline(fp, buffer, len(buffer))
                               read(buffer,*) v((n-1)*10+1 : n*10)
                             end do
