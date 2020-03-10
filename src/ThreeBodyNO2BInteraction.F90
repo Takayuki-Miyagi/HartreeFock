@@ -13,6 +13,7 @@ module ThreeBodyNO2BInteraction
   private :: FinThreeBodyNO2BSpaceCh
   private :: InitThreeBodyNO2BSpace
   private :: FinThreeBodyNO2BSpace
+  private :: NormalOrderingFrom3To2
 
   type :: OneBodyChannels
     integer :: emax
@@ -93,6 +94,7 @@ module ThreeBodyNO2BInteraction
     procedure :: GetThBMENO2B_isospin
     procedure :: GetThBMENO2B_pn
     procedure :: SetThBMENO2B
+    procedure :: NormalOrderingFrom3To2
 
     generic :: init => InitThreeBodyNO2BForce
     generic :: fin => FinThreeBodyNO2BForce
@@ -651,6 +653,48 @@ contains
     this%MatCh(ch)%v(pos) = real(iphase, kind(me)) * me
   end subroutine SetThBMENO2B
 
+  function NormalOrderingFrom3To2(this, two) result(r)
+    use TwoBodyOperator
+    class(ThreeBodyNO2BForce), intent(in) :: this
+    type(TwoBodySpace), intent(in) :: two
+    type(TwoBodyPart) :: r
+    type(SingleParticleOrbit), pointer :: oh
+    integer :: ch, bra, ket, J
+    integer :: i1, i2, i3, i4, e1, e2, e3, e4, eh, ih
+    real(8) :: fact, vsum
+    call r%init(two,.true.,"hamil",0,1,0)
+    do ch = 1, two%NChan
+      J = two%jpz(ch)%J
+      do bra = 1, two%jpz(ch)%n_state
+        i1 = two%jpz(ch)%n2spi1(bra)
+        i2 = two%jpz(ch)%n2spi2(bra)
+        e1 = two%sps%orb(i1)%e
+        e2 = two%sps%orb(i2)%e
+        do ket = 1, bra
+          i3 = two%jpz(ch)%n2spi1(ket)
+          i4 = two%jpz(ch)%n2spi2(ket)
+          e3 = two%sps%orb(i3)%e
+          e4 = two%sps%orb(i4)%e
+
+          fact = 1.d0
+          if(i1==i2) fact = fact / dsqrt(2.d0)
+          if(i3==i4) fact = fact / dsqrt(2.d0)
+          vsum = 0.d0
+          do ih = 1, two%sps%norbs
+            oh => two%sps%GetOrbit(ih)
+            if(oh%GetOccupation() < 1.d-6) cycle
+            eh = oh%e
+            if(e1+e2+eh > this%thr%e3max) cycle
+            if(e3+e4+eh > this%thr%e3max) cycle
+            vsum = vsum + oh%GetOccupation() * &
+                & this%GetNO2BThBME(i1,i2,ih,i3,i4,ih,J)
+          end do
+          r%MatCh(ch,ch)%m(bra,ket) = vsum * fact / dble(2*J+1)
+          r%MatCh(ch,ch)%m(ket,bra) = r%MatCh(ch,ch)%m(bra,ket)
+        end do
+      end do
+    end do
+  end function NormalOrderingFrom3To2
   !
   !
   ! reading three-body scalar

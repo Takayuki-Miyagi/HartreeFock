@@ -50,6 +50,7 @@ module HFInput
     logical :: is_MBPTscalar_full
     logical :: is_MBPTScalar
     logical :: is_MBPTEnergy
+    logical :: HO_reference
     logical :: is_NAT
     logical :: is_4th_order
     logical :: EN_denominator ! Epstein-Nesbet denominator (Moller-Plesset is default)
@@ -99,6 +100,7 @@ contains
     integer :: lmax_1n=-1
     character(256) :: density_matrix_file = 'none'
     logical :: is_Op_out = .false.
+    logical :: HO_reference = .false.
     logical :: is_MBPTscalar_full = .true.
     logical :: is_MBPTScalar = .true.
     logical :: is_MBPTEnergy = .true.
@@ -123,7 +125,7 @@ contains
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
         & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
-        & EN_denominator, dynamic_reference, iter_method, iter_n_history
+        & EN_denominator, dynamic_reference, iter_method, iter_n_history, HO_reference
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -167,6 +169,7 @@ contains
     this%summary_file = trim(this%out_dir) // "/" // trim(summary_file)
     this%density_matrix_file = trim(density_matrix_file)
 
+    this%HO_reference = HO_reference
     this%is_Op_out = is_Op_out
     this%is_MBPTscalar_full = is_MBPTscalar_full
     this%is_MBPTEnergy = is_MBPTEnergy

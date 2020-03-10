@@ -515,8 +515,9 @@ contains
     call timer%Add('Truncate Operator '//trim(op_new%oprtr), omp_get_wtime()-ti)
   end function Truncate
 
-  subroutine NormalOrdering(this) ! Normal ordering w.r.t. refernece state
+  function NormalOrdering(this) result(op) ! Normal ordering w.r.t. refernece state
     class(Ops), intent(inout), target :: this
+    type(Ops) :: op
     type(TwoBodyPart) :: op2from3
     type(OneBodyPart) :: op1from3, op1from2
     real(8) :: op0from1=0.d0, op0from2=0.d0, op0from3=0.d0
@@ -525,48 +526,57 @@ contains
       write(*,*) "Operator ", trim(this%oprtr), " is already normal ordered!"
       return
     end if
-
-
+    op = this
     op1from2 = this%two%NormalOrderingFrom2To1(this%ms%one)
 
     op0from2 = op1from2%NormalOrderingFrom1To0()
     op0from1 = this%one%NormalOrderingFrom1To0()
 
-    this%one = this%one + op1from2
-    this%zero = this%zero + op0from1 + op0from2 * 0.5d0
+    op%one = this%one + op1from2
+    op%zero = this%zero + op0from1 + op0from2 * 0.5d0
 
     if(this%rank == 3) then
-      if(this%ms%is_three_body_jt) then
-        op2from3 = this%thr21%NormalOrderingFrom3To2(this%ms%two)
+      if( .not. op%thr21%zero ) then
+        op2from3 = op%thr21%NormalOrderingFrom3To2(this%ms%two)
         op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
         op0from3 = op1from3%NormalOrderingFrom1To0()
-        this%two = this%two + op2from3
-        this%one = this%one + op1from3 * 0.5d0
-        this%zero = this%zero + op0from3 / 6.d0
+        op%two = this%two + op2from3
+        op%one = this%one + op1from3 * 0.5d0
+        op%zero = this%zero + op0from3 / 6.d0
+      end if
+
+      if( .not. op%thr21_no2b%zero ) then
+        op2from3 = op%thr21_no2b%NormalOrderingFrom3To2(this%ms%two)
+        op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
+        op0from3 = op1from3%NormalOrderingFrom1To0()
+        op%two = this%two + op2from3
+        op%one = this%one + op1from3 * 0.5d0
+        op%zero = this%zero + op0from3 / 6.d0
       end if
 
       if(this%ms%is_three_body) then
-        op2from3 = this%thr%NormalOrderingFrom3To2(this%ms%two)
+        op2from3 = op%thr%NormalOrderingFrom3To2(this%ms%two)
         op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
         op0from3 = op1from3%NormalOrderingFrom1To0()
-        this%two = this%two + op2from3
-        this%one = this%one + op1from3 * 0.5d0
-        this%zero = this%zero + op0from3 / 6.d0
+        op%two = this%two + op2from3
+        op%one = this%one + op1from3 * 0.5d0
+        op%zero = this%zero + op0from3 / 6.d0
       end if
     end if
-    this%is_normal_ordered = .true.
-  end subroutine NormalOrdering
+    op%is_normal_ordered = .true.
+  end function NormalOrdering
 
-  subroutine NO2BApprox(this) ! Normal ordering w.r.t. refernece state
+  function NO2BApprox(this) result(op) ! Normal ordering w.r.t. refernece state
     class(Ops), intent(inout), target :: this
-    call this%NormalOrdering()
+    type(Ops) :: op
+    op = this%NormalOrdering()
     if(this%rank==3) then
-      call this%DiscardThreeBodyForce()
-      call this%DiscardThreeBodyPart()
+      call op%DiscardThreeBodyForce()
+      call op%DiscardThreeBodyPart()
     end if
-    this%rank = 2
-    this%is_normal_ordered = .true.
-  end subroutine NO2BApprox
+    op%rank = 2
+    op%is_normal_ordered = .true.
+  end function NO2BApprox
 
   subroutine UnNormalOrdering2B(this) ! From NO2B approx. Op
     class(Ops), intent(inout), target :: this
@@ -626,7 +636,7 @@ contains
         call o%SetOccupation(0.d0)
       end if
     end do
-    call op%NormalOrdering()
+    op = op%NormalOrdering()
 
     ms%NOcoef = NOcoef_orig
     do idx = 1, ms%sps%norbs
