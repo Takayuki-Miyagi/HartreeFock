@@ -55,7 +55,7 @@ module HFInput
     logical :: is_4th_order
     logical :: EN_denominator ! Epstein-Nesbet denominator (Moller-Plesset is default)
     logical :: dynamic_reference
-    character(256) :: Op_file_format
+    character(:), allocatable :: OpFileName
 
     ! atomic mode
     logical :: is_Atomic
@@ -108,7 +108,7 @@ contains
     logical :: is_4th_order = .false.
     logical :: EN_denominator =.false. ! Epstein-Nesbet denominator (Moller-Plesset is default)
     logical :: dynamic_reference=.false.
-    character(256) :: Op_file_format = "snt"
+    character(256) :: OpFileName = "default"
     ! atomic mode
     logical :: is_Atomic=.false.
     character(512) :: iter_method = "linear"
@@ -123,7 +123,7 @@ contains
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
         & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
-        & Op_file_format, is_Atomic, Core, valence_list, is_NAT, &
+        & OpFileName, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
         & EN_denominator, dynamic_reference, iter_method, iter_n_history, HO_reference
 
@@ -175,7 +175,7 @@ contains
     this%is_MBPTEnergy = is_MBPTEnergy
     this%is_MBPTScalar = is_MBPTScalar
     this%is_NAT = is_NAT
-    this%Op_file_format = Op_file_format
+    this%OpFileName = OpFileName
     this%beta_cm = beta_cm
     this%is_Atomic = is_Atomic
     this%is_4th_order = is_4th_order

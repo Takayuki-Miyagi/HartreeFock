@@ -540,27 +540,27 @@ contains
         op2from3 = op%thr21%NormalOrderingFrom3To2(this%ms%two)
         op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
         op0from3 = op1from3%NormalOrderingFrom1To0()
-        op%two = this%two + op2from3
-        op%one = this%one + op1from3 * 0.5d0
-        op%zero = this%zero + op0from3 / 6.d0
+        op%two = op%two + op2from3
+        op%one = op%one + op1from3 * 0.5d0
+        op%zero = op%zero + op0from3 / 6.d0
       end if
 
-      if( .not. op%thr21_no2b%zero ) then
-        op2from3 = op%thr21_no2b%NormalOrderingFrom3To2(this%ms%two)
+      if( .not. this%thr21_no2b%zero ) then
+        op2from3 = this%thr21_no2b%NormalOrderingFrom3To2(this%ms%two)
         op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
         op0from3 = op1from3%NormalOrderingFrom1To0()
-        op%two = this%two + op2from3
-        op%one = this%one + op1from3 * 0.5d0
-        op%zero = this%zero + op0from3 / 6.d0
+        op%two = op%two + op2from3
+        op%one = op%one + op1from3 * 0.5d0
+        op%zero = op%zero + op0from3 / 6.d0
       end if
 
       if(this%ms%is_three_body) then
         op2from3 = op%thr%NormalOrderingFrom3To2(this%ms%two)
         op1from3 = op2from3%NormalOrderingFrom2To1(this%ms%one)
         op0from3 = op1from3%NormalOrderingFrom1To0()
-        op%two = this%two + op2from3
-        op%one = this%one + op1from3 * 0.5d0
-        op%zero = this%zero + op0from3 / 6.d0
+        op%two = op%two + op2from3
+        op%one = op%one + op1from3 * 0.5d0
+        op%zero = op%zero + op0from3 / 6.d0
       end if
     end if
     op%is_normal_ordered = .true.

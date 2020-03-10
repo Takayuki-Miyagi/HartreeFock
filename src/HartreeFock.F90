@@ -202,7 +202,6 @@ contains
     write(*,'(4x,a,5f18.6)') "HO", this%e0, this%e1, &
         &  this%e2, this%e3,this%ehf
     do iter = 1, this%n_iter_max
-
       call this%DiagonalizeFockMatrix()
       if(iter > 5 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
       call this%UpdateDensityMatrix(iter)

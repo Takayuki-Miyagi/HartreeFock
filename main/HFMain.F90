@@ -148,7 +148,7 @@ program HFMain
       if(p%is_Op_out) then
         call Rho%init("DenMat", ms, 2)
         Rho%one = PTd%rho_HO
-        call w%SetFileName(p%out_dir, p%Op_file_format, Rho)
+        call w%SetFileName(p%OpFileName, Rho)
         call w%writef(p,Rho)
       end if
     case default
@@ -159,7 +159,7 @@ program HFMain
       if(p%is_Op_out) then
         call Rho%init("DenMat", ms, 2)
         Rho%one = PTd%rho_HO
-        call w%SetFileName(p%out_dir, p%Op_file_format, Rho)
+        call w%SetFileName(p%OpFileName, Rho)
         call w%writef(p,Rho)
       end if
     end select
@@ -167,7 +167,7 @@ program HFMain
   end if
 
   if(p%is_Op_out) then
-    call w%SetFileName(p%out_dir, p%Op_file_format, htr)
+    call w%SetFileName(p%OpFileName, htr)
     call w%writef(p,htr)
   end if
   call h%fin()
@@ -201,7 +201,7 @@ program HFMain
       close(wunit)
     end if
     if(p%is_Op_out) then
-      call w%SetFileName(p%out_dir, p%Op_file_format, opr)
+      call w%SetFileName(p%OpFileName, opr)
       call w%writef(p,opr)
     end if
     call opr%fin()
@@ -227,7 +227,7 @@ program HFMain
       close(wunit)
     end if
     if(p%is_Op_out) then
-      call w%SetFileName(p%out_dir, p%Op_file_format, opr)
+      call w%SetFileName(p%OpFileName, opr)
       call w%writef(p,opr)
     end if
     call opr%fin()
@@ -258,7 +258,7 @@ program HFMain
       close(wunit)
     end if
     if(p%is_Op_out) then
-      call w%SetFileName(p%out_dir, p%Op_file_format, opr)
+      call w%SetFileName(p%OpFileName, opr)
       call w%writef(p,opr)
     end if
     call opr%fin()
