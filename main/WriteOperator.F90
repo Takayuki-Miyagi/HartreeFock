@@ -375,7 +375,7 @@ contains
     end do
 
     write(wunit,'(a)') "# Number of non-zero MEs"
-    write(wunit, '(i6)') cnt
+    write(wunit, '(i6,f18.8)') cnt, op%zero
     do chbra = 1, ms%one%NChan
       do chket = 1, chbra
         if(.not. op%one%MatCh(chbra,chket)%is) cycle
