@@ -11,6 +11,7 @@ module HartreeFock
   private :: FinHFSolver
   private :: InitHFSolver
   private :: SolveHFSolver
+  private :: FindOptimalFrequency
   private :: PrintSPEs
   private :: DiagonalizeFockMatrix
   private :: SetOccupationMatrix
@@ -18,6 +19,7 @@ module HartreeFock
   private :: UpdateDensityMatrixFromCoef
   private :: UpdateFockMatrix
   private :: CalcEnergy
+  private :: calc_overlap_ho_hf
   private :: BasisTransform
   private :: BasisTransNO2BHamiltonian
   private :: BasisTransNO2BHamiltonianFromNO2B
@@ -85,6 +87,7 @@ module HartreeFock
     procedure :: fin => FinHFSolver
     procedure :: init => InitHFSolver
     procedure :: solve => SolveHFSolver
+    procedure :: FindOptimalFrequency
     procedure :: SetDynamicReference
     procedure :: SetIterMethod
     procedure :: PrintSPEs
@@ -268,6 +271,71 @@ contains
     call opt%set_init(v)
     deallocate(v)
   end subroutine initialize_optimizer
+
+  subroutine FindOptimalFrequency(this)
+    class(HFSolver), intent(inout) :: this
+    integer :: iter
+    real(8) :: overlap
+    overlap = calc_overlap_ho_hf( this, this%ms%hw )
+    write(*,"(a,f16.8)") "The overlap (HF|HO) is ", overlap
+  end subroutine FindOptimalFrequency
+
+  function calc_overlap_ho_hf( this, hw ) result(overlap)
+    use myfort
+    type(HFSolver), intent(inout) :: this
+    real(8), intent(in) :: hw
+    real(8) :: overlap
+    type(OneBodySpace), pointer :: one
+    type(OneBodyPart) :: Ctmp, Ovlp
+    type(DMat) :: C
+    integer :: ch, n, ndim
+    integer :: bra, ket
+    type(SingleParticleOrbit), pointer :: obra, oket
+    real(8) :: ov, a_original, a_target
+    real(8), allocatable :: r(:), w(:)
+    integer :: NMesh = 100
+    real(8) :: rmin = 0.d0, rmax=15.d0
+
+    one => this%C%one
+    Ctmp = this%C
+
+    call Ovlp%init(  one, .true., 'overlap',  0, 1, 0)
+    a_original = 0.5d0 * (amp + amn) * this%ms%hw / hc**2
+    a_target = 0.5d0 * (amp + amn) * hw / hc**2
+    call gauss_legendre(rmin, rmax, r, w, NMesh)
+    do bra = 1, one%sps%norbs
+      obra => one%sps%GetOrbit(bra)
+      do ket = 1, one%sps%norbs
+        oket => one%sps%GetOrbit(ket)
+        if(obra%l /= oket%l) cycle
+        if(obra%j /= oket%j) cycle
+        ov = 0.d0
+        do n = 1, NMesh
+          ov = ov + w(n) * &
+              & ho_radial_wf_norm(obra%n, obra%l, a_target, r(n)) * &
+              & ho_radial_wf_norm(oket%n, oket%l, a_original, r(n))
+        end do
+        call Ovlp%SetOBME(bra,ket,ov)
+      end do
+    end do
+    deallocate(r,w)
+
+    overlap = 1.d0
+    do ch = 1, one%NChan
+      this%C%MatCh(ch,ch)%DMat = Ovlp%MatCH(ch,ch)%DMat * Ctmp%MatCh(ch,ch)%DMat
+      ndim = 0
+      do n = 1, one%jpz(ch)%n_state
+        if( abs( this%Occ%GetOBME( one%jpz(ch)%n2spi(n), one%jpz(ch)%n2spi(n) ) ) < 1.d-6 ) cycle
+        ndim = ndim + 1
+      end do
+      if(ndim == 0) cycle
+      call C%ini(ndim, ndim)
+      C%m(:,:) = this%C%MatCh(ch,ch)%m(:ndim,:ndim)
+      overlap = overlap * C%det()
+      call C%fin()
+    end do
+    this%C = Ctmp
+  end function calc_overlap_ho_hf
 
   function BasisTransform(HF,Optr,is_NO2B) result(op)
     !  Input: Operator is HO basis operator (not normal ordered)

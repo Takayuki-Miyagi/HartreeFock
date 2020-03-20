@@ -15,7 +15,7 @@ Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q cedar; then echo cedar; \
   else echo other; fi)
 HOST=$(strip $(Host))
-DEBUG_MODE=on
+DEBUG_MODE=off
 compact_no2b=on
 
 OS = Linux
@@ -46,8 +46,8 @@ ifeq ($(strip $(HOST)),other)
   FFLAGS=-O3
   CFLAGS=-O3
   FFLAGS+= -fopenmp
-  FFLAGS+= -Dsingle_precision_three_body_file
-  #FFLAGS+= -Dhalf_precision_three_body_file
+  #FFLAGS+= -Dsingle_precision_three_body_file
+  FFLAGS+= -Dhalf_precision_three_body_file
   #FFLAGS+= -ff2c # for dot product (LinAlgf90)
   ifeq ($(compact_no2b),on)
     FFLAGS+= -Dcompact_no2b_format

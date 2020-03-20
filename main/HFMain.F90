@@ -98,43 +98,52 @@ program HFMain
 
   if( p%HO_reference ) then
     htr = h%NO2BApprox()
-  else
+    call PT%calc(htr, p%is_4th_order, p%EN_denominator)
+  end if
+
+  if( .not. p%HO_reference ) then
     call HF%init(h,alpha=p%alpha)
     call HF%SetDynamicReference(p%dynamic_reference)
     call HF%SetIterMethod(p%iter_method, p%alpha, p%iter_n_history)
     call HF%solve()
 
     open(wunit, file = p%summary_file, action='write',status='replace')
-    call p%PrintInputParameters(wunit)
-    call HF%PrintSPEs(wunit)
-    if(HF%fail) then
-      write(wunit,"(a)") "#*************************************************"
-      write(wunit,"(a)") "#*************************************************"
-      write(wunit,"(a)") "# Hartree-Fock doesn't converge"
-      write(*,"(a)") "#*************************************************"
-      write(*,"(a)") "#*************************************************"
-      write(*,"(a)") "# Hartree-Fock doesn't converge"
-      stop
+    if( p%find_optimal_frequency ) then
+      call HF%FindOptimalFrequency()
     end if
 
-    if(.not. p%is_MBPTEnergy) then
-      write(wunit,'(a,6x,a)') "# Operator", "HF energy"
-      write(wunit,'(a,1f18.8)') 'hamil: ', HF%ehf
-    end if
-
-    if(p%is_MBPTEnergy) then
-      htr = HF%BasisTransform(h)
-      call PT%calc(htr, p%is_4th_order, p%EN_denominator)
-      write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
-      write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
-      write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
-      if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0 .or. PT%energy_gap < 0.d0) then
-        write(wunit,'(a)') "# MBPT might be dengerous! "
+    if( .not. p%find_optimal_frequency ) then
+      call p%PrintInputParameters(wunit)
+      call HF%PrintSPEs(wunit)
+      if(HF%fail) then
+        write(wunit,"(a)") "#*************************************************"
+        write(wunit,"(a)") "#*************************************************"
+        write(wunit,"(a)") "# Hartree-Fock doesn't converge"
+        write(*,"(a)") "#*************************************************"
+        write(*,"(a)") "#*************************************************"
+        write(*,"(a)") "# Hartree-Fock doesn't converge"
+        stop
       end if
-      write(wunit,'(a,11x,a,6x,a,9x,a,9x,a,13x,a)') &
-          & "#", "Operator", "HF energy", "2nd order", "3rd order", "Total"
-      write(wunit,'(a20,4f18.8)') 'hamil', PT%e_0, PT%e_2, PT%e_3, &
-          & PT%e_0+PT%e_2+PT%e_3
+
+      if(.not. p%is_MBPTEnergy) then
+        write(wunit,'(a,6x,a)') "# Operator", "HF energy"
+        write(wunit,'(a,1f18.8)') 'hamil: ', HF%ehf
+      end if
+
+      if(p%is_MBPTEnergy) then
+        htr = HF%BasisTransform(h)
+        call PT%calc(htr, p%is_4th_order, p%EN_denominator)
+        write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
+        write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
+        write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
+        if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0 .or. PT%energy_gap < 0.d0) then
+          write(wunit,'(a)') "# MBPT might be dengerous! "
+        end if
+        write(wunit,'(a,11x,a,6x,a,9x,a,9x,a,13x,a)') &
+            & "#", "Operator", "HF energy", "2nd order", "3rd order", "Total"
+        write(wunit,'(a20,4f18.8)') 'hamil', PT%e_0, PT%e_2, PT%e_3, &
+            & PT%e_0+PT%e_2+PT%e_3
+      end if
     end if
     close(wunit)
   end if
