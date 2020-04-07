@@ -299,10 +299,11 @@ contains
     r = this%MatCh(chbra,chket)%m(bra,ket)
   end function GetOBME
 
-  subroutine SetOBME(this,i1,i2,me)
+  subroutine SetOBME(this,i1,i2,me,set_symmetric)
     class(OneBodyPart), intent(inout) :: this
     integer, intent(in) :: i1, i2
     real(8), intent(in) :: me
+    logical, intent(in), optional :: set_symmetric
     type(OneBodySpace), pointer :: one
     type(SingleParticleOrbit), pointer :: o1, o2
     integer :: chbra, chket, bra, ket
@@ -318,7 +319,10 @@ contains
     bra = one%jpz(chbra)%spi2n(i1)
     ket = one%jpz(chket)%spi2n(i2)
     this%MatCh(chbra,chket)%m(bra,ket) = me
-    this%MatCh(chket,chbra)%m(ket,bra) = me
+    if(present(set_symmetric)) then
+      if(.not. set_symmetric) return
+    end if
+    this%MatCh(chket,chbra)%m(ket,bra) = me*(-1.d0)**( (o2%j-o1%j)/2 )
   end subroutine SetOBME
 
   subroutine PrintOneBodyPart(this, wunit)

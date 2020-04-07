@@ -592,7 +592,7 @@ contains
         &    tbs%jpz(chket)%iphase(i3,i4)
 
     this%MatCh(chbra,chket)%m(bra,ket) = dble(iphase) * me
-    this%MatCh(chket,chbra)%m(ket,bra) = dble(iphase) * me
+    this%MatCh(chket,chbra)%m(ket,bra) = dble(iphase) * me * (-1.d0)**(J34-J12)
   end subroutine SetTwBME_tensor
 
   subroutine SetTwBME_scalar(this,i1,i2,i3,i4,J,me)

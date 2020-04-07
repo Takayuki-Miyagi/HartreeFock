@@ -97,7 +97,11 @@ program HFMain
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
   if( p%HO_reference ) then
-    htr = h%NO2BApprox()
+    if( p%TransFileName == "none") htr = h%NO2BApprox()
+    if( p%TransFileName /= "none") then
+      call HF%ReadTransformationMatrix(h,p%TransFileName)
+      htr = HF%BasisTransform(h)
+    end if
     call PT%calc(htr, p%is_4th_order, p%EN_denominator)
   end if
 
@@ -106,6 +110,7 @@ program HFMain
     call HF%SetDynamicReference(p%dynamic_reference)
     call HF%SetIterMethod(p%iter_method, p%alpha, p%iter_n_history)
     call HF%solve()
+    if( p%TransFileName /= "none") call HF%WriteTransformationMatrix(p%TransFileName)
 
     open(wunit, file = p%summary_file, action='write',status='replace')
     if( p%find_optimal_frequency ) then

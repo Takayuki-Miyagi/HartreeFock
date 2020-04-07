@@ -32,10 +32,6 @@ module HFInput
     integer :: e2max_3n
     integer :: e3max_3n
     integer :: lmax_3n
-    !integer :: emax_mon
-    !integer :: e2max_mon
-    !integer :: e3max_mon
-    !integer :: lmax_mon
     ! output files
     character(:), allocatable :: out_dir
     character(:), allocatable :: summary_file
@@ -56,6 +52,7 @@ module HFInput
     logical :: EN_denominator ! Epstein-Nesbet denominator (Moller-Plesset is default)
     logical :: dynamic_reference
     character(:), allocatable :: OpFileName
+    character(:), allocatable :: TransFileName
     logical :: find_optimal_frequency
 
     ! atomic mode
@@ -110,6 +107,7 @@ contains
     logical :: EN_denominator =.false. ! Epstein-Nesbet denominator (Moller-Plesset is default)
     logical :: dynamic_reference=.false.
     character(256) :: OpFileName = "default"
+    character(256) :: TransFileName = "none"
     logical :: find_optimal_frequency=.false.
     ! atomic mode
     logical :: is_Atomic=.false.
@@ -128,7 +126,7 @@ contains
         & OpFileName, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
         & EN_denominator, dynamic_reference, iter_method, iter_n_history, HO_reference, &
-        & find_optimal_frequency
+        & find_optimal_frequency, TransFileName
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -179,6 +177,7 @@ contains
     this%is_MBPTScalar = is_MBPTScalar
     this%is_NAT = is_NAT
     this%OpFileName = OpFileName
+    this%TransFileName = TransFileName
     this%beta_cm = beta_cm
     this%is_Atomic = is_Atomic
     this%is_4th_order = is_4th_order

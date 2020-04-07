@@ -22,6 +22,7 @@ e3max_3n = 14
 
 Params['optrs']=''
 Params["HO_reference"]=True
+Params["HO_reference"]=False
 Params['is_MBPTEnergy']=True
 Params['type_3n_file']="no2b"
 Params['dynamic_reference']=True
@@ -61,6 +62,11 @@ def SetHamil(hw, emax_nn, e2max_nn, emax_3n, e2max_3n, e3max_3n, lec):
     file_nn_int += str(hw)+'_emax'+str(emax_nn)+'_e2max'+str(e2max_nn)+file_extension_2n
     file_3n_int = "NO2B_ThBME_"+lec3+"_NonLocal4_394_IS_hw"
     file_3n_int += str(hw)+"_ms"+str(emax_3n)+"_"+str(e2max_3n)+"_"+str(e3max_3n)+file_extension_3n
+    if(lec == "DNNLOgo"):
+        file_nn_int = "TwBME-HO_NN-only_DNNLOgo_bare_hw"
+        file_nn_int += str(hw)+'_emax'+str(emax_nn)+'_e2max'+str(e2max_nn)+file_extension_2n
+        file_3n_int = "NO2B_ThBME_DNNLOgo_IS_hw"
+        file_3n_int += str(hw)+"_ms"+str(emax_3n)+"_"+str(e2max_3n)+"_"+str(e3max_3n)+file_extension_3n
     #file_3n_int = "none"
     return path2, file_nn_int, path3, file_3n_int
 
@@ -156,7 +162,7 @@ def main(machinename=None):
             "Ct_1S0np", "Ct_1S0pp", "Ct_3S1", "c1", "c2", "c3", "c4", "cD", "cE"]
     for ZN, e, e3, hw in itertools.product(ZNList,elist,e3list,hwlist):
         for LEC in LECs:
-            Params["OpFileName"] = "SP-CC_DNNLOgo_"+LEC+"_hw"+str(hw)+"_emax"+str(e)+"_e3max"+str(e3)
+            Params["TransFileName"] = "SP-CC_DNNLOgo_"+LEC+"_hw"+str(hw)+"_emax"+str(e)+"_e3max"+str(e3)
             path2, file_nn, path3, file_3n = SetHamil(hw,emax_nn,e2max_nn,emax_3n,e2max_3n,e3max_3n,LEC)
             file_nn_int = path2 + '/' + file_nn
             file_3n_int = 'none'
@@ -164,6 +170,8 @@ def main(machinename=None):
                 file_3n_int = path3 + '/' + file_3n
 
             Params['Nucl'] = element_table[ZN[0]] + str(ZN[0]+ZN[1])
+            Params["OpFileName"] = "SP-CC_DNNLOgo_"+Params['Nucl']+"_"+LEC+"_hw"+str(hw)+"_emax"+str(e)+"_e3max"+str(e3)
+            Params["TransFileName"] = "Trans_DNNLOgo_"+Params['Nucl']+"_"+LEC+"_hw"+str(hw)+"_emax"+str(e)+"_e3max"+str(e3)+".op"
             Params['hw']=hw
             Params['emax'] = e
             Params['e3max'] = e3

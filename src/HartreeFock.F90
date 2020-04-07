@@ -28,6 +28,8 @@ module HartreeFock
   private :: BasisTransNO2BTensor
   private :: BasisTransScalar
   private :: BasisTransTensor
+  private :: WriteTransformationMatrix
+  private :: ReadTransformationMatrix
 
 
   private :: InitMonopole2
@@ -106,6 +108,8 @@ module HartreeFock
     procedure :: BasisTransNO2BTensor
     procedure :: BasisTransScalar
     procedure :: BasisTransTensor
+    procedure :: WriteTransformationMatrix
+    procedure :: ReadTransformationMatrix
   end type HFSolver
   type(Optimizer), private :: opt
 contains
@@ -2414,6 +2418,59 @@ contains
     i5 = mod(shiftr(idx,40), int(1024,kind=8))
     i6 = mod(shiftr(idx,50), int(1024,kind=8))
   end subroutine GetSpLabels3
+
+  subroutine WriteTransformationMatrix(this,filename)
+    class(HFSolver), intent(in) :: this
+    character(*), intent(in) :: filename
+    type(Orbits), pointer :: sps
+    integer :: a, b, wunit=20
+    real(8) :: me
+    sps => this%ms%sps
+    open(wunit, file=filename, status="replace")
+    do a = 1, sps%norbs
+      do b = 1, sps%norbs
+        me = this%C%GetOBME(a,b)
+        if( abs(me) < 1.d-8 ) cycle
+        write(wunit,"(2i4,3es18.8)") a,b,this%ms%NOCoef(a),this%ms%NOCoef(b),me
+      end do
+    end do
+    close(wunit)
+  end subroutine WriteTransformationMatrix
+
+  subroutine ReadTransformationMatrix(this,hamil,filename)
+    class(HFSolver), intent(inout) :: this
+    type(Ops), intent(in) :: hamil
+    character(*), intent(in) :: filename
+    integer :: a, b, runit=20, ios
+    real(8) :: occ_a, occ_b, me
+    type(SingleParticleOrbit), pointer :: oa=>null()
+    call this%init(hamil)
+    open(runit, file=filename, status="old")
+    do
+      read(runit,*,iostat=ios) a, b, occ_a, occ_b, me
+      if(ios < 0) exit
+      this%ms%NOCoef(a) = occ_a
+      call this%C%SetOBME(a,b,me,.false.)
+    end do
+    close(runit)
+    call this%SetOccupationMatrix(this%ms%NOcoef)
+    do a = 1, this%ms%sps%norbs ! print hole states
+      oa => this%ms%sps%GetOrbit(a)
+      call oa%SetOccupation( this%ms%NOcoef(a) )
+    end do
+    call this%ms%GetParticleHoleOrbits()
+    call this%ms%SetEFermi()
+    write(*,'(2a)') " Target Nuclide is ", trim(this%ms%Nucl)
+    write(*,'(a)') "      p/h, idx,  n,  l,  j, tz,   occupation"
+    do a = 1, this%ms%sps%norbs ! print hole states
+      oa => this%ms%sps%GetOrbit(a)
+      if(oa%GetHoleParticle() /= 0) cycle
+      write(*,'(a10,5i4,f14.6)') '     hole:', a, oa%n, oa%l, oa%j, oa%z, oa%GetOccupation()
+    end do
+    call this%ms%InitSubSpace()
+    call this%UpdateDensityMatrixFromCoef()
+    call this%UpdateFockMatrix()
+  end subroutine ReadTransformationMatrix
 end module HartreeFock
 
 !program test
