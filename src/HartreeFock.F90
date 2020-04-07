@@ -2427,6 +2427,7 @@ contains
     real(8) :: me
     sps => this%ms%sps
     open(wunit, file=filename, status="replace")
+    write(wunit,"(a)") "#  a,  b,            Occ_a,            Occ_b,        ( HO|HF )"
     do a = 1, sps%norbs
       do b = 1, sps%norbs
         me = this%C%GetOBME(a,b)
@@ -2446,6 +2447,7 @@ contains
     type(SingleParticleOrbit), pointer :: oa=>null()
     call this%init(hamil)
     open(runit, file=filename, status="old")
+    read(runit,*)
     do
       read(runit,*,iostat=ios) a, b, occ_a, occ_b, me
       if(ios < 0) exit
