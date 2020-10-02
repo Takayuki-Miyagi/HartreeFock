@@ -153,10 +153,10 @@ program HFMain
       if(p%is_MBPTEnergy) then
         htr = HF%BasisTransform(h,NOXB=p%NOXB)
         ! USE HO SPE
-        htr%one%oprtr = "HOHamil"
+        !htr%one%oprtr = "HOHamil"
         !call htr%one%set( htr%ms%hw, htr%ms%A, htr%ms%Z, htr%ms%N)
-        call htr%one%set( 18.d0, htr%ms%A, htr%ms%Z, htr%ms%N)
-        htr%one%oprtr = "hamil"
+        !call htr%one%set( 18.d0, htr%ms%A, htr%ms%Z, htr%ms%N)
+        !htr%one%oprtr = "hamil"
         ! USE HO SPE
         call PT%calc(htr, p%is_4th_order, p%EN_denominator)
         write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
