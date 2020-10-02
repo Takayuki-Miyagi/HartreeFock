@@ -11,6 +11,7 @@ module HFInput
     integer :: lmax
     integer :: e2max
     integer :: e3max
+    integer :: NOXB
     real(8) :: hw
     real(8) :: beta_cm
     real(8) :: alpha
@@ -70,6 +71,7 @@ contains
     integer :: e2max=-1
     integer :: e3max=-1
     integer :: lmax=-1
+    integer :: NOXB=2
     real(8) :: hw=20.d0
     real(8) :: beta_cm = 0.d0 ! lowson's cm parameter, H => H + beta_cm * Hcm in the unit of MeV
     real(8) :: alpha=0.7d0
@@ -126,7 +128,7 @@ contains
         & OpFileName, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
         & EN_denominator, dynamic_reference, iter_method, iter_n_history, HO_reference, &
-        & find_optimal_frequency, TransFileName
+        & find_optimal_frequency, TransFileName, NOXB
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -141,6 +143,7 @@ contains
     if(e2max == -1) this%e2max = 2*emax
     this%e3max = e3max
     if(e3max == -1) this%e3max = 3*emax
+    this%NOXB = NOXB
     this%hw = hw
     this%alpha = alpha
     this%Nucl = Nucl
@@ -250,6 +253,7 @@ contains
       if( this%files_3n(n) == 'none' .or. this%files_3n(n) == '') cycle
       write(iut,'(2a)') "#  ", trim(this%files_3n(n))
     end do
+    write(iut,'(a,i1,a)') "#  3NMEs: NO",this%NOXB,"B approx. will be used."
     write(iut,'(a,i3,a,i3,a,i3,a,i3)') "#  File boundaries are emax =",this%emax_3n, &
         & ", e2max =",this%e2max_3n, ", e3max =", this%e3max_3n, &
         & ", lmax =",this%lmax_3n

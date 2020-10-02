@@ -127,15 +127,17 @@ contains
     this%ms => null()
   end subroutine FinHFSolver
 
-  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,norm_kernel)
+  subroutine InitHFSolver(this,hamil,n_iter_max,tol,alpha,norm_kernel,NOXB_3NF)
     class(HFSolver), intent(inout) :: this
     type(Ops), intent(in) :: hamil
     integer, intent(in), optional :: n_iter_max
     real(8), intent(in), optional :: tol, alpha
     type(OneBodyPart), intent(in), optional :: norm_kernel
+    integer, intent(in), optional :: NOXB_3NF
     type(MSpace), pointer :: ms
     real(8) :: ti
     integer :: ch, ndim
+    logical :: is_3NF
 
     ms => hamil%ms
     this%ms => ms
@@ -150,12 +152,16 @@ contains
     this%e2 = 0.d0
     this%e3 = 0.d0
     this%diff = 1.d2
+    is_3NF = .true.
     if(present(n_iter_max)) this%n_iter_max = n_iter_max
     if(present(tol)) this%tol = tol
     if(present(alpha)) this%alpha = alpha
     if(present(norm_kernel)) then
       this%is_roothaan = .true.
       this%S = norm_kernel
+    end if
+    if(present( NOXB_3NF )) then
+      if( NOXB_3NF == 0 ) is_3NF = .false.
     end if
     this%rank = hamil%rank
     call this%C%init(  ms%one, .true., 'UT',      0, 1, 0)
@@ -172,7 +178,7 @@ contains
     call this%V2%InitMonopole2(hamil%two)
     call timer%Add("Construct Monopole 2Body int.", omp_get_wtime() - ti)
 
-    if(this%rank == 3) then
+    if(this%rank == 3 .and. is_3NF ) then
       ti = omp_get_wtime()
 
       if(.not. hamil%thr21_mon%zero) call this%V3%InitMonopole3FromMon(hamil%thr21_mon)
@@ -341,18 +347,26 @@ contains
     this%C = Ctmp
   end function calc_overlap_ho_hf
 
-  function BasisTransform(HF,Optr,is_NO2B) result(op)
+  function BasisTransform(HF,Optr,NOXB) result(op)
     !  Input: Operator is HO basis operator (not normal ordered)
     ! Output: Operator is HF basis operator {not normal ordered                    , is_NO2B is false
     !                                       {normal ordered with NO2B approximation, is_NO2B is true
     !
     class(HFSolver), intent(inout) :: HF
-    type(Ops), intent(in) :: Optr
+    type(Ops), intent(inout) :: Optr
     type(Ops) :: op
-    logical, intent(in), optional :: is_NO2B
-    logical :: NO2B=.True.
+    integer, intent(in), optional :: NOXB
+    logical :: NO2B
+    integer :: tmp_rank
 
-    if(present(is_NO2B)) NO2B = is_NO2B
+    NO2B = .true.
+    if(present(NOXB)) then
+      if( NOXB == 3 ) NO2B = .false.
+      if( NOXB < 2 ) then
+        tmp_rank = Optr%rank
+        Optr%rank=2
+      end if
+    end if
 
     if(Optr%is_normal_ordered) then
       write(*,'(a)') "Normal ordering status of input operator is wrong!"
@@ -371,6 +385,12 @@ contains
           write(*,*) "Wrong option, taking normal ordering"
           stop
         end if
+
+        if(present(NOXB)) then
+          if( NOXB < 2 ) then
+            Optr%rank=tmp_rank
+          end if
+        end if
         op%is_normal_ordered = .true.
         return
       end if
@@ -380,6 +400,11 @@ contains
         if(.not. Optr%thr21%zero) op = HF%BasisTransNO2BScalar(Optr)              ! w/ full three-body scalar
         if(.not. Optr%thr21_no2b%zero) op = HF%BasisTransNO2BScalarFromNO2B(Optr) ! w/ no2b relevant three-body scalar
         op%is_normal_ordered = .true.
+        if(present(NOXB)) then
+          if( NOXB < 2 ) then
+            Optr%rank=tmp_rank
+          end if
+        end if
         return
       end if
 
@@ -387,6 +412,11 @@ contains
         write(*,*) "Not tested yet."
         return
         op = HF%BasisTransNO2BTensor(Optr)
+        if(present(NOXB)) then
+          if( NOXB < 2 ) then
+            Optr%rank=tmp_rank
+          end if
+        end if
         op%is_normal_ordered = .true.
         return
       end if

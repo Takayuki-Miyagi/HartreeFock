@@ -97,16 +97,31 @@ program HFMain
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
 
   if( p%HO_reference ) then
-    if( p%TransFileName == "none") htr = h%NO2BApprox()
+    open(wunit, file = p%summary_file, action='write',status='replace')
+    if( p%TransFileName == "none") then
+      call HF%init(h,alpha=p%alpha,NOXB_3NF=p%NOXB)
+      !htr = h%NO2BApprox()
+      htr = HF%BasisTransform(h,NOXB=p%NOXB)
+      ! USE HO SPE
+      !htr%one%oprtr = "HOHamil"
+      !call htr%one%set( htr%ms%hw, htr%ms%A, htr%ms%Z, htr%ms%N)
+      !htr%one%oprtr = "hamil"
+      ! USE HO SPE
+    end if
     if( p%TransFileName /= "none") then
       call HF%ReadTransformationMatrix(h,p%TransFileName)
-      htr = HF%BasisTransform(h)
+      htr = HF%BasisTransform(h,NOXB=p%NOXB)
     end if
     call PT%calc(htr, p%is_4th_order, p%EN_denominator)
+    write(wunit,'(a,11x,a,6x,a,9x,a,9x,a,13x,a)') &
+        & "#", "Operator", "HO energy", "2nd order", "3rd order", "Total"
+    write(wunit,'(a20,4f18.8)') 'hamil', PT%e_0, PT%e_2, PT%e_3, &
+        & PT%e_0+PT%e_2+PT%e_3
+    close(wunit)
   end if
 
   if( .not. p%HO_reference ) then
-    call HF%init(h,alpha=p%alpha)
+    call HF%init(h,alpha=p%alpha,NOXB_3NF=p%NOXB)
     call HF%SetDynamicReference(p%dynamic_reference)
     call HF%SetIterMethod(p%iter_method, p%alpha, p%iter_n_history)
     call HF%solve()
@@ -136,7 +151,13 @@ program HFMain
       end if
 
       if(p%is_MBPTEnergy) then
-        htr = HF%BasisTransform(h)
+        htr = HF%BasisTransform(h,NOXB=p%NOXB)
+        ! USE HO SPE
+        htr%one%oprtr = "HOHamil"
+        !call htr%one%set( htr%ms%hw, htr%ms%A, htr%ms%Z, htr%ms%N)
+        call htr%one%set( 18.d0, htr%ms%A, htr%ms%Z, htr%ms%N)
+        htr%one%oprtr = "hamil"
+        ! USE HO SPE
         call PT%calc(htr, p%is_4th_order, p%EN_denominator)
         write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
         write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
@@ -154,7 +175,7 @@ program HFMain
   end if
 
   if(p%is_NAT) then
-    htr = HF%BasisTransform(h)
+    htr = HF%BasisTransform(h,NOXB=p%NOXB)
     call PTd%init(HF, htr, p%EN_denominator)
     HF%C = PTd%C_HO2NAT
     select case(p%density_matrix_file)
@@ -177,7 +198,7 @@ program HFMain
         call w%writef(p,Rho)
       end if
     end select
-    htr = HF%BasisTransform(h)
+    htr = HF%BasisTransform(h,NOXB=p%NOXB)
   end if
 
   if(p%is_Op_out) then
@@ -202,7 +223,7 @@ program HFMain
     write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
     call opr%init(p%Ops(n),ms,2)
     call opr%set()
-    opr = HF%BasisTransform(opr)
+    opr = HF%BasisTransform(opr,NOXB=p%NOXB)
     if(p%is_MBPTScalar) then
       if(s%find(p%Ops(n), 'Hamil') .or. p%Ops(n) == "Tkin") then
         call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
@@ -230,7 +251,7 @@ program HFMain
     call opr%init(p%Ops(n),ms, 2)
     call opr%set(p%files_nn(n), 'none', &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
-    opr = HF%BasisTransform(opr)
+    opr = HF%BasisTransform(opr,NOXB=p%NOXB)
     if(p%is_MBPTScalar) then
       if(s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
       if(.not. s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
@@ -259,7 +280,7 @@ program HFMain
     call opr%set(p%files_nn(n), p%files_3n(n), &
         & [p%emax_nn, p%e2max_nn,p%lmax_nn], &
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
-    opr = HF%BasisTransform(opr)
+    opr = HF%BasisTransform(opr,NOXB=p%NOXB)
     if(p%is_MBPTScalar) then
       if(s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
       if(.not. s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
