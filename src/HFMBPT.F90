@@ -50,6 +50,7 @@ module HFMBPT
   ! Methods for Scalar Operator
   private :: CalcScalarCorr
   private :: scalar_first
+  private :: scalar_first1
   private :: scalar_second
   private :: scalar_second_s1p
   private :: scalar_second_s1h
@@ -138,6 +139,7 @@ contains
     type(Ops), intent(in) :: hamil
     logical, intent(in), optional :: fourth_order
     logical, intent(in), optional :: EN_denominator_in
+    real(8) :: s_1
     logical :: is_4th_order=.false.
     integer :: i, jmax
 
@@ -1155,6 +1157,9 @@ contains
           if( ms%sps%orb(j)%GetHoleParticle() /= 0 ) cycle
           max_val = max(max_val, &
               & abs(h%two%GetTwBME(i,j,a,b,J2)) / abs(get_denominator2(h,i,j,a,b)))
+          !!$omp critical
+          !write(*,*) ch,a,b,i,j,max_val
+          !!$omp end critical
         end do
       end do
       !$omp end do
@@ -1180,6 +1185,7 @@ contains
     logical, intent(in), optional :: part_of_hamil
     type(MSpace), pointer :: ms
     integer :: jmax
+    real(8) :: s_1
 
     write(*,'(a)') " Many-body perturbation calculation up to 2nd order (scalar)"
     write(*,*)
@@ -1208,7 +1214,12 @@ contains
     ms => hamil%ms
     this%s_0 = opr%zero
     if(is_MBPT_full) then
-      this%s_1 = scalar_first(hamil,opr)
+      s_1 = scalar_first1(hamil,opr)
+      write(*,'(a,f16.8)') "First order correction from f: ", s_1
+      s_1 = s_1 + scalar_second1(hamil,opr)
+      write(*,'(a,f16.8)') "Second order correction from f: ", s_1
+      s_1 = s_1 + scalar_first(hamil,opr)
+      this%s_1 = s_1
       if(this%part_of_hamil) this%s_1 = 0.5d0 * this%s_1
       write(*,'(a,f16.8)') "First order correction: ", this%s_1
     end if
@@ -1232,6 +1243,50 @@ contains
     EN_denominator=.false.
     this%part_of_hamil=.false.
   end subroutine CalcScalarCorr
+
+  function scalar_first1(h,s) result(r)
+    ! a : particle
+    ! i : hole
+    !
+    !    /\===========x
+    !   /  \
+    !   |  |
+    ! a |  | i               x 2
+    !   |  |
+    !   \  /
+    !    \/___________x
+    !
+    ! 2 \sum_{i,a} <i||a> <a||i> / denominator
+    type(Ops), intent(in) :: h, s
+    type(MSPace), pointer :: ms
+    type(OneBodyChannel), pointer :: ch_one
+    integer :: ch, a, i, J1, n, bra, ket
+    type(Orbits), pointer :: sps
+    type(SingleParticleOrbit), pointer :: oa, oi
+    real(8) :: vsum, v, ti, r
+
+    ti = omp_get_wtime()
+    ms => h%ms
+    sps => ms%sps
+
+    vsum = 0.d0
+    do bra = 1, ms%nh
+      i = ms%holes(bra)
+      oi => sps%GetOrbit(i)
+      do ket = 1, ms%np
+        a = ms%particles(ket)
+        oa => sps%GetOrbit(a)
+        if(oi%l /= oa%l) cycle
+        if(oi%j /= oa%j) cycle
+        if(oi%z /= oa%z) cycle
+        vsum = vsum + dble(oi%j+1) * s%one%GetOBME(a,i) * h%one%GetOBME(a,i) / get_denominator1(h,i,a)
+        !vsum = vsum + dble(oi%j+1) * s%one%GetOBME(a,i) * h%one%GetOBME(a,i) / (oi%e - oa%e) / ms%hw ! degenerate gap denominator
+        !vsum = vsum + dble(oi%j+1) * s%one%GetOBME(a,i) * h%one%GetOBME(a,i) / (oi%e - oa%e) / 12.d0
+      end do
+    end do
+    r = 2.d0 * vsum
+    call timer%Add("First order MBPT for Scalar",omp_get_wtime()-ti)
+  end function scalar_first1
 
   function scalar_first(h,s) result(r)
     ! a, b : particle
@@ -1312,6 +1367,92 @@ contains
         & this%s_2_s2pp + this%s_2_s2hh + this%s_2_s2ph + &
         & this%s_2_v2pp + this%s_2_v2hh + this%s_2_v2ph
   end subroutine scalar_second
+
+  function scalar_second1(h,s) result(r)
+    !
+    !       ______x           _______x
+    !     /|                /|               /|=======x          /|=======x
+    !    / |               / |              / |                 / |
+    !   /  | i            /  | b           /  | b              /  | j
+    !   |  |              |  |             |  |                |  |
+    ! a |  |======x     i |  |=======x   i |  |_______x 2    a |  |_______x 2
+    !   |  |              |  |             |  |                |  |
+    !   \  | j            \  | a           \  | a              \  | i
+    !    \ |               \ |              \ |                 \ |
+    !     \|______x         \|_______x       \|_______x          \|_______x
+    !
+    type(Ops), intent(in) :: h, s
+    type(MSPace), pointer :: ms
+    type(OneBodyChannel), pointer :: ch_one
+    integer :: ch, a, b, i, j, ia, ib, ii, ij, J1, n, bra, ket
+    type(Orbits), pointer :: sps
+    type(SingleParticleOrbit), pointer :: oa, ob, oi, oj
+    real(8) :: spp, shh, r, ti
+
+    ti = omp_get_wtime()
+    ms => h%ms
+    sps => ms%sps
+    spp = 0.d0; shh = 0.d0
+    do i = 1, ms%nh
+      ii = ms%holes(i)
+      oi => sps%GetOrbit(ii)
+      do a = 1, ms%np
+        ia = ms%particles(a)
+        oa => sps%GetOrbit(ia)
+        if(oi%l /= oa%l) cycle
+        if(oi%j /= oa%j) cycle
+        if(oi%z /= oa%z) cycle
+        do b = 1, ms%np
+          ib = ms%particles(b)
+          ob => sps%GetOrbit(ib)
+          if(oa%l /= ob%l) cycle
+          if(oa%j /= ob%j) cycle
+          if(oa%z /= ob%z) cycle
+          spp = spp + &
+              & dble(oi%j+1) * &
+              & (      h%one%GetOBME(ii,ia) * s%one%GetOBME(ia,ib) * h%one%GetOBME(ib,ii) + &
+              & 2.d0 * s%one%GetOBME(ii,ia) * h%one%GetOBME(ia,ib) * h%one%GetOBME(ib,ii)) / &
+              & ( get_denominator1(h,ii,ia) * get_denominator1(h,ii,ib) )
+          !spp = spp + &
+          !    & dble(oi%j+1) * &
+          !    & (      h%one%GetOBME(ii,ia) * s%one%GetOBME(ia,ib) * h%one%GetOBME(ib,ii) + &
+          !    & 2.d0 * s%one%GetOBME(ii,ia) * h%one%GetOBME(ia,ib) * h%one%GetOBME(ib,ii)) / &
+          !    & ( (oi%e-oa%e) * (oi%e-ob%e) * 12.d0 )
+        end do
+      end do
+    end do
+
+    do i = 1, ms%nh
+      ii = ms%holes(i)
+      oi => sps%GetOrbit(ii)
+      do j = 1, ms%nh
+        ij = ms%holes(j)
+        oj => sps%GetOrbit(ij)
+        if(oi%l /= oj%l) cycle
+        if(oi%j /= oj%j) cycle
+        if(oi%z /= oj%z) cycle
+        do a = 1, ms%np
+          ia = ms%particles(a)
+          oa => sps%GetOrbit(ia)
+          if(oi%l /= oa%l) cycle
+          if(oi%j /= oa%j) cycle
+          if(oi%z /= oa%z) cycle
+          shh = shh - &
+              & dble(oi%j+1) * &
+              & (      h%one%GetOBME(ia,ii) * s%one%GetOBME(ii,ij) * h%one%GetOBME(ij,ia) + &
+              & 2.d0 * s%one%GetOBME(ia,ii) * h%one%GetOBME(ii,ij) * h%one%GetOBME(ij,ia)) / &
+              & ( get_denominator1(h,ii,ia) * get_denominator1(h,ij,ia) )
+          !shh = shh - &
+          !    & dble(oi%j+1) * &
+          !    & (      h%one%GetOBME(ia,ii) * s%one%GetOBME(ii,ij) * h%one%GetOBME(ij,ia) + &
+          !    & 2.d0 * s%one%GetOBME(ia,ii) * h%one%GetOBME(ii,ij) * h%one%GetOBME(ij,ia)) / &
+          !    & ( (oi%e-oa%e) * (oj%e-oa%e) * 12.d0 )
+        end do
+      end do
+    end do
+    r = spp + shh
+    call timer%Add("Second order MBPT for Scalar",omp_get_wtime()-ti)
+  end function scalar_second1
 
   function scalar_second_s1p(h,s) result(r)
     ! a, b, c : particle

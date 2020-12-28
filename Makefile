@@ -220,7 +220,7 @@ $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.c
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f
 	$(FC) $(FFLAGS) $(MODOUT) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f90
-	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
+	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -fallow-argument-mismatch -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.F90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 
