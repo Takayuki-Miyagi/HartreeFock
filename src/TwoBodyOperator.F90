@@ -125,6 +125,7 @@ module TwoBodyOperator
     !procedure :: ExtractCrossCoupledChannel_ppph2ppph
     procedure :: GetCrossCoupledME1423
     procedure :: GetCrossCoupledME1324
+    procedure :: GetUsedMemory
 
     generic :: init => InitTwoBodyPart
     generic :: fin => FinTwoBodyPart
@@ -167,6 +168,21 @@ module TwoBodyOperator
   end type Read2BodyFiles
 
 contains
+
+  function GetUsedMemory(this) result(mem)
+    class(TwoBodyPart), intent(in) :: this
+    real(8) :: mem
+    integer :: chbra, chket, nbra, nket
+    do chbra = 1, this%Two%NChan
+      do chket = 1, this%Two%NChan
+        if( .not. this%MatCh(chbra,chket)%is ) cycle
+        nbra = this%two%jpz(chbra)%n_state
+        nket = this%two%jpz(chket)%n_state
+        mem = mem + dble(nbra)*dble(nket)*8.d0
+      end do
+    end do
+    mem = mem / 1024.d0**3 ! in unit of GB
+  end function GetUsedMemory
 
   subroutine FinTwoBodyPart(this)
     class(TwoBodyPart), intent(inout) :: this

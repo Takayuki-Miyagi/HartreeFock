@@ -266,6 +266,33 @@ contains
     write(*,'(2a)') "2B file: ", trim(file_nn)
     call rd2%ReadTwoBodyFile(this%two)
 
+    ! Tcm or Hcm
+    select case(this%oprtr)
+    case('hamil', 'Hamil')
+      call Tcm_one%init(ms%one, .true., 'Tcm', 0, 1, 0)
+      call Tcm_two%init(ms%two, .true., 'Tcm', 0, 1, 0)
+
+      ti = omp_get_wtime()
+      call Tcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
+      call Tcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
+
+      this%one = this%one - Tcm_one
+      this%two = this%two - Tcm_two
+      call timer%add("Set Tcm operator",omp_get_wtime() - ti)
+
+      if(ms%beta > 1.d-4) then
+        call Hcm_one%init(ms%one, .true., 'Hcm', 0, 1, 0)
+        call Hcm_two%init(ms%two, .true., 'Hcm', 0, 1, 0)
+
+        call Hcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
+        call Hcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
+
+        this%zero = this%zero - (1.5d0 * ms%beta)
+        this%one = this%one + (Hcm_one * (ms%beta / ms%hw))
+        this%two = this%two + (Hcm_two * (ms%beta / ms%hw))
+      end if
+    end select
+
     !------ Three-body file ------
     ! full case
     if(this%rank == 3 .and. this%ms%is_three_body_jt .and. .not. this%thr21%zero) then
@@ -315,33 +342,6 @@ contains
       end if
     end if
 
-    select case(this%oprtr)
-    case('hamil', 'Hamil')
-      call Tcm_one%init(ms%one, .true., 'Tcm', 0, 1, 0)
-      call Tcm_two%init(ms%two, .true., 'Tcm', 0, 1, 0)
-
-      ti = omp_get_wtime()
-      call Tcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
-      call Tcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
-
-      this%one = this%one - Tcm_one
-      this%two = this%two - Tcm_two
-      call timer%add("Set Tcm operator",omp_get_wtime() - ti)
-
-      if(ms%beta > 1.d-4) then
-        call Hcm_one%init(ms%one, .true., 'Hcm', 0, 1, 0)
-        call Hcm_two%init(ms%two, .true., 'Hcm', 0, 1, 0)
-
-        call Hcm_one%set(ms%hw, ms%A, ms%Z, ms%N)
-        call Hcm_two%set(ms%hw, ms%A, ms%Z, ms%N)
-
-        this%zero = this%zero - (1.5d0 * ms%beta)
-        this%one = this%one + (Hcm_one * (ms%beta / ms%hw))
-        this%two = this%two + (Hcm_two * (ms%beta / ms%hw))
-      end if
-    case default
-      return
-    end select
   end subroutine SetOperatorFromFile
 
   subroutine SetOperator(this)

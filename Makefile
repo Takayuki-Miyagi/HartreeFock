@@ -71,7 +71,7 @@ ifeq ($(strip $(HOST)),apt)
   FFLAGS+= -openmp
   FFLAGS+= -Dsingle_precision_three_body_file
   ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b
+    FFLAGS+= -Dcompact_no2b_format
   endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
@@ -89,7 +89,7 @@ ifeq ($(strip $(HOST)),oak)
   FFLAGS+= -qopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
   ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b
+    FFLAGS+= -Dcompact_no2b_format
   endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
@@ -106,7 +106,7 @@ ifeq ($(strip $(HOST)),cedar)
   FFLAGS+= -qopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
   ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b
+    FFLAGS+= -Dcompact_no2b_format
   endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all

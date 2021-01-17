@@ -45,8 +45,7 @@ module HFInput
     !
     logical :: is_Op_out
     logical :: is_MBPTscalar_full
-    logical :: is_MBPTScalar
-    logical :: is_MBPTEnergy
+    logical :: is_MBPT
     logical :: HO_reference
     logical :: is_NAT
     logical :: is_4th_order
@@ -102,8 +101,7 @@ contains
     logical :: is_Op_out = .false.
     logical :: HO_reference = .false.
     logical :: is_MBPTscalar_full = .true.
-    logical :: is_MBPTScalar = .true.
-    logical :: is_MBPTEnergy = .true.
+    logical :: is_MBPT = .true.
     logical :: is_NAT = .false.
     logical :: is_4th_order = .false.
     logical :: EN_denominator =.false. ! Epstein-Nesbet denominator (Moller-Plesset is default)
@@ -124,7 +122,7 @@ contains
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
-        & is_MBPTScalar, is_MBPTEnergy, beta_cm, out_dir,&
+        & is_MBPT, beta_cm, out_dir,&
         & OpFileName, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
         & EN_denominator, dynamic_reference, iter_method, iter_n_history, HO_reference, &
@@ -176,8 +174,7 @@ contains
     this%HO_reference = HO_reference
     this%is_Op_out = is_Op_out
     this%is_MBPTscalar_full = is_MBPTscalar_full
-    this%is_MBPTEnergy = is_MBPTEnergy
-    this%is_MBPTScalar = is_MBPTScalar
+    this%is_MBPT = is_MBPT
     this%is_NAT = is_NAT
     this%OpFileName = OpFileName
     this%TransFileName = TransFileName
@@ -263,12 +260,10 @@ contains
       write(iut,'(a,a)') "#  Operator is ", trim(this%Ops(n))
     end do
 
-    if(this%is_MBPTEnergy) then
+    if(this%is_MBPT) then
       write(iut,'(a)') "#  MBPT calc g.s. energy is done up to 3rd order"
       if(.not. this%EN_denominator) write(iut,'(a)') "#  Moller-Plesset (MP) denominator"
       if(      this%EN_denominator) write(iut,'(a)') "#  Epstein-Nesbet (EN) denominator"
-    end if
-    if(this%is_MBPTScalar) then
       write(iut,'(a)') "#  MBPT calc g.s. scalar is done up to 2nd order"
       if(this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is fully done up to 2nd order."
       if(.not. this%is_MBPTscalar_full) write(iut, '(a)') "#  MBPT for scalar operator is approximately done. "

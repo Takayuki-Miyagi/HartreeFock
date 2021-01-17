@@ -55,6 +55,7 @@ module ThreeBodyInteraction
     procedure :: ScaleThreeBodyForce
     procedure :: PrintThreeBodyForce
     procedure :: NormalOrderingFrom3To2
+    procedure :: GetUsedMemory
 
     generic :: init => InitThreeBodyForce
     generic :: fin => FinThreeBodyForce
@@ -86,6 +87,22 @@ module ThreeBodyInteraction
   end type Read3BodyFiles
 
 contains
+
+  function GetUsedMemory(this) result(mem)
+    class(ThreeBodyForce), intent(in) :: this
+    real(8) :: mem
+    integer :: ch, n
+    do ch = 1, this%thr%NChan
+      n = this%thr%jpt(ch)%n_state
+#ifdef single_precision_three_body_file
+      mem = mem + dble(n) * dble(n) * 4.d0
+#else
+      mem = mem + dble(n) * dble(n) * 8.d0
+#endif
+    end do
+    mem = mem / 1024.d0**3 ! in unit of GB
+  end function GetUsedMemory
+
   subroutine InitThreeBodyForce(this, thr)
     class(ThreeBodyForce), intent(inout) :: this
     type(NonOrthIsospinThreeBodySpace), target, intent(in) :: thr

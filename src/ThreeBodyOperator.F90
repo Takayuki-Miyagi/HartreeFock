@@ -83,6 +83,7 @@ module ThreeBodyOperator
     generic :: operator(*) => ScaleThreeBodyPart
   end type ThreeBodyPart
 contains
+
   subroutine FinThreeBodyPart(this)
     class(ThreeBodyPart), intent(inout) :: this
     integer :: chbra, chket

@@ -21,7 +21,7 @@ contains
     call HF%init(h,alpha=p%alpha)
     call HF%solve()
 
-    if(.not. p%is_MBPTEnergy) then
+    if(.not. p%is_MBPT) then
       open(wunit, file = p%summary_file, action='write',status='replace')
       call p%PrintInputParameters(wunit)
       call print_single_particle_energies(HF,wunit)
@@ -31,7 +31,7 @@ contains
       close(wunit)
     end if
 
-    if(p%is_MBPTEnergy) then
+    if(p%is_MBPT) then
       h = HF%BasisTransform(h)
       call PT%calc(H)
       open(wunit, file = p%summary_file, action='write',status='replace')

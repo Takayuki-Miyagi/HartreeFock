@@ -91,6 +91,7 @@ module ThreeBodyNO2BInteraction
   contains
     procedure :: InitThreeBodyNO2BForce
     procedure :: FinThreeBodyNO2BForce
+    procedure :: GetUsedMemory
     procedure :: GetThBMENO2B_isospin
     procedure :: GetThBMENO2B_pn
     procedure :: SetThBMENO2B
@@ -119,6 +120,22 @@ module ThreeBodyNO2BInteraction
     !procedure :: read_scalar_me3j_binary
   end type Read3BodyNO2B
 contains
+
+  function GetUsedMemory(this) result(mem)
+    class(ThreeBodyNO2BForce), intent(in) :: this
+    real(8) :: mem
+    integer :: ch, n
+    do ch = 1, this%thr%NChan
+      n = this%thr%chan(ch)%n_state
+#if defined(single_precision_three_body_file) || defined(half_precision_three_body_file)
+      mem = mem + dble(n) * dble(n+1) * 2.d0
+#else
+      mem = mem + dble(n) * dble(n+1) * 4.d0
+#endif
+    end do
+    mem = mem / 1024.d0**3 ! in unit of GB
+  end function GetUsedMemory
+
   subroutine FinOneBodyChannels(this)
     class(OneBodyChannels) :: this
     deallocate(this%j)
