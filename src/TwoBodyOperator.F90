@@ -20,6 +20,7 @@ module TwoBodyOperator
   private :: SetTwBME_tensor
   private :: GetTwBME_scalar
   private :: GetTwBME_tensor
+  private :: GetTwBME_mscheme
   private :: AddToTwBME_scalar
   private :: AddToTwBME_tensor
   private :: CopyTwoBodyPart
@@ -109,6 +110,7 @@ module TwoBodyOperator
     procedure :: SetTwBME_tensor
     procedure :: GetTwBME_scalar
     procedure :: GetTwBME_tensor
+    procedure :: GetTwBME_mscheme
     procedure :: GetTwBMEMon
     procedure :: AddToTwBME_scalar
     procedure :: AddToTwBME_tensor
@@ -516,6 +518,39 @@ contains
 
     r = dble(iphase) * this%MatCh(ch,ch)%m(bra,ket)
   end function GetTwBME_scalar
+
+  function GetTwBME_mscheme(this,i1,m1,i2,m2,i3,m3,i4,m4,M) result(r)
+    real(8) :: r
+    class(TwoBodyPart), intent(in) :: this
+    integer, intent(in) :: i1,i2,i3,i4,m1,m2,m3,m4,M
+    type(TwoBodySpace), pointer :: tbs
+    type(SingleParticleOrbit), pointer :: o1, o2, o3, o4
+    integer :: J12, J34
+    real(8) :: me
+
+    r = 0.d0
+    if(i1==i2 .and. m1==m2) return
+    if(i3==i4 .and. m3==m4) return
+    tbs => this%two
+    o1 => tbs%sps%orb(i1)
+    o2 => tbs%sps%orb(i2)
+    o3 => tbs%sps%orb(i3)
+    o4 => tbs%sps%orb(i4)
+
+    do J12 = abs(o1%j-o2%j)/2, (o1%j+o2%j)/2
+      if(abs(m1+m2) > 2*J12) cycle
+      do J34 = abs(o3%j-o4%j)/2, (o3%j+o4%j)/2
+        if(abs(m3+m4) > 2*J34) cycle
+        if(triag(J12, this%Jr, J34)) cycle
+        if(m3+m4+2*M-m1-m2 /=0 ) cycle
+        r = r + this%GetTwBME(i1,i2,i3,i4,J12,J34) * &
+            & dcg(o1%j, m1, o2%j, m2, 2*J12, m1+m2) * dcg(o3%j, m3, o4%j, m4, 2*J34, m3+m4)
+!            & dcg(2*this%Jr, 2*M, 2*J34, m3+m4, 2*J12, m1+m2) / sqrt(dble(2*J12+1))
+      end do
+    end do
+    if(i1==i2) r = r * sqrt(2.d0)
+    if(i3==i4) r = r * sqrt(2.d0)
+  end function GetTwBME_mscheme
 
   function GetTwBMEMon(this, i1, i2, i3, i4) result(r)
     real(8) :: r
