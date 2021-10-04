@@ -186,6 +186,10 @@ contains
       do i = 1, 39
         write(*,"(a,i2,f16.8)") "Fourth order correction F", i, this%e_4(i)
       end do
+      write(*,"(a,f16.8)") "   Single excitations: ",  sum(this%e_4(1:4))
+      write(*,"(a,f16.8)") "   Double excitations: ",  sum(this%e_4(5:16))
+      write(*,"(a,f16.8)") "   Triple excitations: ",  sum(this%e_4(17:32))
+      write(*,"(a,f16.8)") "Quadruple excitations: ",  sum(this%e_4(33:39))
       !call this%energy_fourth_M(hamil)
       !do i = 1, 39
       !  write(*,"(a,i2,f16.8)") "Fourth order correction F", i, this%e_4(i)
@@ -1083,26 +1087,26 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(op1,op2,oh1,oh2)) cycle
 
-            if(CheckParityZ(op3,op4,op1,op2)) cycle
+            do p3 = 1, sps%norbs
+              op3 => sps%GetOrbit(p3)
+              if(op3%GetOccupation() > 1.d-6) cycle
+              do p4 = 1, sps%norbs
+                op4 => sps%GetOrbit(p4)
+                if(op4%GetOccupation() > 1.d-6) cycle
 
-            do p5 = 1, sps%norbs
-              op5 => sps%GetOrbit(p5)
-              if(op5%GetOccupation() > 1.d-6) cycle
-              do h1 = 1, sps%norbs
-                oh1 => sps%GetOrbit(h1)
-                if(oh1%GetOccupation() < 1.d-6) cycle
-                do h2 = 1, sps%norbs
-                  oh2 => sps%GetOrbit(h2)
-                  if(oh2%GetOccupation() < 1.d-6) cycle
+                if(CheckParityZ(op3,op4,op1,op2)) cycle
 
-                  if(CheckParityZ(op1,op2,oh1,oh2)) cycle
+                do p5 = 1, sps%norbs
+                  op5 => sps%GetOrbit(p5)
+                  if(op5%GetOccupation() > 1.d-6) cycle
 
                   do h3 = 1, sps%norbs
                     oh3 => sps%GetOrbit(h3)
@@ -1568,7 +1572,7 @@ contains
     call timer%Add("Fourth order MBPT F13",omp_get_wtime()-ti)
   end function energy_fourth_F13
 
-  function energy_fourth_F14(h) result(r)
+  function energy_fourth_F14_(h) result(r)
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(Orbits), pointer :: sps
@@ -1650,6 +1654,61 @@ contains
     !$omp end do
     !$omp end parallel
     r = vsum / 16.d0
+    call timer%Add("Fourth order MBPT F14",omp_get_wtime()-ti)
+  end function energy_fourth_F14_
+
+  function energy_fourth_F14(h) result(r)
+    type(Ops), intent(in) :: h
+    type(MSPace), pointer :: ms
+    type(TwoBodyChannel), pointer :: ch_two
+    type(Orbits), pointer :: sps
+    type(Ops) :: v_pphh
+    type(DMat) :: m1, m2
+    integer :: ch, ab, a, b, ij, i, j, J2
+    real(8) :: r, ti, v, vsum, denom
+
+    ti = omp_get_wtime()
+    ms => h%ms
+    sps => ms%sps
+    ! intermediate stuffs
+    call v_pphh%init(0,1,0,"v for MBPT",ms,2)
+    do ch = 1, ms%two%NChan
+      m1 = get_pphh_part(h%two%MatCh(ch,ch), h)
+      if(m1%n_row<1 .or. m1%n_col<1) cycle
+      m2 = h%two%MatCh(ch,ch)%get_pppp(ms%sps)
+      if(m2%n_row>0 .and. m2%n_col>0) then
+        call v_pphh%two%MatCh(ch,ch)%set_pphh(ms%sps, m2*m1)
+      end if
+      call m1%fin()
+      call m2%fin()
+    end do
+
+    vsum = 0.d0
+    do ch = 1, ms%two%NChan
+      ch_two => ms%two%jpz(ch)
+      J2 = ch_two%j
+      if(ch_two%n_hh_state < 1) cycle
+      if(ch_two%n_pp_state < 1) cycle
+      v = 0.d0
+      !$omp parallel
+      !$omp do private(ab,a,b,ij,i,j,denom) reduction(+:v)
+      do ab = 1, ch_two%n_pp_state
+        a = ch_two%n2spi1(ch_two%pp_s(ab))
+        b = ch_two%n2spi2(ch_two%pp_s(ab))
+        do ij = 1, ch_two%n_hh_state
+          i = ch_two%n2spi1(ch_two%hh_s(ij))
+          j = ch_two%n2spi2(ch_two%hh_s(ij))
+          denom = 1.d0 / get_denominator2(h,i,j,a,b)
+
+          v = v + v_pphh%two%GetTwBME(i,j,a,b,J2) * &
+              &   v_pphh%two%GetTwBME(a,b,i,j,J2) * denom
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      vsum = vsum + v * dble(2*J2+1)
+    end do
+    r = vsum
     call timer%Add("Fourth order MBPT F14",omp_get_wtime()-ti)
   end function energy_fourth_F14
 
@@ -2016,34 +2075,30 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(op1,op2,oh1,oh2)) cycle
 
-            do p5 = 1, sps%norbs
-              op5 => sps%GetOrbit(p5)
-              if(op5%GetOccupation() > 1.d-6) cycle
-
-              do h1 = 1, sps%norbs
-                oh1 => sps%GetOrbit(h1)
-                if(oh1%GetOccupation() < 1.d-6) cycle
-
-                if(CheckParityZ(oh1,op4,op1,op3)) cycle
-                do h2 = 1, sps%norbs
-                  oh2 => sps%GetOrbit(h2)
-                  if(oh2%GetOccupation() < 1.d-6) cycle
-
-                  if(CheckParityZ(op1,op2,oh1,oh2)) cycle
+              do p3 = 1, sps%norbs
+                op3 => sps%GetOrbit(p3)
+                if(op3%GetOccupation() > 1.d-6) cycle
+                do p4 = 1, sps%norbs
+                  op4 => sps%GetOrbit(p4)
+                  if(op4%GetOccupation() > 1.d-6) cycle
+                  if(CheckParityZ(oh1,op4,op1,op3)) cycle
 
                   do h3 = 1, sps%norbs
                     oh3 => sps%GetOrbit(h3)
                     if(oh3%GetOccupation() < 1.d-6) cycle
-
-                    if(CheckParityZ(op3,op5,op2,oh3)) cycle
-                    if(CheckParityZ(oh2,oh3,op4,op5)) cycle
+                    do p5 = 1, sps%norbs
+                      op5 => sps%GetOrbit(p5)
+                      if(op5%GetOccupation() > 1.d-6) cycle
+                      if(CheckParityZ(op3,op5,op2,oh3)) cycle
+                      if(CheckParityZ(oh2,oh3,op4,op5)) cycle
 
                     J1min = max(abs(op1%j-op2%j), abs(oh1%j-oh2%j))/2
                     J1max = min(   (op1%j+op2%j),    (oh1%j+oh2%j))/2
@@ -2555,33 +2610,29 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(oh1,oh2,op1,op2)) cycle
 
-            do p5 = 1, sps%norbs
-              op5 => sps%GetOrbit(p5)
-              if(op5%GetOccupation() > 1.d-6) cycle
+            do p3 = 1, sps%norbs
+              op3 => sps%GetOrbit(p3)
+              if(op3%GetOccupation() > 1.d-6) cycle
 
-              do h1 = 1, sps%norbs
-                oh1 => sps%GetOrbit(h1)
-                if(oh1%GetOccupation() < 1.d-6) cycle
+              do p5 = 1, sps%norbs
+                op5 => sps%GetOrbit(p5)
+                if(op5%GetOccupation() > 1.d-6) cycle
+                if(CheckParityZ(oh1,oh2,op3,op5)) cycle
 
-                if(CheckParityZ(oh1,op4,op1,op3)) cycle
-                do h2 = 1, sps%norbs
-                  oh2 => sps%GetOrbit(h2)
-                  if(oh2%GetOccupation() < 1.d-6) cycle
-
-                  if(CheckParityZ(oh1,oh2,op1,op2)) cycle
-                  if(CheckParityZ(oh1,oh2,op3,op5)) cycle
-
+                do p4 = 1, sps%norbs
+                  op4 => sps%GetOrbit(p4)
+                  if(op4%GetOccupation() > 1.d-6) cycle
                   do h3 = 1, sps%norbs
                     oh3 => sps%GetOrbit(h3)
                     if(oh3%GetOccupation() < 1.d-6) cycle
-
                     if(CheckParityZ(op3,op4,op1,oh3)) cycle
                     if(CheckParityZ(oh3,op5,op4,op2)) cycle
 
@@ -2810,35 +2861,33 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(oh1,oh2,op1,op2)) cycle
 
-            do p5 = 1, sps%norbs
-              op5 => sps%GetOrbit(p5)
-              if(op5%GetOccupation() > 1.d-6) cycle
+            do h3 = 1, sps%norbs
+              oh3 => sps%GetOrbit(h3)
+              if(oh3%GetOccupation() < 1.d-6) cycle
+              do p5 = 1, sps%norbs
+                op5 => sps%GetOrbit(p5)
+                if(op5%GetOccupation() > 1.d-6) cycle
+                if(CheckParityZ(oh3,oh2,op5,op2)) cycle
 
-              do h1 = 1, sps%norbs
-                oh1 => sps%GetOrbit(h1)
-                if(oh1%GetOccupation() < 1.d-6) cycle
+                do p3 = 1, sps%norbs
+                  op3 => sps%GetOrbit(p3)
+                  if(op3%GetOccupation() > 1.d-6) cycle
 
-                if(CheckParityZ(op5,oh1,op3,op4)) cycle
-
-                do h2 = 1, sps%norbs
-                  oh2 => sps%GetOrbit(h2)
-                  if(oh2%GetOccupation() < 1.d-6) cycle
-
-                  if(CheckParityZ(oh1,oh2,op1,op2)) cycle
-
-                  do h3 = 1, sps%norbs
-                    oh3 => sps%GetOrbit(h3)
-                    if(oh3%GetOccupation() < 1.d-6) cycle
+                  do p4 = 1, sps%norbs
+                    op4 => sps%GetOrbit(p4)
+                    if(op4%GetOccupation() > 1.d-6) cycle
 
                     if(CheckParityZ(op3,op4,oh3,op1)) cycle
-                    if(CheckParityZ(oh3,oh2,op5,op2)) cycle
+                    if(CheckParityZ(op5,oh1,op3,op4)) cycle
+
 
                     J1min = max(abs(op1%j-op2%j), abs(oh1%j-oh2%j))/2
                     J1max = min(   (op1%j+op2%j),    (oh1%j+oh2%j))/2
@@ -3210,27 +3259,25 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(oh1,oh2,op1,op2)) cycle
 
             do p5 = 1, sps%norbs
               op5 => sps%GetOrbit(p5)
               if(op5%GetOccupation() > 1.d-6) cycle
+              if(CheckParityZ(oh1,oh2,op1,op5)) cycle
 
-              do h1 = 1, sps%norbs
-                oh1 => sps%GetOrbit(h1)
-                if(oh1%GetOccupation() < 1.d-6) cycle
-
-                do h2 = 1, sps%norbs
-                  oh2 => sps%GetOrbit(h2)
-                  if(oh2%GetOccupation() < 1.d-6) cycle
-
-                  if(CheckParityZ(oh1,oh2,op1,op2)) cycle
-                  if(CheckParityZ(oh1,oh2,op1,op5)) cycle
+              do p3 = 1, sps%norbs
+                op3 => sps%GetOrbit(p3)
+                if(op3%GetOccupation() > 1.d-6) cycle
+                do p4 = 1, sps%norbs
+                  op4 => sps%GetOrbit(p4)
+                  if(op4%GetOccupation() > 1.d-6) cycle
 
                   do h3 = 1, sps%norbs
                     oh3 => sps%GetOrbit(h3)
@@ -3455,28 +3502,25 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(op1,op2,oh1,oh2)) cycle
 
-            do h1 = 1, sps%norbs
-              oh1 => sps%GetOrbit(h1)
-              if(oh1%GetOccupation() < 1.d-6) cycle
-              do h2 = 1, sps%norbs
-                oh2 => sps%GetOrbit(h2)
-                if(oh2%GetOccupation() < 1.d-6) cycle
+            do h3 = 1, sps%norbs
+              oh3 => sps%GetOrbit(h3)
+              if(oh3%GetOccupation() < 1.d-6) cycle
+              if(CheckParityZ(oh1,oh3,op1,op2)) cycle
 
-                if(CheckParityZ(op1,op2,oh1,oh2)) cycle
-
-                do h3 = 1, sps%norbs
-                  oh3 => sps%GetOrbit(h3)
-                  if(oh3%GetOccupation() < 1.d-6) cycle
-
-                  if(CheckParityZ(oh1,oh3,op1,op2)) cycle
-
+              do p3 = 1, sps%norbs
+                op3 => sps%GetOrbit(p3)
+                if(op3%GetOccupation() > 1.d-6) cycle
+                do p4 = 1, sps%norbs
+                  op4 => sps%GetOrbit(p4)
+                  if(op4%GetOccupation() > 1.d-6) cycle
                   do h4 = 1, sps%norbs
                     oh4 => sps%GetOrbit(h4)
                     if(oh4%GetOccupation() < 1.d-6) cycle
@@ -4019,33 +4063,30 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(op1,op2,oh1,oh2)) cycle
 
-            do h1 = 1, sps%norbs
-              oh1 => sps%GetOrbit(h1)
-              if(oh1%GetOccupation() < 1.d-6) cycle
-              do h2 = 1, sps%norbs
-                oh2 => sps%GetOrbit(h2)
-                if(oh2%GetOccupation() < 1.d-6) cycle
+            do h4 = 1, sps%norbs
+              oh4 => sps%GetOrbit(h4)
+              if(oh4%GetOccupation() < 1.d-6) cycle
+              if(CheckParityZ(oh1,oh4,op1,op2)) cycle
 
-                if(CheckParityZ(op1,op2,oh1,oh2)) cycle
-
-                do h3 = 1, sps%norbs
-                  oh3 => sps%GetOrbit(h3)
-                  if(oh3%GetOccupation() < 1.d-6) cycle
-                  if(CheckParityZ(oh2,oh3,op3,op4)) cycle
-
-                  do h4 = 1, sps%norbs
-                    oh4 => sps%GetOrbit(h4)
-                    if(oh4%GetOccupation() < 1.d-6) cycle
-
+              do p3 = 1, sps%norbs
+                op3 => sps%GetOrbit(p3)
+                if(op3%GetOccupation() > 1.d-6) cycle
+                do p4 = 1, sps%norbs
+                  op4 => sps%GetOrbit(p4)
+                  if(op4%GetOccupation() > 1.d-6) cycle
+                  do h3 = 1, sps%norbs
+                    oh3 => sps%GetOrbit(h3)
+                    if(oh3%GetOccupation() < 1.d-6) cycle
+                    if(CheckParityZ(oh2,oh3,op3,op4)) cycle
                     if(CheckParityZ(op3,op4,oh4,oh3)) cycle
-                    if(CheckParityZ(oh1,oh4,op1,op2)) cycle
 
                     J1min = max(abs(op1%j-op2%j), abs(oh1%j-oh2%j), abs(oh1%j-oh4%j))/2
                     J1max = min(   (op1%j+op2%j),    (oh1%j+oh2%j),    (oh1%j+oh4%j))/2
@@ -4144,31 +4185,28 @@ contains
       do p2 = 1, sps%norbs
         op2 => sps%GetOrbit(p2)
         if(op2%GetOccupation() > 1.d-6) cycle
-        do p3 = 1, sps%norbs
-          op3 => sps%GetOrbit(p3)
-          if(op3%GetOccupation() > 1.d-6) cycle
-          do p4 = 1, sps%norbs
-            op4 => sps%GetOrbit(p4)
-            if(op4%GetOccupation() > 1.d-6) cycle
+        do h1 = 1, sps%norbs
+          oh1 => sps%GetOrbit(h1)
+          if(oh1%GetOccupation() < 1.d-6) cycle
+          do h2 = 1, sps%norbs
+            oh2 => sps%GetOrbit(h2)
+            if(oh2%GetOccupation() < 1.d-6) cycle
+            if(CheckParityZ(op1,op2,oh1,oh2)) cycle
 
-            do h1 = 1, sps%norbs
-              oh1 => sps%GetOrbit(h1)
-              if(oh1%GetOccupation() < 1.d-6) cycle
-              do h2 = 1, sps%norbs
-                oh2 => sps%GetOrbit(h2)
-                if(oh2%GetOccupation() < 1.d-6) cycle
+            do p4 = 1, sps%norbs
+              op4 => sps%GetOrbit(p4)
+              if(op4%GetOccupation() > 1.d-6) cycle
+              if(CheckParityZ(op1,op4,oh1,oh2)) cycle
 
-                if(CheckParityZ(op1,op2,oh1,oh2)) cycle
-                if(CheckParityZ(op1,op4,oh1,oh2)) cycle
-
+              do p3 = 1, sps%norbs
+                op3 => sps%GetOrbit(p3)
+                if(op3%GetOccupation() > 1.d-6) cycle
                 do h3 = 1, sps%norbs
                   oh3 => sps%GetOrbit(h3)
                   if(oh3%GetOccupation() < 1.d-6) cycle
-
                   do h4 = 1, sps%norbs
                     oh4 => sps%GetOrbit(h4)
                     if(oh4%GetOccupation() < 1.d-6) cycle
-
                     if(CheckParityZ(oh3,oh4,op4,op3)) cycle
                     if(CheckParityZ(op2,op3,oh3,oh4)) cycle
 
