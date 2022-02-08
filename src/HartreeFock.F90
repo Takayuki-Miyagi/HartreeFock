@@ -2452,19 +2452,50 @@ contains
   subroutine WriteTransformationMatrix(this,filename)
     class(HFSolver), intent(in) :: this
     character(*), intent(in) :: filename
+    type(MSpace), pointer :: ms
     type(Orbits), pointer :: sps
-    integer :: a, b, wunit=20
+    integer :: ch, a, b, nb, wunit=20
+    type(SingleParticleOrbit), pointer :: op
     real(8) :: me
+    real(8), allocatable :: wf(:)
+    type(OneBodyPart) :: F_HF
     sps => this%ms%sps
-    open(wunit, file=filename, status="replace")
-    write(wunit,"(a)") "#  a,  b,            Occ_a,            Occ_b,        ( HO|HF )"
-    do a = 1, sps%norbs
-      do b = 1, sps%norbs
-        me = this%C%GetOBME(a,b)
-        if( abs(me) < 1.d-8 ) cycle
-        write(wunit,"(2i4,3es18.8)") a,b,this%ms%NOCoef(a),this%ms%NOCoef(b),me
-      end do
+    ms => this%ms
+    F_HF = this%F
+    do ch = 1, ms%one%NChan
+      F_HF%MatCh(ch,ch)%DMat = this%C%MatCh(ch,ch)%DMat%T() * &
+          &  this%F%MatCh(ch,ch)%DMat * this%C%MatCh(ch,ch)%DMat
     end do
+    ! Oakridge
+    !open(wunit, file=filename, status="replace")
+    !write(wunit,"(a)") "#  a,  b,            Occ_a,            Occ_b,        ( HO|HF )"
+    !do a = 1, sps%norbs
+    !  do b = 1, sps%norbs
+    !    op => sps%GetOrbit(a)
+    !    oq => sps%GetOrbit(b)
+    !    me = this%C%GetOBME(a,b)
+    !    if( abs(me) < 1.d-12 ) cycle
+    !    write(wunit,"(2i4,3es18.8)") a,b,this%ms%NOCoef(a),this%ms%NOCoef(b),me ! For Oakridge group
+    !  end do
+    !end do
+    !close(wunit)
+
+    ! Darmstadt
+    open(wunit, file=filename, status="replace")
+    write(wunit,"(a)") "#  idx,  n,  l,  j, tz,   SPE,  Occ,  wf"
+    allocate(wf(this%ms%emax/2+1))
+    do a = 1, sps%norbs
+      wf(:) = 0.d0
+      op => sps%GetOrbit(a)
+      do nb = 0, this%ms%emax/2
+        if(2*nb + op%l > this%ms%emax) cycle
+        b = sps%nljz2idx(nb,op%l,op%j,op%z)
+        wf(nb+1) = this%C%GetOBME(b,a)
+      end do
+      !write(*,"(5i4,100es18.8)") a, op%n, op%l, op%j, op%z, F_HF%GetOBME(a,a), this%ms%NOCoef(a), wf
+      write(wunit,"(5i4,100es18.8)") a, op%n, op%l, op%j, op%z, F_HF%GetOBME(a,a), this%ms%NOCoef(a), wf
+    end do
+    deallocate(wf)
     close(wunit)
   end subroutine WriteTransformationMatrix
 

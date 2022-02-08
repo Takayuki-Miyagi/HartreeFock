@@ -186,6 +186,7 @@ program HFMain
     htr = HF%BasisTransform(h,NOXB=p%NOXB)
     call PTd%init(HF, htr, p%EN_denominator)
     HF%C = PTd%C_HO2NAT
+    if( p%TransFileName /= "none") call HF%WriteTransformationMatrix(p%TransFileName)
     select case(p%density_matrix_file)
     case("", "none", "NONE", "None")
       if(p%is_Op_out) then

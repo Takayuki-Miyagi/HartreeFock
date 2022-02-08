@@ -5,7 +5,7 @@
 # -heap-arrays option is needed for built in transpose function with
 #  large dimension matrix
 #--------------------------------------------------
-TARGET=HartreeFock
+TARGET=HartreeFock_half
 INSTLDIR=$(HOME)/bin
 EXEDIR=$(PWD)/exe
 MODDIR = mod
@@ -13,6 +13,7 @@ MPI=off
 Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q oak; then echo oak; \
   elif hostname|grep -q cedar; then echo cedar; \
+  elif hostname|grep -q strongint; then echo strongint; \
   else echo other; fi)
 HOST=$(strip $(Host))
 DEBUG_MODE=off
@@ -118,6 +119,31 @@ ifeq ($(DEBUG_MODE),on)
   #DFLAGS+=-DTwoBodyOperatorDebug
 endif
 
+#--------------------------------------------------
+# Strongint cluster
+#--------------------------------------------------
+ifeq ($(strip $(HOST)),strongint)
+  FC=gfortran 
+  #LFLAGS+= -I/usr/local/include -L/usr/local/lib -I/usr/lib64/gfortran/modules
+  LFLAGS+= -lblas -llapack -lz -lgsl -lgslcblas
+  FFLAGS= -O3
+  FFLAGS+= -fopenmp -fdec-math
+  ifeq ($(compact_no2b),on)
+    FFLAGS+= -Dcompact_no2b_format
+  endif
+  ifeq ($(strip $(TARGET)),HartreeFock_half) 
+    FFLAGS+= -Dhalf_precision_three_body_file
+  endif
+  DFLAGS+= -Wall
+  ifeq ($(DEBUG_MODE),on)
+    DFLAGS+= -pedantic -fbounds-check -O -Wuninitialized -fbacktrace
+    #FDFLAGS+=-ffpe-trap=invalid,zero,overflow # Note: gsl larguerre signal
+    ifneq ($(OS), OSX)
+      DFLAGS+= -pg -g
+    endif
+  endif
+  LINT= -fdefault-integer-8
+endif
 
 
 #--------------------------------------------------
@@ -176,6 +202,10 @@ ifeq ($(strip $(HOST)),other)
   MODOUT=-J$(MODDIR)
 endif
 
+ifeq ($(strip $(HOST)),strongint)
+  MODOUT=-J$(MODDIR)
+endif
+
 ifeq ($(strip $(HOST)),apt)
   MODOUT=-module $(MODDIR)
 endif
@@ -220,7 +250,7 @@ $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.c
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f
 	$(FC) $(FFLAGS) $(MODOUT) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f90
-	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -fallow-argument-mismatch -o $@ -c $<
+	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.F90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 
