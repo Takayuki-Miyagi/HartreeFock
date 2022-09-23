@@ -10,6 +10,9 @@ module HFInput
     integer :: emax
     integer :: lmax
     integer :: e2max
+    integer :: emax_mbpt
+    integer :: lmax_mbpt
+    integer :: e2max_mbpt
     integer :: e3max
     integer :: NOXB
     real(8) :: hw
@@ -70,6 +73,9 @@ contains
     integer :: e2max=-1
     integer :: e3max=-1
     integer :: lmax=-1
+    integer :: emax_mbpt=-1
+    integer :: e2max_mbpt=-1
+    integer :: lmax_mbpt=-1
     integer :: NOXB=2
     real(8) :: hw=20.d0
     real(8) :: beta_cm = 0.d0 ! lowson's cm parameter, H => H + beta_cm * Hcm in the unit of MeV
@@ -126,7 +132,7 @@ contains
         & OpFileName, is_Atomic, Core, valence_list, is_NAT, &
         & type_3n_file, is_4th_order, density_matrix_file, emax_1n, lmax_1n, &
         & EN_denominator, dynamic_reference, iter_method, iter_n_history, HO_reference, &
-        & find_optimal_frequency, TransFileName, NOXB
+        & find_optimal_frequency, TransFileName, NOXB, emax_mbpt, e2max_mbpt, lmax_mbpt
 
     open(118, file=inputfile, action='read', iostat=io)
     if(io /= 0) then
@@ -141,6 +147,9 @@ contains
     if(e2max == -1) this%e2max = 2*emax
     this%e3max = e3max
     if(e3max == -1) this%e3max = 3*emax
+    this%emax_mbpt = emax_mbpt
+    this%e2max_mbpt = e2max_mbpt
+    this%lmax_mbpt = lmax_mbpt
     this%NOXB = NOXB
     this%hw = hw
     this%alpha = alpha
@@ -191,6 +200,9 @@ contains
     if(lmax_1n == -1) this%lmax_1n = emax_1n
     if(lmax_nn == -1) this%lmax_nn = emax_nn
     if(lmax_3n == -1) this%lmax_3n = emax_3n
+    if(emax_mbpt == -1) this%emax_mbpt = this%emax
+    if(e2max_mbpt == -1) this%e2max_mbpt = 2*this%emax_mbpt
+    if(lmax_mbpt == -1) this%lmax_mbpt = this%emax_mbpt
 
     call s%split(optrs, ',', this%Ops)
     call s%split(files_nn, ',', this%files_nn)
@@ -232,6 +244,12 @@ contains
         & this%emax, ", e2max =", this%e2max, &
         & ", e3max =", this%e3max, ", lmax =", this%lmax
     write(iut,'(a,f8.3,a)') "#  HO basis parameter hw = ", this%hw, " MeV"
+    if(this%emax /= this%emax_mbpt) then
+      write(iut,'(a)') "#"
+      write(iut,'(a,i3,a,i3,a,i3)') "#  Model space for MBPT: emax =", &
+          & this%emax_mbpt, ", e2max =", this%e2max_mbpt, &
+          & ", lmax =", this%lmax_mbpt
+    end if
 
     write(iut,'(a)') "#"
     write(iut,'(a)') "#  NN files:"

@@ -11,7 +11,7 @@ program HFMain
   use Atomic
   implicit none
   type(InputParameters) :: p
-  type(MSpace) :: ms
+  type(MSpace) :: ms, msNAT
   type(Ops) :: h, opr, htr, Rho
   type(HFSolver) :: HF
   type(MBPTEnergy) :: PT
@@ -208,6 +208,29 @@ program HFMain
       end if
     end select
     htr = HF%BasisTransform(h,NOXB=p%NOXB)
+    call htr%UnNormalOrdering2B()
+
+    call msNAT%init(Nucl=ms%Nucl, Core=ms%Core, hw=ms%hw, emax=p%emax_mbpt, e2max=p%e2max_mbpt, e3max=0)
+    h = htr%truncate(msNAT)
+
+    call HF%fin()
+    call HF%init(h,alpha=p%alpha)
+    call HF%solve()
+    if(p%is_MBPT) then
+        htr = HF%BasisTransform(h,NOXB=p%NOXB)
+        call PT%calc(htr, p%is_4th_order, p%EN_denominator)
+        write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
+        write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
+        write(wunit,'(a,f12.6)') "# min( e_p ) - max( e_h ) = ", PT%energy_gap
+        if(max(PT%perturbativity1b, PT%perturbativity2b) > 1.d0 .or. PT%energy_gap < 0.d0) then
+          write(wunit,'(a)') "# MBPT might be dengerous! "
+        end if
+        write(wunit,'(a,11x,a,6x,a,9x,a,9x,a,13x,a)') &
+            & "#", "Operator", "Ref. exp. val.", "MBPT LO", "MBPT NLO", "Total"
+        write(wunit,'(a20,4f18.8)') 'hamil', PT%e_0, PT%e_2, PT%e_3, &
+            & PT%e_0+PT%e_2+PT%e_3
+      end if
+
   end if
 
   if(p%is_Op_out) then

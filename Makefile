@@ -5,7 +5,7 @@
 # -heap-arrays option is needed for built in transpose function with
 #  large dimension matrix
 #--------------------------------------------------
-TARGET=HartreeFock_half
+TARGET=HartreeFock
 INSTLDIR=$(HOME)/bin
 EXEDIR=$(PWD)/exe
 MODDIR = mod
@@ -39,7 +39,7 @@ LINT=    # 8-byte integer
 #--------------------------------------------------
 ifeq ($(strip $(HOST)),other)
   FDEP=makedepf90
-  FC=gfortran
+  FC=gfortran -fallow-argument-mismatch # if GCC version > 10.xx
   ifeq ($(OS), OSX)
     LFLAGS+= -I/usr/local/include -L/usr/local/lib
   endif
