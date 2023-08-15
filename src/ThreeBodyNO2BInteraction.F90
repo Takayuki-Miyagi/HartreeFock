@@ -945,11 +945,7 @@ contains
           if(e2 + e3 > e2max) cycle
           if(e1 + e2 + e3 > e3max) cycle
           P123 = (-1) ** (l1+l2+l3)
-#ifdef compact_no2b_format
           do i4 = 1, i1
-#else
-          do i4 = 1, spsf%norbs
-#endif
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
             e4 = spsf%orb(i4)%e
@@ -1047,11 +1043,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-#ifdef compact_no2b_format
           do i4 = 1, i1
-#else
-          do i4 = 1, spsf%norbs
-#endif
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1216,11 +1208,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-#ifdef compact_no2b_format
           do i4 = 1, i1
-#else
-          do i4 = 1, spsf%norbs
-#endif
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j
@@ -1415,11 +1403,7 @@ contains
           if(e1 + e2 + e3 > e3max) cycle
 
           P123 = (-1) ** (l1+l2+l3)
-#ifdef compact_no2b_format
           do i4 = 1, i1
-#else
-          do i4 = 1, spsf%norbs
-#endif
             n4 = spsf%orb(i4)%n
             l4 = spsf%orb(i4)%l
             j4 = spsf%orb(i4)%j

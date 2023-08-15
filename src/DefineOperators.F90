@@ -39,7 +39,7 @@ contains
     case('hamil', 'Hamil', "HOHamil", "Hohamil", 'hohamil' ,&
           & 'Hcm','HCM','RM2', 'Rm2', "rm2", &
           & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2',"DenMat",&
-          & "Tkin", "tkin")
+          & "Tkin", "tkin", 'Rp2so', 'rp2so')
       jr = 0
       pr = 1
       zr = 0
@@ -138,6 +138,18 @@ contains
       r = r * hc ** 2 / (amnucl * hw)
       return
 
+    case("Rp2so", "rp2so")
+      if(la /= lb) return
+      if(ja /= jb) return
+      if(za /= zb) return
+      if(na /= nb) return
+      if(ja == 2*la-1) r = dble(la)
+      if(ja == 2*la+1) r =-dble(la+1)
+      if(za == -1) r = (r+1.d0) * 1.79d0
+      if(za ==  1) r = (r+1.d0) * (-1.91d0)
+      r = (-1.d0) * r * hc**2 / ((amp+amn)*0.5d0)**2 / dble(Z)
+
+
     case("Rn2","RN2", "rn2")
       if(la /= lb) return
       if(ja /= jb) return
@@ -216,6 +228,9 @@ contains
       if(Zab ==  1) r =  2.d0 * r_dot_r(ia,ib,ic,id,Jab) / dble(A)**2
       amnucl = (amp + amn) * 0.5d0
       r = r * hc**2 / (amnucl*hw)
+      return
+
+    case("Rp2so", "rp2so")
       return
 
     case('Rn2', 'RN2', 'rn2')

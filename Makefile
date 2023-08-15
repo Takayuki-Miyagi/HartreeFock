@@ -17,7 +17,6 @@ Host= $(shell if hostname|grep -q apt1; then echo apt; \
   else echo other; fi)
 HOST=$(strip $(Host))
 DEBUG_MODE=off
-compact_no2b=on
 
 OS = Linux
 ifneq (,$(findstring arwin,$(shell uname)))
@@ -50,9 +49,6 @@ ifeq ($(strip $(HOST)),other)
   FFLAGS+= -Dsingle_precision_three_body_file
   #FFLAGS+= -Dhalf_precision_three_body_file
   #FFLAGS+= -ff2c # for dot product (LinAlgf90)
-  ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b_format
-  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-Wall -pedantic -fbounds-check -O -Wuninitialized -fbacktrace
     #FDFLAGS+=-ffpe-trap=invalid,zero,overflow # Note: gsl larguerre signal
@@ -71,9 +67,6 @@ ifeq ($(strip $(HOST)),apt)
   FFLAGS=-O3 -heap-arrays -static
   FFLAGS+= -openmp
   FFLAGS+= -Dsingle_precision_three_body_file
-  ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b_format
-  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
   endif
@@ -89,9 +82,6 @@ ifeq ($(strip $(HOST)),oak)
   FFLAGS=-O3 -heap-arrays
   FFLAGS+= -qopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
-  ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b_format
-  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
   endif
@@ -106,9 +96,6 @@ ifeq ($(strip $(HOST)),cedar)
   FFLAGS=-O3 -heap-arrays
   FFLAGS+= -qopenmp
   FFLAGS+= -Dsingle_precision_three_body_file
-  ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b_format
-  endif
   ifeq ($(DEBUG_MODE),on)
     DFLAGS+=-check all
   endif
@@ -123,15 +110,12 @@ endif
 # Strongint cluster
 #--------------------------------------------------
 ifeq ($(strip $(HOST)),strongint)
-  FC=gfortran 
+  FC=gfortran
   #LFLAGS+= -I/usr/local/include -L/usr/local/lib -I/usr/lib64/gfortran/modules
   LFLAGS+= -lblas -llapack -lz -lgsl -lgslcblas
   FFLAGS= -O3
   FFLAGS+= -fopenmp -fdec-math
-  ifeq ($(compact_no2b),on)
-    FFLAGS+= -Dcompact_no2b_format
-  endif
-  ifeq ($(strip $(TARGET)),HartreeFock_half) 
+  ifeq ($(strip $(TARGET)),HartreeFock_half)
     FFLAGS+= -Dhalf_precision_three_body_file
   endif
   DFLAGS+= -Wall
