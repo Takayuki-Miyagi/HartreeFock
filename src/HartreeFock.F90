@@ -110,6 +110,14 @@ module HartreeFock
     procedure :: BasisTransTensor
     procedure :: WriteTransformationMatrix
     procedure :: ReadTransformationMatrix
+    procedure :: OccVecToOcc
+    procedure :: OccToOccVec
+    procedure :: ParticleNumberFromOcc
+    procedure :: ParticleNumberFromOccVec
+    procedure :: OptimizeOccupation
+    procedure :: CalcEnergyFromOccVec
+    procedure :: GetSPIndices
+    procedure :: GetSPEs
   end type HFSolver
   type(Optimizer), private :: opt
 contains
@@ -216,17 +224,17 @@ contains
         &  this%e2, this%e3,this%ehf
     do iter = 1, this%n_iter_max
       call this%DiagonalizeFockMatrix()
-      if(iter > 5 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
       call this%UpdateDensityMatrix(iter)
       call this%UpdateFockMatrix()
+      call this%DiagonalizeFockMatrix()
 
       call this%CalcEnergy()
-
       write(*,'(2x,i4,5f18.6)') iter, this%e0, this%e1, &
           &  this%e2, this%e3,this%ehf
+      if(iter > 10 .and. this%dynamic_reference) call this%OptimizeOccupation()
+      !if(iter > 10 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
 
       if(this%tol > opt%r) exit
-
       if(iter == this%n_iter_max) then
         write(*,'(a,i5,a)') "Hartree-Fock iteration does not converge after ", &
             & this%n_iter_max, " iterations"
@@ -259,8 +267,9 @@ contains
       end do
       call this%ms%InitSubSpace()
     end if
-
     call opt%fin()
+    write(*,'(a6,f8.2,a6,f8.2)') "Z: ", this%ParticleNumberFromOcc(this%Occ, -1), &
+        & "N: ", this%ParticleNumberFromOcc(this%Occ, 1)
     call timer%Add("Hartree-Fock iteration",omp_get_wtime() - ti)
   end subroutine SolveHFSolver
 
@@ -1224,6 +1233,22 @@ contains
     this%ehf = this%e0 + this%e1 + this%e2 + this%e3
   end subroutine CalcEnergy
 
+  function CalcEnergyFromOccVec(this, occ) result(Ehf)
+    class(HFSolver), intent(inout) :: this
+    real(8), intent(in) :: occ(:)
+    real(8) :: Ehf
+    integer :: i
+    do i = 1, this%ms%sps%norbs
+      call this%Occ%SetOBME(i,i,occ(i))
+    end do
+    call this%UpdateDensityMatrixFromCoef()
+    call this%UpdateFockMatrix()
+    call this%DiagonalizeFockMatrix()
+    call this%UpdateDensityMatrixFromCoef()
+    call this%CalcEnergy()
+    Ehf = this%ehf
+  end function CalcEnergyFromOccVec
+
   subroutine DiagonalizeFockMatrix(this)
     class(HFSolver), intent(inout) :: this
     type(EigenSolSymD) :: sol
@@ -1470,6 +1495,63 @@ contains
     end do
     call Fold%fin()
   end subroutine UpdateFockMatrix
+
+  function GetSPIndices(this, pn, ph) result(idx)
+    class(HFSolver), intent(in) :: this
+    integer, optional, intent(in) :: pn, ph
+    type(MSpace), pointer :: ms
+    integer :: ndim, i
+    type(SingleParticleOrbit), pointer :: o => null()
+    integer, allocatable :: idx(:)
+    integer :: particle_hole, proton_neutron
+    proton_neutron=  0
+    particle_hole = -1
+    if(present(pn)) proton_neutron = pn
+    if(present(ph)) particle_hole  = ph
+    ms => this%ms
+    ndim = 0
+    do i = 1, ms%sps%norbs
+      o => ms%sps%GetOrbit(i)
+     if(proton_neutron/= 0 .and. proton_neutron/=o%z) cycle
+     if(particle_hole /=-1 .and. particle_hole/=o%GetHoleParticle()) cycle
+     ndim = ndim + 1
+    end do
+
+    allocate(idx(ndim))
+    ndim = 0
+    do i = 1, ms%sps%norbs
+      o => ms%sps%GetOrbit(i)
+      if(proton_neutron/= 0 .and. proton_neutron/=o%z) cycle
+      if(particle_hole /=-1 .and. particle_hole/=o%GetHoleParticle()) cycle
+      ndim = ndim + 1
+      idx(ndim) = i
+    end do
+  end function GetSPIndices
+
+  function GetSPEs(this, pn, ph) result(spes)
+    class(HFSolver), intent(in) :: this
+    integer, optional, intent(in) :: pn, ph
+    type(MSpace), pointer :: ms
+    integer :: ndim
+    integer :: e, g, j, l, n, iop, ion
+    integer :: i, io, ch, z
+    type(OneBodyPart) :: F_HF
+    type(SingleParticleOrbit), pointer :: o => null()
+    real(8), allocatable :: spes(:)
+    integer, allocatable :: idx(:)
+    ms => this%ms
+    F_HF = this%F
+    do ch = 1, ms%one%NChan
+      F_HF%MatCh(ch,ch)%DMat = this%C%MatCh(ch,ch)%DMat%T() * &
+          &  this%F%MatCh(ch,ch)%DMat * this%C%MatCh(ch,ch)%DMat
+    end do
+
+    idx = this%GetSPIndices(pn, ph)
+    allocate(spes(size(idx)))
+    do i = 1, size(idx)
+      spes(i) = F_HF%GetOBME(idx(i),idx(i))
+    end do
+  end function GetSPEs
 
   subroutine PrintSPEs(this,iunit)
     class(HFSolver), intent(in) :: this
@@ -2534,6 +2616,255 @@ contains
     call this%UpdateDensityMatrixFromCoef()
     call this%UpdateFockMatrix()
   end subroutine ReadTransformationMatrix
+
+  function OccVecToOcc(this, occ) result(occ_op)
+    class(HFSolver), intent(inout) :: this
+    real(8), intent(in) :: occ(:)
+    type(OneBodyPart) :: occ_op
+    type(SingleParticleOrbit), pointer :: o=>null()
+    integer :: i
+    call this%Occ%init(this%ms%one, .true., 'Occ',     0, 1, 0)
+    do i = 1, this%ms%sps%norbs
+      o => this%ms%sps%GetOrbit(i)
+      call occ_op%SetOBME(i,i,occ(i))
+    end do
+  end function OccVecToOcc
+
+  function OccToOccVec(this, occ_op) result(occ)
+    class(HFSolver), intent(inout) :: this
+    type(OneBodyPart), intent(in) :: occ_op
+    real(8), allocatable :: occ(:)
+    integer :: i
+    allocate(occ(this%ms%sps%norbs))
+    occ(:) = 0.d0
+    do i = 1, this%ms%sps%norbs
+      occ(i) = occ_op%GetOBME(i,i)
+    end do
+  end function OccToOccVec
+
+  function ParticleNumberFromOccVec(this, occ, pn) result(N)
+    class(HFSolver), intent(inout) :: this
+    real(8), intent(in) :: occ(:)
+    integer, intent(in) :: pn
+    real(8) :: N
+    integer :: i
+    type(SingleParticleOrbit), pointer :: o=>null()
+    N = 0.d0
+    do i = 1, this%ms%sps%norbs
+      o => this%ms%sps%GetOrbit(i)
+      if(pn /= o%z) cycle
+      N = N + dble(o%j + 1) * occ(i)
+    end do
+  end function ParticleNumberFromOccVec
+
+  function ParticleNumberFromOcc(this, occ, pn) result(N)
+    class(HFSolver), intent(inout) :: this
+    type(OneBodyPart), intent(in) :: occ
+    integer, intent(in) :: pn
+    real(8) :: N
+    integer :: i
+    type(SingleParticleOrbit), pointer :: o=>null()
+    N = 0.d0
+    do i = 1, this%ms%sps%norbs
+      o => this%ms%sps%GetOrbit(i)
+      if(pn /= o%z) cycle
+      N = N + dble(o%j + 1) * occ%GetOBME(i,i)
+    end do
+  end function ParticleNumberFromOcc
+
+  subroutine OptimizeOccupation(this)
+    class(HFSolver), intent(inout) :: this
+    real(8), allocatable :: xn(:,:), tmp(:,:)
+    real(8), allocatable :: xo(:)
+    real(8), allocatable :: xr(:)
+    real(8), allocatable :: xe(:)
+    real(8), allocatable :: xc(:)
+    real(8), allocatable :: fs(:)
+    real(8), allocatable :: occ_original(:)
+    type(SingleParticleOrbit), pointer :: o=>null()
+    real(8) :: lambda, alpha, gam, rho, sigma, mul
+    real(8) :: fr, fe, fc
+    integer, allocatable :: sort_idx(:)
+    integer :: i, j, cnt, iter, ndim, norbs
+    real(8) :: f_old
+    real(8), parameter :: tol = 1.d-8, Egap = 5.d0
+    integer, allocatable :: p_holes(:), p_particles(:), n_holes(:), n_particles(:)
+    integer, allocatable :: idx_to_hp(:,:)
+
+    p_holes = select_orbits(-1, 0, Egap)
+    n_holes = select_orbits( 1, 0, Egap)
+    p_particles = select_orbits(-1, 1, Egap)
+    n_particles = select_orbits( 1, 1, Egap)
+    if(size(p_particles) + size(n_particles)==0) return
+    ndim = size(p_holes) * size(p_particles) + size(n_holes) * size(n_particles)
+    norbs = this%ms%sps%norbs
+    allocate(xn(norbs, ndim+1), tmp(norbs, ndim+1))
+    allocate(xo(norbs), xr(norbs), xe(norbs), xc(norbs), fs(ndim+1))
+    allocate(occ_original(norbs))
+    allocate(sort_idx(ndim+1))
+    allocate(idx_to_hp(2,ndim))
+    lambda = 1.d0; alpha = 1.d0; gam = 2.0d0; rho = 0.5d0; sigma = 0.5d0
+    mul = 1.d6
+
+    cnt = 0
+    do i = 1, size(p_holes)
+      do j = 1, size(p_particles)
+        cnt = cnt + 1
+        idx_to_hp(1,cnt) = p_holes(i)
+        idx_to_hp(2,cnt) = p_particles(j)
+      end do
+    end do
+
+    do i = 1, size(n_holes)
+      do j = 1, size(n_particles)
+        cnt = cnt + 1
+        idx_to_hp(1,cnt) = n_holes(i)
+        idx_to_hp(2,cnt) = n_particles(j)
+      end do
+    end do
+
+    xn(:,:) = 0.d0
+    do i = 1, norbs
+      o => this%ms%sps%GetOrbit(i)
+      xn(i,1) = o%GetOccupation()
+      occ_original(i) = o%GetOccupation()
+    end do
+
+    do i = 1, ndim
+      xn(:,i+1) = xn(:,1) + lambda * delta_occ_vec(idx_to_hp(1,i), idx_to_hp(2,i), xn(idx_to_hp(1,i),1))
+    end do
+
+    do i = 1, ndim+1
+      fs(i) = ObjectFunction(xn(:,i))
+    end do
+
+    f_old = mul
+    ! Nelder-Mead
+    do iter = 1, 1000
+      sort_idx = sort(fs)
+      if(iter > ndim .and. abs(fs(sort_idx(1)) - f_old) < tol) exit
+      tmp(:,:) = xn(:,:)
+      do i = 1, ndim+1
+        xn(:,i) = tmp(:,sort_idx(i))
+      end do
+
+      do i = 1, norbs
+        xo(i) = sum(xn(i,1:ndim)) / dble(ndim)
+      end do
+      xr(:) = xo(:) + alpha * (xo(:) - xn(:,ndim+1))
+      fr = ObjectFunction(xr)
+      if(fr >= fs(sort_idx(1)) .and. fr < fs(ndim)) then ! reflection
+        xn(:,ndim+1) = xr(:)
+      else if (fr < fs(sort_idx(1))) then ! expansion
+        xe(:) = xo(:) + gam * (xr(:) - xo(:))
+        fe = ObjectFunction(xe)
+        if(fe < fr) then
+          xn(:,ndim+1) = xe
+        else
+          xn(:,ndim+1) = xr
+        end if
+      else ! contraction
+        xc(:) = xo(:) + rho * (xn(:,ndim+1) - xo(:))
+        fc = ObjectFunction(xc)
+        if(fc < fs(ndim+1)) then
+          xn(:,ndim+1) = xc(:)
+        else
+          do i = 1, ndim
+            xn(:,i+1) = xn(:,1) + sigma * (xn(:,i+1) - xn(:,1))
+          end do
+        end if
+      end if
+      do i = 1, ndim+1
+        fs(i) = ObjectFunction(xn(:,i))
+      end do
+      f_old = fs(sort_idx(1))
+    end do
+    call this%SetOccupationMatrix(xn(:,sort_idx(1)))
+    call this%UpdateDensityMatrixFromCoef()
+    do i = 1, this%ms%sps%norbs ! print hole states
+      o => this%ms%sps%GetOrbit(i)
+      call o%SetOccupation(this%Occ%GetOBME(i,i))
+      this%ms%NOcoef(i) = o%GetOccupation()
+      call o%SetOccupation(this%ms%NOcoef(i))
+    end do
+    call this%ms%GetParticleHoleOrbits()
+    call this%ms%SetEFermi()
+    call this%CalcEnergy()
+  contains
+    function ObjectFunction(occ) result(f)
+      real(8), intent(in) :: occ(:)
+      real(8) :: f
+      integer :: i
+      f = this%CalcEnergyFromOccVec(occ)
+      f = f + &
+          & mul * abs(this%ms%Z - this%ParticleNumberFromOccVec(occ,-1)) + &
+          & mul * abs(this%ms%N - this%ParticleNumberFromOccVec(occ, 1))
+      do i = 1, this%ms%sps%norbs
+        if(occ(i) < 0.d0) f = f - mul * occ(i)
+        if(occ(i) > 1.d0) f = f + mul * (occ(i) - 1.d0)
+      end do
+    end function ObjectFunction
+
+    function sort(vec) result(idx)
+      real(8), intent(inout) :: vec(:)
+      integer, allocatable :: idx(:)
+      integer :: lsup, bubble, j
+      real(8) :: vmax
+      real(8), allocatable :: temp(:)
+      allocate(idx(size(vec)), temp(size(vec)))
+      temp = vec
+      do j = 1, size(temp)
+        vmax = maxval(vec) + 1.d4
+        idx(j) = minloc(temp, size(temp))
+        temp(idx(j)) = vmax
+      end do
+    end function sort
+
+    function select_orbits(pn,ph,delta) result(idx_orbits)
+      integer, intent(in) :: pn, ph
+      real(8), intent(in) :: delta
+      integer, allocatable :: idx_orbits(:)
+      real(8), allocatable :: spes(:), spe_holes(:)
+      real(8) :: Efermi
+      integer :: i, n_orbs
+      type(SingleParticleOrbit), pointer :: o => null()
+
+      spes = this%GetSPEs()
+      spe_holes = this%GetSPEs(pn,0)
+      Efermi = maxval(spe_holes)
+      n_orbs = 0
+      do i = 1, size(spes)
+        o => this%ms%sps%GetOrbit(i)
+        if(ph==o%GetHoleParticle() .and. abs(Efermi-spes(i))<delta .and. o%z==pn) n_orbs = n_orbs + 1
+      end do
+      allocate(idx_orbits(n_orbs))
+      n_orbs = 0
+      do i = 1, size(spes)
+        o => this%ms%sps%GetOrbit(i)
+        if(ph==o%GetHoleParticle() .and. abs(Efermi-spes(i))<delta .and. o%z==pn) then
+          n_orbs = n_orbs + 1
+          idx_orbits(n_orbs) = i
+        end if
+      end do
+    end function select_orbits
+
+    function delta_occ_vec(hole, particle, nprob) result(docc)
+      integer, intent(in) :: hole, particle
+      real(8), intent(in) :: nprob
+      real(8), allocatable :: docc(:)
+      real(8) :: num
+      type(SingleParticleOrbit), pointer :: oh => null()
+      type(SingleParticleOrbit), pointer :: op => null()
+      allocate(docc(this%ms%sps%norbs))
+      docc(:) = 0.d0
+      oh => this%ms%sps%GetOrbit(hole)
+      op => this%ms%sps%GetOrbit(particle)
+      num = min(dble(oh%j+1) * nprob, dble(op%j+1))
+      docc(hole) = -num / dble(oh%j + 1)
+      docc(particle) = num / dble(op%j + 1)
+    end function delta_occ_vec
+
+  end subroutine OptimizeOccupation
 end module HartreeFock
 
 !program test

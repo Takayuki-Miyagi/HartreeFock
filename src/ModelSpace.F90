@@ -286,7 +286,7 @@ contains
     end do
     do i = 1, this%sps%norbs ! print valence states
       o => this%sps%GetOrbit(i)
-      if(o%GetCoreValenceOutside() /= 2) cycle
+      if(o%GetCoreValenceOutside() /= 1) cycle
       write(*,'(a10,5i4,f14.6)') '  valence:', i, o%n, o%l, o%j, o%z, this%NOcoef(i)
     end do
     write(*,*)
@@ -362,6 +362,7 @@ contains
       if(o%GetCoreValenceOutside() == 1) cycle
       call o%SetCoreValenceOutside(2)
     end do
+
   end subroutine GetConfFromFile
 
   subroutine AssignCoreValence(this, valence_orbits)
