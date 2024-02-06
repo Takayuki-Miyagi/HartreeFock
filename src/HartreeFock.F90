@@ -225,15 +225,14 @@ contains
     do iter = 1, this%n_iter_max
       call this%DiagonalizeFockMatrix()
       call this%UpdateDensityMatrix(iter)
-      call this%UpdateFockMatrix()
-      call this%DiagonalizeFockMatrix()
 
       call this%CalcEnergy()
       write(*,'(2x,i4,5f18.6)') iter, this%e0, this%e1, &
           &  this%e2, this%e3,this%ehf
-      if(iter > 10 .and. this%dynamic_reference) call this%OptimizeOccupation()
-      !if(iter > 10 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
+      !if(iter > 10 .and. this%dynamic_reference) call this%OptimizeOccupation()
+      if(iter > 10 .and. this%dynamic_reference) call this%SetDynamicalOccupation()
 
+      call this%UpdateFockMatrix()
       if(this%tol > opt%r) exit
       if(iter == this%n_iter_max) then
         write(*,'(a,i5,a)') "Hartree-Fock iteration does not converge after ", &
@@ -2781,11 +2780,10 @@ contains
     end do
     call this%SetOccupationMatrix(xn(:,sort_idx(1)))
     call this%UpdateDensityMatrixFromCoef()
-    do i = 1, this%ms%sps%norbs ! print hole states
+    do i = 1, this%ms%sps%norbs
       o => this%ms%sps%GetOrbit(i)
-      call o%SetOccupation(this%Occ%GetOBME(i,i))
-      this%ms%NOcoef(i) = o%GetOccupation()
-      call o%SetOccupation(this%ms%NOcoef(i))
+      this%ms%NOcoef(i) = xn(i,sort_idx(1))
+      call o%SetOccupation(xn(i,sort_idx(1)))
     end do
     call this%ms%GetParticleHoleOrbits()
     call this%ms%SetEFermi()

@@ -100,13 +100,7 @@ program HFMain
     open(wunit, file = p%summary_file, action='write',status='replace')
     if( p%TransFileName == "none") then
       call HF%init(h,alpha=p%alpha,NOXB_3NF=p%NOXB)
-      !htr = h%NO2BApprox()
       htr = HF%BasisTransform(h,NOXB=p%NOXB)
-      ! USE HO SPE
-      !htr%one%oprtr = "HOHamil"
-      !call htr%one%set( htr%ms%hw, htr%ms%A, htr%ms%Z, htr%ms%N)
-      !htr%one%oprtr = "hamil"
-      ! USE HO SPE
     end if
     if( p%TransFileName /= "none") then ! Transformation file reading mode, not HO
       call HF%ReadTransformationMatrix(h,p%TransFileName)
@@ -160,12 +154,6 @@ program HFMain
 
       if(p%is_MBPT) then
         htr = HF%BasisTransform(h,NOXB=p%NOXB)
-        ! USE HO SPE
-        !htr%one%oprtr = "HOHamil"
-        !call htr%one%set( htr%ms%hw, htr%ms%A, htr%ms%Z, htr%ms%N)
-        !call htr%one%set( 18.d0, htr%ms%A, htr%ms%Z, htr%ms%N)
-        !htr%one%oprtr = "hamil"
-        ! USE HO SPE
         call PT%calc(htr, p%is_4th_order, p%EN_denominator)
         write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
         write(wunit,'(a,f12.6)') "# max(| v / (e_h1 + e_h2 - e_p1 - e_p2) |) = ", PT%perturbativity2b
