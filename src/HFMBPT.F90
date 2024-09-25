@@ -218,12 +218,16 @@ contains
     type(Ops), intent(in) :: h
     type(MSPace), pointer :: ms
     type(TwoBodyChannel), pointer :: ch_two
+    type(ThreeBodyChannel), pointer :: ch_three
+    type(Orbits), pointer :: sps
     integer :: ch, ab, ij, J2, n
-    integer :: a, b, i, j
+    integer :: a, b, c, i, j, k, abc, ijk, Jab, Jij
+    type(SingleParticleOrbit), pointer :: oa, ob, oc, oi, oj, ok
     real(8) :: vsum, v, ti, r
 
     ti = omp_get_wtime()
     ms => h%ms
+    sps => ms%sps
     vsum = 0.d0
     do ch = 1, ms%two%NChan
       ch_two => ms%two%jpz(ch)
@@ -251,6 +255,47 @@ contains
     end do
     r = vsum
     call timer%Add("Second order MBPT",omp_get_wtime()-ti)
+    if(h%rank<3) return
+
+    ti = omp_get_wtime()
+    vsum = 0.d0
+    do ch = 1, ms%thr21%NChan
+      ch_three => ms%thr%jpz(ch)
+      J2 = ch_three%j
+      n = ch_three%n_state
+      v = 0.d0
+      !$omp parallel
+      !$omp do private(abc,ijk,a,b,c,i,j,k,Jab,Jij) reduction(+:v)
+      do abc = 1, ch_three%n_state
+        a = ch_three%n2spi1(abc)
+        b = ch_three%n2spi2(abc)
+        c = ch_three%n2spi3(abc)
+        oa => sps%GetOrbit(a)
+        ob => sps%GetOrbit(b)
+        oc => sps%GetOrbit(c)
+        do ij = 1, ch_three%n_state
+          i = ch_three%n2spi1(ijk)
+          j = ch_three%n2spi2(ijk)
+          k = ch_three%n2spi2(ijk)
+          oi => sps%GetOrbit(i)
+          oj => sps%GetOrbit(j)
+          ok => sps%GetOrbit(k)
+
+          do Jab = max(abs(oa%j-ob%j), abs(J2-oc%j))/2, min(oa%j+ob%j, J2+oc%j)/2
+            do Jij = max(abs(oi%j-oj%j), abs(J2-ok%j))/2, min(oi%j+oj%j, J2+ok%j)/2
+
+              v = v + h%thr%GetThBMEJ(i,j,k,Jij,a,b,c,Jab,J2)**2 / &
+                & get_denominator3(h,i,j,k,a,b,c)
+            end do
+          end do
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      vsum = vsum + v * dble(J2+1)
+    end do
+    call timer%Add("Second order MBPT",omp_get_wtime()-ti)
+
   end function energy_second
 
   function get_denominator1(h,h1,p1) result(r)

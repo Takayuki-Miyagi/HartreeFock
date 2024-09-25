@@ -148,8 +148,8 @@ contains
       if(na /= nb) return
       if(ja == 2*la-1) r = dble(la)
       if(ja == 2*la+1) r =-dble(la+1)
-      if(za == -1) r = (r+1.d0) * 1.79d0
-      if(za ==  1) r = (r+1.d0) * (-1.91d0)
+      if(za == -1) r = (r+1.d0) * (gs+gv-1.d0)*0.5d0
+      if(za ==  1) r = (r+1.d0) * (gs-gv) * 0.5d0
       r = (-1.d0) * r * hc**2 / ((amp+amn)*0.5d0)**2 / dble(Z)
 
 

@@ -56,7 +56,6 @@ contains
     type(sys) :: s
 
     ti = omp_get_wtime()
-
     if(s%find(this%filename, "kshell.snt")) then
       call write_operator_kshell_snt(this%filename, p, op)
       return

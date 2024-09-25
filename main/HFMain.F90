@@ -165,6 +165,11 @@ program HFMain
             & "#", "Operator", "Ref. exp. val.", "MBPT LO", "MBPT NLO", "Total"
         write(wunit,'(a20,4f18.8)') 'hamil', PT%e_0, PT%e_2, PT%e_3, &
             & PT%e_0+PT%e_2+PT%e_3
+
+        if(p%is_Op_out) then ! This can be an input of an NCSM calculation
+          call w%SetFileName(p%OpFileName, htr)
+          call w%writef(p,htr)
+        end if
       end if
     end if
     close(wunit)
@@ -200,6 +205,10 @@ program HFMain
 
     call msNAT%init(Nucl=ms%Nucl, Core=ms%Core, hw=ms%hw, emax=p%emax_mbpt, e2max=p%e2max_mbpt, e3max=0)
     h = htr%truncate(msNAT)
+    if(p%is_Op_out) then ! This can be an input of an NCSM calculation
+      call w%SetFileName(p%OpFileName, h)
+      call w%writef(p,h)
+    end if
 
     call HF%fin()
     call HF%init(h,alpha=p%alpha)
@@ -219,11 +228,6 @@ program HFMain
             & PT%e_0+PT%e_2+PT%e_3
       end if
 
-  end if
-
-  if(p%is_Op_out) then
-    call w%SetFileName(p%OpFileName, htr)
-    call w%writef(p,htr)
   end if
   call h%fin()
 

@@ -41,6 +41,8 @@ ifeq ($(strip $(HOST)),other)
   FC=gfortran -fallow-argument-mismatch # if GCC version > 10.xx
   ifeq ($(OS), OSX)
     LFLAGS+= -I/usr/local/include -L/usr/local/lib
+    LFLAGS+= -I/opt/homebrew/include -L/opt/homebrew/lib
+    LFLAGS+= -L/opt/homebrew/opt/openblas/lib
   endif
   LFLAGS+= -lblas -llapack -lgsl -lz
   FFLAGS=-O3

@@ -432,6 +432,7 @@ contains
 
     if(Optr%Scalar) then
       op = HF%BasisTransScalar(Optr)
+      op = op%NormalOrdering()
       return
     end if
 
@@ -2533,10 +2534,11 @@ contains
   subroutine WriteTransformationMatrix(this,filename)
     class(HFSolver), intent(in) :: this
     character(*), intent(in) :: filename
+    character(:), allocatable :: fn
     type(MSpace), pointer :: ms
     type(Orbits), pointer :: sps
     integer :: ch, a, b, nb, wunit=20
-    type(SingleParticleOrbit), pointer :: op
+    type(SingleParticleOrbit), pointer :: op, oq
     real(8) :: me
     real(8), allocatable :: wf(:)
     type(OneBodyPart) :: F_HF
@@ -2547,37 +2549,69 @@ contains
       F_HF%MatCh(ch,ch)%DMat = this%C%MatCh(ch,ch)%DMat%T() * &
           &  this%F%MatCh(ch,ch)%DMat * this%C%MatCh(ch,ch)%DMat
     end do
-    ! Oakridge
-    !open(wunit, file=filename, status="replace")
-    !write(wunit,"(a)") "#  a,  b,            Occ_a,            Occ_b,        ( HO|HF )"
-    !do a = 1, sps%norbs
-    !  do b = 1, sps%norbs
-    !    op => sps%GetOrbit(a)
-    !    oq => sps%GetOrbit(b)
-    !    me = this%C%GetOBME(a,b)
-    !    if( abs(me) < 1.d-12 ) cycle
-    !    write(wunit,"(2i4,3es18.8)") a,b,this%ms%NOCoef(a),this%ms%NOCoef(b),me ! For Oakridge group
-    !  end do
-    !end do
-    !close(wunit)
+
+    fn = trim(adjustl(filename))
+    ! snt-like
+    if(fn(len(fn)-3:len(fn)) == ".snt") then
+      open(wunit, file=filename, status="replace")
+      write(wunit,"(4i4)") sps%norbs/2, sps%norbs/2, 0, 0
+      write(wunit,"(a)") " idx,   n,  l,  j, tz"
+      do a = 1, sps%norbs
+        op => sps%GetOrbit(a)
+        write(wunit,"(5i4)") a, op%n, op%l, op%j, op%z
+      end do
+      write(wunit,"(i8,i2)") sps%norbs * sps%norbs, 0
+      write(wunit,"(a)") "#  a,  b,  ( HO|HF )"
+      do a = 1, sps%norbs
+        do b = 1, sps%norbs
+          op => sps%GetOrbit(a)
+          oq => sps%GetOrbit(b)
+          me = this%C%GetOBME(a,b)
+          write(wunit,"(2i4,es18.8)") a,b,me 
+        end do
+      end do
+      close(wunit)
+      return
+    end if
 
     ! Darmstadt
-    open(wunit, file=filename, status="replace")
-    write(wunit,"(a)") "#  idx,  n,  l,  j, tz,   SPE,  Occ,  wf"
-    allocate(wf(this%ms%emax/2+1))
-    do a = 1, sps%norbs
-      wf(:) = 0.d0
-      op => sps%GetOrbit(a)
-      do nb = 0, this%ms%emax/2
-        if(2*nb + op%l > this%ms%emax) cycle
-        b = sps%nljz2idx(nb,op%l,op%j,op%z)
-        wf(nb+1) = this%C%GetOBME(b,a)
+    if(fn(len(fn)-3:len(fn)) == ".TUD") then
+      open(wunit, file=filename, status="replace")
+      write(wunit,"(a)") "#  idx,  n,  l,  j, tz,   SPE,  Occ,  wf"
+      allocate(wf(this%ms%emax/2+1))
+      do a = 1, sps%norbs
+        wf(:) = 0.d0
+        op => sps%GetOrbit(a)
+        do nb = 0, this%ms%emax/2
+          if(2*nb + op%l > this%ms%emax) cycle
+          b = sps%nljz2idx(nb,op%l,op%j,op%z)
+          wf(nb+1) = this%C%GetOBME(b,a)
+        end do
+        !write(*,"(5i4,100es18.8)") a, op%n, op%l, op%j, op%z, F_HF%GetOBME(a,a), this%ms%NOCoef(a), wf
+        write(wunit,"(5i4,100es18.8)") a, op%n, op%l, op%j, op%z, F_HF%GetOBME(a,a), this%ms%NOCoef(a), wf
       end do
-      !write(*,"(5i4,100es18.8)") a, op%n, op%l, op%j, op%z, F_HF%GetOBME(a,a), this%ms%NOCoef(a), wf
-      write(wunit,"(5i4,100es18.8)") a, op%n, op%l, op%j, op%z, F_HF%GetOBME(a,a), this%ms%NOCoef(a), wf
-    end do
-    deallocate(wf)
-    close(wunit)
+      deallocate(wf)
+      close(wunit)
+      return
+    end if
+
+    ! Oakridge
+    if(fn(len(fn)-4:len(fn)) == ".okrg") then
+      open(wunit, file=filename, status="replace")
+      write(wunit,"(a)") "#  a,  b,            Occ_a,            Occ_b,        ( HO|HF )"
+      do a = 1, sps%norbs
+        do b = 1, sps%norbs
+          op => sps%GetOrbit(a)
+          oq => sps%GetOrbit(b)
+          me = this%C%GetOBME(a,b)
+          if( abs(me) < 1.d-12 ) cycle
+          write(wunit,"(2i4,3es18.8)") a,b,this%ms%NOCoef(a),this%ms%NOCoef(b),me ! For Oakridge group
+        end do
+      end do
+      close(wunit)
+      return
+    end if
+
   end subroutine WriteTransformationMatrix
 
   subroutine ReadTransformationMatrix(this,hamil,filename)
