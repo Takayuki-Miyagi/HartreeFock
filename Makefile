@@ -5,6 +5,7 @@
 # -heap-arrays option is needed for built in transpose function with
 #  large dimension matrix
 #--------------------------------------------------
+#TARGET=gMBPT
 TARGET=HartreeFock
 INSTLDIR=$(HOME)/bin
 EXEDIR=$(PWD)/exe
@@ -39,11 +40,11 @@ LINT=    # 8-byte integer
 ifeq ($(strip $(HOST)),other)
   FDEP=makedepf90
   FC=gfortran -fallow-argument-mismatch # if GCC version > 10.xx
-  ifeq ($(OS), OSX)
-    LFLAGS+= -I/usr/local/include -L/usr/local/lib
-    LFLAGS+= -I/opt/homebrew/include -L/opt/homebrew/lib
-    LFLAGS+= -L/opt/homebrew/opt/openblas/lib
-  endif
+#  ifeq ($(OS), OSX)
+#    LFLAGS+= -I/usr/local/include -L/usr/local/lib
+#    LFLAGS+= -I/opt/homebrew/include -L/opt/homebrew/lib
+#    LFLAGS+= -L/opt/homebrew/opt/openblas/lib
+#  endif
   LFLAGS+= -lblas -llapack -lgsl -lz
   FFLAGS=-O3
   CFLAGS=-O3
@@ -168,16 +169,28 @@ OBJF95_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_my
 SRCS_myfort= $(SRCC_myfort) $(SRCF77_myfort) $(SRCF90_myfort) $(SRCF95_myfort)
 OBJS_myfort= $(OBJC_myfort) $(OBJF77_myfort) $(OBJF90_myfort) $(OBJF95_myfort)
 
+EXCLUDE:=$(SRCDIR_HF)/HFMain.F90 $(SRCDIR_HF)/MBPTMain.F90
 SRCC_HF:=$(wildcard $(SRCDIR_HF)/*.c)
 SRCF77_HF:=$(wildcard $(SRCDIR_HF)/*.f)
 SRCF90_HF:=$(wildcard $(SRCDIR_HF)/*.f90)
-SRCF95_HF:=$(wildcard $(SRCDIR_HF)/*.F90)
+SRCF95_HF:=$(filter-out $(EXCLUDE), $(wildcard $(SRCDIR_HF)/*.F90))
 OBJC_HF:=$(addprefix $(OBJDIR)/, $(patsubst %c, %o, $(notdir $(SRCC_HF))))
 OBJF77_HF:=$(addprefix $(OBJDIR)/, $(patsubst %f, %o, $(notdir $(SRCF77_HF))))
 OBJF90_HF:=$(addprefix $(OBJDIR)/, $(patsubst %f90, %o, $(notdir $(SRCF90_HF))))
-OBJF95_HF:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_HF))))
+OBJF95_HF:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(filter-out HFMain.F90 MBPTMain.F90, $(notdir $(SRCF95_HF)))))
 SRCS_HF= $(SRCC_HF) $(SRCF77_HF) $(SRCF90_HF) $(SRCF95_HF)
 OBJS_HF= $(OBJC_HF) $(OBJF77_HF) $(OBJF90_HF) $(OBJF95_HF)
+
+ifeq ($(strip $(TARGET)), HartreeFock)
+  SRCS_HF+= $(SRCDIR_HF)/HFMain.F90
+  OBJS_HF+= $(OBJDIR)/HFMain.o
+endif
+ifeq ($(strip $(TARGET)), gMBPT)
+  SRCS_HF+= $(SRCDIR_HF)/MBPTMain.F90
+  OBJS_HF+= $(OBJDIR)/MBPTMain.o
+endif
+$(info $(SRCS_HF))
+$(info $(OBJS_HF))
 
 
 SRCS_ALL = $(SRCS) $(SRCS_myfort) $(SRCS_HF)
