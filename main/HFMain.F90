@@ -213,10 +213,10 @@ program HFMain
       call w%writef(p,h)
     end if
 
-    call HF%fin()
-    call HF%init(h,alpha=p%alpha)
-    call HF%solve()
     if(p%is_MBPT) then
+        call HF%fin()
+        call HF%init(h,alpha=p%alpha)
+        call HF%solve()
         htr = HF%BasisTransform(h,NOXB=p%NOXB)
         call PT%calc(htr, p%is_4th_order, p%EN_denominator)
         write(wunit,'(a,f12.6)') "# max(| h / (e_h1 - e_p1) |)               = ", PT%perturbativity1b
@@ -238,14 +238,18 @@ program HFMain
 
   ! -- bare Ops --
   do n = 1, size(p%Ops)
-    if(p%Ops(n) == 'none' .or. p%Ops(n) == "" .or. s%find(p%Ops(n), "_file")) cycle
+    if(p%is_MBPT .and. p%is_NAT) then
+      write(*,*) "This option is not implemented. Please switch off either is_MBPT or is_NAT"
+      cycle
+    end if
+    if(p%Ops(n) == 'none' .or. p%Ops(n) == "" .or. s%find(s%str(p%Ops(n)), s%str("_file"))) cycle
     write(*,*)
     write(*,'(3a)') "## Calculating bare ", trim(p%Ops(n)), " operator"
     call opr%init(p%Ops(n),ms,2)
     call opr%set()
     opr = HF%BasisTransform(opr,NOXB=p%NOXB)
     if(p%is_MBPT) then
-      if(s%find(p%Ops(n), 'Hamil') .or. p%Ops(n) == "Tkin") then
+      if(s%find(s%str(p%Ops(n)), s%str('Hamil')) .or. p%Ops(n) == "Tkin") then
         call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
       else
         call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
@@ -259,15 +263,19 @@ program HFMain
       write(wunit,'(a20, f18.8)') trim(p%Ops(n)), opr%zero
       close(wunit)
     end if
-    if(p%is_Op_out) then
-      call w%SetFileName(p%OpFileName, opr)
-      call w%writef(p,opr)
-    end if
+!    if(p%is_Op_out) then
+!      call w%SetFileName(p%OpFileName, opr)
+!      call w%writef(p,opr)
+!    end if
     call opr%fin()
   end do
 
   ! -- Ops from NN file (srg evolved or two-body current) --
   do n = 1, size(p%Ops)
+    if(p%is_MBPT .and. p%is_NAT) then
+      write(*,*) "This option is not implemented. Please switch off either is_MBPT or is_NAT"
+      cycle
+    end if
     if(n > size(p%files_nn)) cycle
     if(p%files_nn(n) == 'none' .or. p%Ops(n) == "") cycle
     write(*,*)
@@ -277,8 +285,8 @@ program HFMain
         & [p%emax_nn, p%e2max_nn,p%lmax_nn])
     opr = HF%BasisTransform(opr,NOXB=p%NOXB)
     if(p%is_MBPT) then
-      if(s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
-      if(.not. s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
+      if(s%find(s%str(p%Ops(n)), s%str('Hamil'))) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
+      if(.not. s%find(s%str(p%Ops(n)), s%str('Hamil'))) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
@@ -289,15 +297,19 @@ program HFMain
       write(wunit,'(a20, f18.8)') trim(p%Ops(n)), opr%zero
       close(wunit)
     end if
-    if(p%is_Op_out) then
-      call w%SetFileName(p%OpFileName, opr)
-      call w%writef(p,opr)
-    end if
+!    if(p%is_Op_out) then
+!      call w%SetFileName(p%OpFileName, opr)
+!      call w%writef(p,opr)
+!    end if
     call opr%fin()
   end do
 
   ! -- Ops from NN+3N file (srg evolved) --
   do n = 1, size(p%Ops)
+    if(p%is_MBPT .and. p%is_NAT) then
+      write(*,*) "This option is not implemented. Please switch off either is_MBPT or is_NAT"
+      cycle
+    end if
     if(n > size(p%files_nn)) cycle
     if(n > size(p%files_3n)) cycle
     if(p%files_3n(n) == 'none' .or. p%Ops(n) == "") cycle
@@ -310,8 +322,8 @@ program HFMain
         & [p%emax_3n,p%e2max_3n,p%e3max_3n,p%lmax_3n])
     opr = HF%BasisTransform(opr,NOXB=p%NOXB)
     if(p%is_MBPT) then
-      if(s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
-      if(.not. s%find(p%Ops(n), 'Hamil')) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
+      if(s%find(s%str(p%Ops(n)), s%str('Hamil'))) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator, part_of_hamil=.true.)
+      if(.not. s%find(s%str(p%Ops(n)), s%str('Hamil'))) call PTs%calc(htr,opr,p%is_MBPTScalar_full, p%EN_denominator)
       open(wunit, file = p%summary_file, action='write',status='old',position='append')
       !write(wunit,'(3a)') "# Expectation value : <HF| ", trim(opr%optr)," |HF>:"
       !write(wunit,'(2a)') "# 2B file is ", trim(p%files_nn(n))
@@ -324,10 +336,10 @@ program HFMain
       write(wunit,'(a20, f18.8)') trim(p%Ops(n)), opr%zero
       close(wunit)
     end if
-    if(p%is_Op_out) then
-      call w%SetFileName(p%OpFileName, opr)
-      call w%writef(p,opr)
-    end if
+!    if(p%is_Op_out) then
+!      call w%SetFileName(p%OpFileName, opr)
+!      call w%writef(p,opr)
+!    end if
     call opr%fin()
   end do
 

@@ -5,30 +5,30 @@ contains
   subroutine GetOperatorRank(optr, jr, pr, zr)
     character(*), intent(in) :: optr
     integer, intent(out) :: jr, pr, zr
-    character(256), allocatable :: splt(:)
-    character(:), allocatable :: str
+    type(str), allocatable :: splt(:)
+    type(str) :: str
     type(sys) :: s
 
     jr = 0
     pr = 0
     zr = 0
 
-    if(s%find(optr, "file_")) then
-      call s%split(optr, "file_", splt)
+    if(s%find(s%str(optr), s%str("file_"))) then
+      call s%split(s%str(optr), s%str("file_"), splt)
       str = splt(2)
-      call s%split(str, "+", splt)
+      call s%split(str, s%str("+"), splt)
       if(size(splt) > 1) then
-        read(splt(1),*) jr
+        read(splt(1)%val,*) jr
         pr = 1
-        read(splt(2),*) zr
+        read(splt(2)%val,*) zr
         return
       end if
 
-      call s%split(str, "-", splt)
+      call s%split(str, s%str("-"), splt)
       if(size(splt) > 1) then
-        read(splt(1),*) jr
+        read(splt(1)%val,*) jr
         pr = -1
-        read(splt(2),*) zr
+        read(splt(2)%val,*) zr
         return
       end if
 
@@ -39,10 +39,15 @@ contains
     case('hamil', 'Hamil', "HOHamil", "Hohamil", 'hohamil' ,&
           & 'Hcm','HCM','RM2', 'Rm2', "rm2", &
           & 'Tcm', 'tcm', 'Rp2', 'RP2', 'rp2', 'Rn2', 'RN2', 'rn2',"DenMat",&
-          & "Tkin", "tkin", 'Rp2so', 'rp2so', 'Rp2_1b', 'Rp2_2b', 'Rp4_LO', 'Rp4_NLO')
+          & "Tkin", "tkin", 'Rp2so', 'rp2so', 'Rp2_1b', 'Rp2_2b', 'Rp4_LO', 'Rp4_NLO','Eccentricity2', &
+          & "R2", "R4")
       jr = 0
       pr = 1
       zr = 0
+    case('GT')
+      jr = 1
+      pr = 1
+      zr = 1
     case default
       write(*,'(2a)') 'Unknown operator: ', trim(optr)
     end select
@@ -52,7 +57,7 @@ contains
     real(8) :: r
     character(*), intent(in) :: optr
     real(8), intent(in) :: hw
-    real(8) :: amnucl
+    real(8) :: amnucl, c
     integer, intent(in) :: ia(4), ib(4), A, Z, N
     integer :: na, la, ja, za
     integer :: nb, lb, jb, zb
@@ -124,6 +129,26 @@ contains
       r = r * (1.d0/dble(A) - 1.d0/dble(A)**2) * hc ** 2 / (amnucl * hw)
       return
 
+    case("R2")
+      if(la /= lb) return
+      if(ja /= jb) return
+      if(za /= zb) return
+      if(abs(na - nb) > 1) return
+      if(na == nb) r = dble(2*na + la) + 1.5d0
+      if(na == nb + 1) r = -dsqrt(dble(na) * (dble(na+la)+0.5d0))
+      if(na == nb - 1) r = -dsqrt(dble(nb) * (dble(nb+lb)+0.5d0))
+      amnucl = (amp + amn) * 0.5d0
+      r = r * hc ** 2 / (amnucl * hw)
+      return
+
+    case("R4")
+      if(la /= lb) return
+      if(ja /= jb) return
+      if(za /= zb) return
+      amnucl = (amp + amn) * 0.5d0
+      r = radius_power(4, na, la, nb, lb, sqrt(hc**2 / (amnucl * hw)))
+      return
+
     case("Rp2","RP2", "rp2", "Rp2_1b")
       if(la /= lb) return
       if(ja /= jb) return
@@ -180,6 +205,27 @@ contains
       if(za /= zb) return
       r = radius_power(4, na, la, nb, lb, sqrt(2.d0 * hc**2 / ((amp + amn) * hw))) * (1.d0 - dble(za))
       r = 0.5d0 * r / dble(Z) * (1.d0 - 4.d0 / dble(A))
+
+    case("GT")
+      if(la /= lb) return
+      if(ja /= jb) return
+      if(za /= zb) return
+      r = radius_power(4, na, la, nb, lb, sqrt(2.d0 * hc**2 / ((amp + amn) * hw))) * (1.d0 - dble(za))
+      r = 0.5d0 * r / dble(Z) * (1.d0 - 4.d0 / dble(A))
+
+    case("Eccentricity2")
+      if(za /= zb) return
+      if(ja /= jb) return
+      if(mod(la+lb,2)==1) return
+      amnucl = (amp + amn) * 0.5d0
+      r = radius_power(4, na, la, nb, lb, sqrt(hc**2 / (amnucl * hw)))
+      r = r * sqrt(dble(ja+1)*dble(jb+1)) * 5.d0 * dcg(4, 0, 4, 0, 0, 0) / (4.d0*pi)
+      r = r * (-1.d0)**((jb-1)/2) * tjs(ja, 0, jb, -1, 0, 1)
+      c = exp(ln_gamma(dble(6))-dble(4)*log(2.d0)-2.d0*ln_gamma(dble(3))) / (4.d0*pi)
+      r = r / c
+      r = r * dcg(2*2, -2*2, 2*2, 2*2, 0, 0)
+      r = r / sqrt(dble(ja+1))
+      return
 
     case default
       write(*,'(3a)') "In one_body_element, ", &
@@ -251,6 +297,8 @@ contains
       return
     case("Rp2so", "rp2so")
       return
+    case("R2", "R4")
+      return
 
     case('Rn2', 'RN2', 'rn2')
       if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
@@ -274,6 +322,13 @@ contains
       end if
       r = matel_r4(ia, ib, ic, id, Jab, 0, hw) - matel_r4(ia, ib, ic, id, Jab, 1, hw)
       r = r * (-2.d0) / dble(Z * A)
+
+    case("Eccentricity2")
+      if(Jab /= Jcd .or. Pab /= Pcd .or. Zab /= Zcd) then
+        write(*,'(a,2i3)') "Error in SetTwoBodyChannel: ", Jab, Jcd
+        return
+      end if
+      r = matel_eccentricity2(ia, ib, ic, id, Jab, hw)
 
     case default
       write(*,'(3a)') "In two_body_element, ", &
@@ -486,6 +541,67 @@ contains
         & iso2 * radius_power(1, ni, li, nk, lk, bpar) * radius_power(3, nj, lj, nl, ll, bpar))
     end function matel_not_asym
   end function matel_r4
+
+  function matel_eccentricity2(p, q, r, s, J, hw) result(res)
+    !
+    ! < pq:J || [r_1^2 Y_2(1) r_2^2 Y_2(2)]_0 || rs:J >
+    ! p: [np, lp, jp, tzp]
+    ! q: [nq, lq, jq, tzq]
+    ! r: [nr, lr, jr, tzr]
+    ! s: [ns, ls, js, tzs]
+    !
+    real(8) :: res
+    integer, intent(in) :: p(4), q(4), r(4), s(4), J
+    real(8), intent(in) :: hw
+    res = eccentricity_me(p, q, r, s, J, J, 2, 0, hw) &
+      & - eccentricity_me(p, q, s, r, J, J, 2, 0, hw) * (-1.d0)**((r(3)+s(3))/2 - J)
+    if(p(1)==q(1) .and. p(2)==q(2) .and. p(3)==q(3) .and. p(4)==q(4)) res = res / sqrt(2.d0)
+    if(r(1)==s(1) .and. r(2)==s(2) .and. r(3)==s(3) .and. r(4)==s(4)) res = res / sqrt(2.d0)
+    res = res / sqrt(dble(2*J+1)) ! reduced -> non-reduced
+
+  contains
+
+    function eccentricity_me(p, q, r, s, Jpq, Jrs, k, lambda, hw) result(res)
+      real(8) :: res
+      integer, intent(in) :: p(4), q(4), r(4), s(4), Jpq, Jrs, k, lambda
+      real(8), intent(in) :: hw
+      real(8) :: c
+      integer :: np, lp, jp, tzp
+      integer :: nq, lq, jq, tzq
+      integer :: nr, lr, jr, tzr
+      integer :: ns, ls, js, tzs
+      np = p(1); lp = p(2); jp = p(3); tzp= p(4);
+      nq = q(1); lq = q(2); jq = q(3); tzq= q(4);
+      nr = r(1); lr = r(2); jr = r(3); tzr= r(4);
+      ns = s(1); ls = s(2); js = s(3); tzs= s(4);
+      res = 0.d0
+      if(tzp /= tzr) return
+      if(tzq /= tzs) return
+      res = sqrt(dble(2*Jpq+1) * dble(2*Jrs+1) * dble(2*lambda+1))
+      res = res * snj(jp, jq, 2*Jpq, jr, js, 2*Jrs, 2*k, 2*k, 2*lambda) ! 9j-symbol
+      res = res * reduced_me_rY(np, lp, jp, nr, lr, jr, k, hw)
+      res = res * reduced_me_rY(nq, lq, jq, ns, ls, js, k, hw)
+      res = res * 2.d0
+      c = (-1.d0)**k * exp(ln_gamma(dble(2*k+2))-dble(2*k)*log(2.d0)-2.d0*ln_gamma(dble(k+1))) / (4.d0*pi)
+      res = res / c
+      res = res * dcg(2*k, -2*k, 2*k, 2*k, 2*lambda, 0)
+    end function eccentricity_me
+
+    function reduced_me_rY(np, lp, jp, nq, lq, jq, k, hw) result(res)
+      real(8) :: res
+      integer, intent(in) :: np, lp, jp, nq, lq, jq, k
+      real(8), intent(in) :: hw
+      real(8) :: b
+      res = 0.d0
+      if(mod(lp+lq+k, 2) == 1) return
+      if(abs(lp - lq) > k .or. lp + lq < k) return
+      if(abs(jp - jq) > 2*k .or. jp + jq < 2*k) return
+      b = sqrt(hc**2 / ((amp+amn) * 0.5d0 * hw))
+      res = (-1.d0)**((jq-1)/2+k) * sqrt(dble(jp+1) * dble(jq+1) * dble(2*k+1) / (4.d0*pi))
+      res = res * tjs(jp, 2*k, jq, -1, 0, 1) ! 3j-symbol
+      res = res * radius_power(k, np, lp, nq, lq, b)
+    end function reduced_me_rY
+  end function matel_eccentricity2
 
   function radius_power(k, n1, l1, n2, l2, bpar) result(s)
     !

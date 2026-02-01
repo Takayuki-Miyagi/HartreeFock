@@ -605,17 +605,17 @@ contains
     type(ThreeBodyMonForce), intent(inout) :: thr
     type(sys) :: s
 
-    if(s%find(this%file_3n,'.txt')) then
+    if(s%find(s%str(this%file_3n),s%str('.txt'))) then
       call this%read_scalar_me3j_ascii_txt(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'.me3j.gz')) then
+    if(s%find(s%str(this%file_3n),s%str('.me3j.gz'))) then
       call this%read_scalar_me3j_gzip(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'.me3j')) then
+    if(s%find(s%str(this%file_3n),s%str('.me3j'))) then
       call this%read_scalar_me3j_ascii(thr)
       return
     end if

@@ -260,7 +260,7 @@ contains
       call rd2%set(bound_2b_file(1), bound_2b_file(2), bound_2b_file(3))
     end if
 
-    if(.not.s%find(this%oprtr,"file_")) then
+    if(.not.s%find(s%str(this%oprtr),s%str("file_"))) then
       call this%one%set(ms%hw, ms%A, ms%Z, ms%N)
     end if
     write(*,'(2a)') "2B file: ", trim(file_nn)

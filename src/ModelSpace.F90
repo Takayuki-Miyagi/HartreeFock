@@ -93,6 +93,7 @@ contains
     deallocate(this%holes)
     deallocate(this%particles)
     call this%sps%fin()
+    call this%isps%fin()
     call this%one%fin()
     call this%two%fin()
     call this%cc_two%fin()
@@ -166,6 +167,7 @@ contains
     real(8), intent(in), optional :: beta
     logical, intent(in), optional :: is_three_body_jt, is_three_body
     type(sys) :: s
+    type(str) :: tmp
     integer :: i
     type(SingleParticleOrbit), pointer :: o
     real(8) :: ti
@@ -187,8 +189,10 @@ contains
       this%A = Nucl(1); this%Z = Nucl(2); this%N = Nucl(3)
     end if
 
-    this%Core = adjustl(trim(elements(this%Zc+1)) // trim(s%str(this%Ac)))
-    this%Nucl = adjustl(trim(elements(this%Z+1)) // trim(s%str(this%A)))
+    tmp = s%str(this%Ac)
+    this%Core = trim(elements(this%Zc+1)) // tmp%val
+    tmp = s%str(this%A)
+    this%Nucl = trim(elements(this%Z+1)) // tmp%val
     if(present(hw)) this%hw = hw
     if(present(emax)) this%emax = emax
     if(present(e2max)) this%e2max = e2max
@@ -237,6 +241,7 @@ contains
     real(8), intent(in), optional :: beta
     logical, intent(in), optional :: is_three_body_jt, is_three_body
     type(sys) :: s
+    type(str) :: tmp
     integer :: Ac, Zc, Nc, A, Z, N, i
     type(SingleParticleOrbit), pointer :: o
     real(8) :: ti
@@ -274,8 +279,10 @@ contains
     this%Ac = Ac
     this%Zc = Zc
     this%Nc = Nc
-    this%Core = trim(elements(this%Zc+1)) // trim(s%str(this%Ac))
-    this%Nucl = trim(elements(this%Z+1)) // trim(s%str(this%A))
+    tmp = s%str(this%Ac)
+    this%Core = trim(elements(this%Zc+1)) // tmp%val
+    tmp = s%str(this%A)
+    this%Nucl = trim(elements(this%Z+1)) // tmp%val
     write(*,'(2a)') " Target Nuclide is ", trim(this%Nucl)
     write(*,'(2a)') "   Core Nuclide is ", trim(this%Core)
     write(*,'(a)') "      cvo, idx,  n,  l,  j, tz,   occupation"
@@ -369,8 +376,8 @@ contains
     ! This should be called after obtaining A, Z, N
     class(MSpace), intent(inout), target :: this
     character(*), intent(in), optional :: valence_orbits
-    character(256), allocatable :: v_orbits(:)
-    character(:), allocatable :: vlabel
+    type(str), allocatable :: v_orbits(:)
+    type(str) :: vlabel
     integer :: Z, N
     integer :: e, l, j, g, ns
     integer :: zz, nn, vz, vn
@@ -478,8 +485,8 @@ contains
     end do
 
     if(present(valence_orbits)) then
-      call s%split(valence_orbits, ",", v_orbits)
-      if(v_orbits(1) == "" .or. v_orbits(1) == "none") then
+      call s%split(s%str(valence_orbits), s%str(","), v_orbits)
+      if(v_orbits(1)%val == "" .or. v_orbits(1)%val == "none") then
         do l = 1, this%sps%norbs
           o => this%sps%orb(l)
           if(o%GetCoreValenceOutside() == 0) cycle
@@ -493,11 +500,11 @@ contains
     if(allocated(v_orbits)) then
       do l = 1, size(v_orbits)
         vlabel = v_orbits(l)
-        if(vlabel == "" .or. vlabel == "none") cycle
-        idx = this%sps%GetIndexFromLabel(vlabel)
+        if(vlabel%val == "" .or. vlabel%val == "none") cycle
+        idx = this%sps%GetIndexFromLabel(vlabel%val)
         o => this%sps%orb(idx)
         if(o%GetCoreValenceOutside() == 0) then
-          write(*,"(2a)") "Error: conflict occurs core and valence orbit ", trim(vlabel)
+          write(*,"(2a)") "Error: conflict occurs core and valence orbit ", vlabel%val
           stop
         end if
         call o%SetCoreValenceOutside(1)

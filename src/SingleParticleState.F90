@@ -389,12 +389,12 @@ contains
     j = this%orb(idx)%j
     z = this%orb(idx)%z
     if(z == -1) then
-      r = 'p' // trim(s%str(n)) // OrbitalAngMom(l+1) // trim(s%str(j)) // '/2'
+      r = 'p' + s%str(n) + OrbitalAngMom(l+1) + s%str(j) + '/2'
       return
     end if
 
     if(z ==  1) then
-      r = 'n' // trim(s%str(n)) // OrbitalAngMom(l+1) // trim(s%str(j)) // '/2'
+      r = 'n' + s%str(n) + OrbitalAngMom(l+1) + s%str(j) + '/2'
       return
     end if
     write(*,'(a)') 'Error in GetLabelFromIndex'
@@ -416,7 +416,7 @@ contains
     n = this%orb(idx)%n
     l = this%orb(idx)%l
     j = this%orb(idx)%j
-    r = trim(s%str(n)) // OrbitalAngMom(l+1) // trim(s%str(j)) // '/2'
+    r = s%str(n) + OrbitalAngMom(l+1) + s%str(j) + '/2'
   end function GetLabelFromIndexIsospin
 
   function GetIndexFromLabel(this, label) result(r)

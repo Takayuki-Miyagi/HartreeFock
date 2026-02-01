@@ -355,7 +355,7 @@ contains
     this%C = Ctmp
   end function calc_overlap_ho_hf
 
-  function BasisTransform(HF,Optr,NOXB) result(op)
+  function BasisTransform(HF,Optr,NOXB,is_NO) result(op)
     !  Input: Operator is HO basis operator (not normal ordered)
     ! Output: Operator is HF basis operator {not normal ordered                    , is_NO2B is false
     !                                       {normal ordered with NO2B approximation, is_NO2B is true
@@ -364,16 +364,18 @@ contains
     type(Ops), intent(inout) :: Optr
     type(Ops) :: op
     integer, intent(in), optional :: NOXB
-    logical :: NO2B
-    integer :: tmp_rank
+    logical, optional :: is_NO
+    logical :: NO
+    integer :: tmp_rank, NOXB_
 
-    NO2B = .true.
-    if(present(NOXB)) then
-      if( NOXB == 3 ) NO2B = .false.
-      if( NOXB < 2 ) then
-        tmp_rank = Optr%rank
-        Optr%rank=2
-      end if
+    NO = .true.
+    if(present(is_NO)) NO = is_NO
+
+    NOXB_ = 3
+    if(present(NOXB)) NOXB_ = NOXB
+    if(NOXB_ < 2) then
+      tmp_rank = Optr%rank
+      Optr%rank = 2
     end if
 
     if(Optr%is_normal_ordered) then
@@ -382,7 +384,7 @@ contains
     end if
 
     call HF%UpdateDensityMatrixFromCoef()
-    if(NO2B) then
+    if(NO) then
       if(Optr%oprtr=='hamil' .or. Optr%oprtr=='Hamil') then
         call HF%UpdateFockMatrix()
         call HF%CalcEnergy()
@@ -417,8 +419,7 @@ contains
       end if
 
       if(.not. Optr%Scalar) then
-        write(*,*) "Not tested yet."
-        return
+        write(*,*) "Not tested yet!!!!"
         op = HF%BasisTransNO2BTensor(Optr)
         if(present(NOXB)) then
           if( NOXB < 2 ) then
@@ -432,13 +433,11 @@ contains
 
     if(Optr%Scalar) then
       op = HF%BasisTransScalar(Optr)
-      op = op%NormalOrdering()
+      !op = op%NormalOrdering()
       return
     end if
 
     if(.not. Optr%Scalar) then
-      write(*,*) "Not tested yet."
-      return
       op = HF%BasisTransTensor(Optr)
     end if
 
@@ -458,6 +457,7 @@ contains
     real(8) :: ph, ti
     type(DMat) :: UT, V2, V3
 
+    write(*,*) "I am in BasisTransNO2BHamiltonian"
     ti = omp_get_wtime()
     ms => H%ms
     sps => ms%sps
@@ -554,6 +554,7 @@ contains
     real(8) :: ph, ti
     type(DMat) :: UT, V2, V3
 
+    write(*,*) "I am in BasisTransNO2BHamiltonianFromNO2B"
     ti = omp_get_wtime()
     ms => H%ms
     sps => ms%sps
@@ -645,8 +646,9 @@ contains
     integer :: je, le, ze, ee
     integer :: jf, lf, zf, ef
     real(8) :: ph, ti, o0from1, o0from2, o0from3
-    type(DMat) :: UT, V2, V3
+    type(DMat) :: UT, V3
 
+    write(*,*) "I am in BasisTransNO2BScalar"
     ms => Opr%ms
     ti = omp_get_wtime()
     call op%init(0, 1, 0, opr%oprtr, ms, 2)
@@ -728,7 +730,7 @@ contains
       if(Opr%rank/=3 .or. .not. Opr%ms%is_three_body_jt) o2from3%MatCh(ch,ch)%DMat = &
           & UT%T() * o2from3%MatCh(ch,ch)%DMat * UT
       call UT%fin()
-      call V2%fin()
+      call V3%fin()
     end do
 
     o1from3 = o2from3%NormalOrderingFrom2To1(ms%one)
@@ -762,6 +764,7 @@ contains
     real(8) :: ph, ti, o0from1, o0from2, o0from3
     type(DMat) :: UT
 
+    write(*,*) "I am in BasisTransNO2BScalarFromNO2B"
     ti = omp_get_wtime()
     ms => opr%ms
     sps => ms%sps
@@ -872,6 +875,7 @@ contains
     real(8) :: ph, ti, o0from1, o0from2, o0from3
     type(DMat) :: UTbra, UTket, V2
 
+    write(*,*) "I am in BasisTransNO2BTensor"
     ms => Opr%ms
     ti = omp_get_wtime()
     call op%init(opr%jr, opr%pr, opr%zr, opr%oprtr, ms, 2)
@@ -968,6 +972,7 @@ contains
     real(8) :: ph, ti
     type(DMat) :: UT, V2
 
+    write(*,*) "I am in BasisTransScalar"
     ti = omp_get_wtime()
     ms => Op%ms
     sps => ms%sps
@@ -1051,12 +1056,14 @@ contains
     real(8) :: ph, ti
     type(DMat) :: UTbra, UTket
 
+    write(*,*) "I am in BasisTransTensor"
     ti = omp_get_wtime()
     ms => Op%ms
-    call opnew%init(op%jr, op%pr, op%zr, op%oprtr, ms, 3)
+    call opnew%init(op%jr, op%pr, op%zr, op%oprtr, ms, op%rank)
     Opnew%zero = 0.d0
     do chbra = 1, ms%one%NChan
       do chket = 1, ms%one%NChan
+      if(.not. Op%one%MatCh(chbra,chket)%is) cycle
         Opnew%one%MatCh(chbra,chket)%DMat = HF%C%MatCh(chbra,chbra)%DMat%T() * &
             &  Op%one%MatCh(chbra,chket)%DMat * HF%C%MatCh(chket,chket)%DMat
       end do
@@ -1072,7 +1079,7 @@ contains
       do bra = 1, nbra
         a = ms%two%jpz(chbra)%n2spi1(bra)
         b = ms%two%jpz(chbra)%n2spi2(bra)
-        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-Jket)
+        ph = (-1.d0)**((ms%sps%orb(a)%j+ms%sps%orb(b)%j)/2-Jbra)
         do ket = 1, nbra
           c = ms%two%jpz(chbra)%n2spi1(ket)
           d = ms%two%jpz(chbra)%n2spi2(ket)
@@ -1088,6 +1095,7 @@ contains
       !$omp end parallel
 
       do chket = 1, ms%two%NChan
+        if(.not. Opnew%two%MatCh(chbra,chket)%is) cycle
         Jket = ms%two%jpz(chket)%j
         nket = ms%two%jpz(chket)%n_state
         call UTket%zeros(nket,nket)
@@ -1112,9 +1120,9 @@ contains
         !$omp end parallel
         Opnew%two%MatCh(chbra,chket)%DMat = &
             & UTbra%T() * Op%two%MatCh(chbra,chket)%DMat * UTket
-        call UTbra%fin()
         call UTket%fin()
       end do
+      call UTbra%fin()
     end do
 
     if(Op%rank < 3) return
@@ -1307,7 +1315,7 @@ contains
       do ch = 1, this%F%one%NChan
         call sol_gen%init(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
         call sol_gen%DiagSym(this%F%MatCh(ch,ch)%DMat, this%S%MatCh(ch,ch)%DMat)
-        call diag%MatCh(ch,ch)%DiagMat(sol%eig)
+        call diag%MatCh(ch,ch)%Diag(sol%eig)
         call sol_gen%fin()
       end do
     end if
@@ -1316,7 +1324,7 @@ contains
       do ch = 1, this%F%one%NChan
         call sol%init(this%F%MatCh(ch,ch)%DMat)
         call sol%DiagSym(this%F%MatCh(ch,ch)%DMat)
-        call diag%MatCh(ch,ch)%DiagMat(sol%eig)
+        call diag%MatCh(ch,ch)%Diag(sol%eig)
         call sol%fin()
       end do
     end if
@@ -2534,7 +2542,7 @@ contains
   subroutine WriteTransformationMatrix(this,filename)
     class(HFSolver), intent(in) :: this
     character(*), intent(in) :: filename
-    character(:), allocatable :: fn
+    type(sys) :: s
     type(MSpace), pointer :: ms
     type(Orbits), pointer :: sps
     integer :: ch, a, b, nb, wunit=20
@@ -2550,9 +2558,8 @@ contains
           &  this%F%MatCh(ch,ch)%DMat * this%C%MatCh(ch,ch)%DMat
     end do
 
-    fn = trim(adjustl(filename))
     ! snt-like
-    if(fn(len(fn)-3:len(fn)) == ".snt") then
+    if(s%find(s%str(filename), s%str(".snt"))) then
       open(wunit, file=filename, status="replace")
       write(wunit,"(4i4)") sps%norbs/2, sps%norbs/2, 0, 0
       write(wunit,"(a)") " idx,   n,  l,  j, tz"
@@ -2567,7 +2574,7 @@ contains
           op => sps%GetOrbit(a)
           oq => sps%GetOrbit(b)
           me = this%C%GetOBME(a,b)
-          write(wunit,"(2i4,es18.8)") a,b,me 
+          write(wunit,"(2i4,es18.8)") a,b,me
         end do
       end do
       close(wunit)
@@ -2575,7 +2582,7 @@ contains
     end if
 
     ! Darmstadt
-    if(fn(len(fn)-3:len(fn)) == ".TUD") then
+    if(s%find(s%str(filename), s%str(".TUD"))) then
       open(wunit, file=filename, status="replace")
       write(wunit,"(a)") "#  idx,  n,  l,  j, tz,   SPE,  Occ,  wf"
       allocate(wf(this%ms%emax/2+1))
@@ -2596,7 +2603,7 @@ contains
     end if
 
     ! Oakridge
-    if(fn(len(fn)-4:len(fn)) == ".okrg") then
+    if(s%find(s%str(filename), s%str(".okrg"))) then
       open(wunit, file=filename, status="replace")
       write(wunit,"(a)") "#  a,  b,            Occ_a,            Occ_b,        ( HO|HF )"
       do a = 1, sps%norbs
@@ -2618,18 +2625,40 @@ contains
     class(HFSolver), intent(inout) :: this
     type(Ops), intent(in) :: hamil
     character(*), intent(in) :: filename
-    integer :: a, b, runit=20, ios
+    type(sys) :: s
+    integer :: a, b, runit=20, ios, norb, porb, n, l, j, z, nlines, i
+    integer, allocatable :: n_orb(:), l_orb(:), j_orb(:), z_orb(:)
     real(8) :: occ_a, occ_b, me
     type(SingleParticleOrbit), pointer :: oa=>null()
     call this%init(hamil)
     open(runit, file=filename, status="old")
-    read(runit,*)
-    do
-      read(runit,*,iostat=ios) a, b, occ_a, occ_b, me
-      if(ios < 0) exit
-      this%ms%NOCoef(a) = occ_a
-      call this%C%SetOBME(a,b,me,.false.)
-    end do
+    if(s%find(s%str(filename), s%str(".snt"))) then
+      read(runit,*,iostat=ios) porb, norb, a, b
+      allocate(n_orb(porb+norb), l_orb(porb+norb), j_orb(porb+norb), z_orb(porb+norb))
+      read(runit,'()',iostat=ios)
+      do a = 1, porb+norb
+        read(runit,*,iostat=ios) i, n, l, j, z
+        n_orb(i) = n; l_orb(i) = l; j_orb(i) = j; z_orb(i) = z;
+      end do
+      read(runit,*,iostat=ios) nlines, a
+      read(runit,'()',iostat=ios)
+      do n = 1, nlines
+        read(runit,*,iostat=ios) a, b, me
+        i = this%ms%sps%nljz2idx(n_orb(a), l_orb(a), j_orb(a), z_orb(a))
+        j = this%ms%sps%nljz2idx(n_orb(b), l_orb(b), j_orb(b), z_orb(b))
+        call this%C%SetOBME(i,j,me,.false.)
+      end do
+    end if
+
+
+    if(s%find(s%str(filename), s%str(".okrg"))) then
+      do
+        read(runit,*,iostat=ios) a, b, occ_a, occ_b, me
+        if(ios < 0) exit
+        this%ms%NOCoef(a) = occ_a
+        call this%C%SetOBME(a,b,me,.false.)
+      end do
+    end if
     close(runit)
     call this%SetOccupationMatrix(this%ms%NOcoef)
     do a = 1, this%ms%sps%norbs ! print hole states

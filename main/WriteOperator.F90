@@ -35,6 +35,7 @@ contains
     character(*), intent(in) :: file_name
     type(Ops), intent(in) :: op
     type(MSpace), pointer :: ms
+    type(str) :: tmp
     type(sys) :: s
 
     ms => op%ms
@@ -42,10 +43,11 @@ contains
       this%filename = trim(op%oprtr) // "_" // trim(file_name)
       return
     end if
-    this%filename = trim(op%oprtr) // '_' // trim(ms%Nucl) // &
-        & '_HF_hw' // trim(s%str(ms%hw)) // &
-        & '_e' // trim(s%str(this%emax)) // &
-        & '_2e' // trim(s%str(this%e2max)) // '.snt'
+    tmp = s%str(op%oprtr) + '_' + s%str(ms%Nucl) + &
+        & '_HF_hw' + s%str(ms%hw) + &
+        & '_e' + s%str(this%emax) + &
+        & '_2e' + s%str(this%e2max) + '.snt'
+    this%filename = tmp%val
   end subroutine SetFileName
 
   subroutine WriteFile(this,p,op)
@@ -56,17 +58,17 @@ contains
     type(sys) :: s
 
     ti = omp_get_wtime()
-    if(s%find(this%filename, "kshell.snt")) then
+    if(s%find(s%str(this%filename), s%str("kshell.snt"))) then
       call write_operator_kshell_snt(this%filename, p, op)
       return
     end if
 
-    if(s%find(this%filename, "SP-CC")) then
+    if(s%find(s%str(this%filename), s%str("SP-CC"))) then
       call write_operator_sp_cc_input(this%filename, p, op)
       return
     end if
 
-    if(s%find(this%filename, "snt")) then
+    if(s%find(s%str(this%filename), s%str("snt"))) then
       call write_operator_ascii_snt(this%filename, p, op)
       return
     end if
@@ -314,6 +316,7 @@ contains
     end do
 
     close(wunit)
+    call ksps%fin()
   end subroutine write_operator_kshell_snt
 
   subroutine write_operator_sp_cc_input(f, p, op)

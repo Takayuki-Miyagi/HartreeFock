@@ -638,7 +638,7 @@ contains
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
     type(sys) :: s
-    character(:), allocatable :: msg
+    type(str) :: msg
     integer :: jbra, pbra, zbra, jket, pket, zket
 
     msg = ""
@@ -651,11 +651,11 @@ contains
         pket = this%thr%jpz(chket)%p
         zket = this%thr%jpz(chket)%z
         if(.not. this%MatCh(chbra,chket)%is) cycle
-        msg = trim(this%oprtr) // " (" // trim(s%str(jbra)) // &
-            & "," // trim(s%str(pbra)) // "," // trim(s%str(zbra)) // &
-            & ")  (" // trim(s%str(jket)) // "," // &
-            & trim(s%str(pket)) // "," // trim(s%str(zket)) // ")"
-        call this%MatCh(chbra,chket)%prt(msg=msg,iunit=wunit)
+        msg = s%str(trim(this%oprtr)) + " (" + s%str(jbra) + &
+            & "," + s%str(pbra) + "," + s%str(zbra) + &
+            & ")  (" + s%str(jket) + "," + &
+            & s%str(pket) + "," + s%str(zket) + ")"
+        call this%MatCh(chbra,chket)%prnt(msg=msg%val,iunit=wunit)
       end do
     end do
   end subroutine PrintThreeBodyPart

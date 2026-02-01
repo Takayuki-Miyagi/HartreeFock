@@ -24,7 +24,9 @@ module HFInput
     character(:), allocatable :: valence_list
     ! two-body file
     character(256) :: int_nn_file
+    character(256), allocatable :: files_n(:)
     character(256), allocatable :: files_nn(:)
+    character(32), allocatable :: jpt_of_files(:)
     integer :: emax_nn
     integer :: e2max_nn
     integer :: lmax_nn
@@ -88,7 +90,9 @@ contains
     character(256) :: type_3n_file="full"
 
     character(1024) :: optrs="none"
+    character(1024) :: files_n="none"
     character(1024) :: files_nn="none"
+    character(1024) :: jpt_of_files="none"
     integer :: emax_nn=6
     integer :: e2max_nn=12
     integer :: lmax_nn=-1
@@ -119,12 +123,14 @@ contains
     logical :: is_Atomic=.false.
     character(512) :: iter_method = "linear"
     integer :: iter_n_history = 10
+    type(str), allocatable :: tmp_strs(:)
 
     type(sys) :: s
     integer :: io
+    integer :: i
 
     namelist /input/ emax, e2max, e3max, lmax, hw, &
-        & Nucl, int_nn_file, files_nn, emax_nn, optrs, &
+        & Nucl, int_nn_file, files_n, files_nn, jpt_of_files, emax_nn, optrs, &
         & e2max_nn, lmax_nn, int_3n_file, files_3n, &
         & emax_3n, e2max_3n, e3max_3n, lmax_3n, alpha, &
         & summary_file, is_Op_out, is_MBPTscalar_full, &
@@ -204,9 +210,42 @@ contains
     if(e2max_mbpt == -1) this%e2max_mbpt = 2*this%emax_mbpt
     if(lmax_mbpt == -1) this%lmax_mbpt = this%emax_mbpt
 
-    call s%split(optrs, ',', this%Ops)
-    call s%split(files_nn, ',', this%files_nn)
-    call s%split(files_3n, ',', this%files_3n)
+    call s%split(s%str(optrs), s%str(','), tmp_strs)
+    allocate(this%Ops(size(tmp_strs)))
+    do i = 1, size(tmp_strs)
+      this%Ops(i) = tmp_strs(i)%val
+    end do
+
+    call s%split(s%str(files_n), s%str(','), tmp_strs)
+    allocate(this%files_n(size(tmp_strs)))
+    do i = 1, size(tmp_strs)
+      this%files_n(i) = tmp_strs(i)%val
+    end do
+
+    call s%split(s%str(files_nn), s%str(','), tmp_strs)
+    allocate(this%files_nn(size(tmp_strs)))
+    do i = 1, size(tmp_strs)
+      this%files_nn(i) = tmp_strs(i)%val
+    end do
+
+    call s%split(s%str(files_3n), s%str(','), tmp_strs)
+    allocate(this%files_3n(size(tmp_strs)))
+    do i = 1, size(tmp_strs)
+      this%files_3n(i) = tmp_strs(i)%val
+    end do
+
+    call s%split(s%str(jpt_of_files), s%str(','), tmp_strs)
+    allocate(this%jpt_of_files(size(tmp_strs)))
+    do i = 1, size(tmp_strs)
+      this%jpt_of_files(i) = tmp_strs(i)%val
+    end do
+
+    if( size(this%Ops) /= size(this%files_n) ) then
+      write(*,*) "# Number of Op is not same as the number of N files. Assuming all N files are 'none'."
+      deallocate(this%files_n)
+      allocate(this%files_n(size(this%Ops)))
+      this%files_n(:) = 'none'
+    end if
 
     if( size(this%Ops) /= size(this%files_nn) ) then
       write(*,*) "# Number of Op is not same as the number of NN files. Assuming all NN files are 'none'."

@@ -167,6 +167,7 @@ OBJF90_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %f90, %o, $(notdir $(SRCF90_my
 OBJF95_myfort:=$(addprefix $(OBJDIR)/, $(patsubst %F90, %o, $(notdir $(SRCF95_myfort))))
 SRCS_myfort= $(SRCC_myfort) $(SRCF77_myfort) $(SRCF90_myfort) $(SRCF95_myfort)
 OBJS_myfort= $(OBJC_myfort) $(OBJF77_myfort) $(OBJF90_myfort) $(OBJF95_myfort)
+OBJS_myfort+= $(OBJDIR)/dvode_f90_m.o
 
 SRCC_HF:=$(wildcard $(SRCDIR_HF)/*.c)
 SRCF77_HF:=$(wildcard $(SRCDIR_HF)/*.f)
@@ -207,20 +208,22 @@ endif
 #--------------------------------------------------
 # Rules
 #--------------------------------------------------
+$(info $(OBJS_ALL))
 all: dirs $(TARGET)
 $(TARGET): $(OBJS_ALL)
-	$(FC) $(FFLAGS) $(DFLAGS) -o $(TARGET).exe $^ $(LFLAGS)
+	$(FC) $(FFLAGS) $(DFLAGS) -o HartreeFock.exe $(filter-out $(OBJDIR)/BasisTransform.o, $(OBJS_ALL)) $(LFLAGS)
+	$(FC) $(FFLAGS) $(DFLAGS) -o BasisTransform.exe $(filter-out $(OBJDIR)/HFMain.o, $(OBJS_ALL)) $(LFLAGS)
 	if test -d $(EXEDIR); then \
 		: ; \
 	else \
 		mkdir -p $(EXEDIR); \
 	fi
-	mv $(TARGET).exe $(EXEDIR)
+	mv HartreeFock.exe $(EXEDIR)
+	mv BasisTransform.exe $(EXEDIR)
 	@echo "#####################################################################################"
 	@echo "To complete the installation, do 'make install'."
 	@echo "Edit '$(PWD)/exe/run_hf_mbpt.py' and excecute."
 	@echo "#####################################################################################"
-
 
 $(OBJDIR)/%.o:$(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -231,6 +234,10 @@ $(OBJDIR)/%.o:$(SRCDIR)/%.f90
 $(OBJDIR)/%.o:$(SRCDIR)/%.F90
 	$(FC) $(FFLAGS) $(DFLAGS) $(MODOUT) -o $@ -c $<
 
+$(OBJDIR)/dvode_f90_m.o:$(SRCDIR_myfort)/dvode/dvode_f90_m.f90
+	$(FC) $(FFLAGS) $(DFLAGS) $(LINT) $(MODOUT)  -o $@ -c $(SRCDIR_myfort)/dvode/dvode_f90_m.f90
+$(OBJDIR)/renormalization.o:$(SRCDIR_myfort)/renormalization.f90
+	$(FC) $(FFLAGS) $(DFLAGS) $(LINT) $(MODOUT)  -o $@ -c $(SRCDIR_myfort)/renormalization.f90
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 $(OBJDIR)/%.o:$(SRCDIR_myfort)/%.f
@@ -251,6 +258,9 @@ $(OBJDIR)/%.o:$(SRCDIR_HF)/%.F90
 
 dep:
 	$(FDEP) $(SRCS_ALL) -b $(OBJDIR)/ > $(DEPDIR)/makefile.d
+	@echo "obj/dvode_f90_m.o : $(SRCDIR_myfort)/dvode/dvode_f90_m.f90" >> makefile.d
+	@echo $(OBJDIR)/renormalization.o : $(SRCDIR_myfort)/renormalization.f90 $(OBJDIR)/dvode_f90_m.o $(OBJDIR)/linear_algebra.o $(OBJDIR)/profiler.o >> makefile.d
+
 
 dirs:
 	if test -d $(OBJDIR); then \
@@ -265,13 +275,14 @@ dirs:
 	fi
 
 install:
-	ln -sf $(EXEDIR)/$(TARGET).exe $(INSTLDIR)
+	ln -sf $(EXEDIR)/HartreeFock.exe $(INSTLDIR)
+	ln -sf $(EXEDIR)/BasisTransform.exe $(INSTLDIR)
 	@printf "####################################################################\n"
 	@printf " make sure that '$(INSTLDIR)' is included in PATH \n"
 	@printf "####################################################################\n"
 
 clean:
-	rm -f $(TARGET).exe
+	rm -f $(EXEDIR)/HartreeFock.exe $(EXEDIR)/BasisTransform.exe
 	rm -rf $(OBJDIR)
 	rm -rf $(MODDIR)
 

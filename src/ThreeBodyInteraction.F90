@@ -324,17 +324,17 @@ contains
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
     type(sys) :: s
-    character(:), allocatable :: msg
+    type(str) :: msg
     type(DMat) :: m
 
     do chbra = 1, this%thr%NChan
       do chket = 1, this%thr%NChan
         if(chbra /= chket) cycle
-        msg = "hamil " // trim(s%str(chbra)) &
-            &  // " " // trim(s%str(chket))
+        msg = s%str("hamil ") + s%str(chbra) &
+            &  + " " + s%str(chket)
         call m%ini(this%thr%jpt(chbra)%n_state, this%thr%jpt(chket)%n_state)
         m%m(:,:) = this%MatCh(chbra,chket)%v(:,:)
-        call m%prt(msg=msg,iunit=wunit)
+        call m%prnt(msg=msg%val,iunit=wunit)
         call m%fin()
       end do
     end do
@@ -475,32 +475,32 @@ contains
     type(ThreeBodyForce), intent(inout) :: thr
     type(sys) :: s
 
-    if(s%find(this%file_3n,'.txt')) then
+    if(s%find(s%str(this%file_3n),s%str('.txt'))) then
       call this%read_scalar_me3j_ascii_txt(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'.me3j.gz')) then
+    if(s%find(s%str(this%file_3n),s%str('.me3j.gz'))) then
       call this%read_scalar_me3j_gzip(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'.me3j')) then
+    if(s%find(s%str(this%file_3n),s%str('.me3j'))) then
       call this%read_scalar_me3j_ascii(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'stream.bin')) then
+    if(s%find(s%str(this%file_3n),s%str('stream.bin'))) then
       call this%read_scalar_me3j_binary_stream(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'.bin') .and. s%find(this%file_3n,'_comp')) then
+    if(s%find(s%str(this%file_3n),s%str('.bin')) .and. s%find(s%str(this%file_3n),s%str('_comp'))) then
       call this%read_scalar_me3j_binary_comp(thr)
       return
     end if
 
-    if(s%find(this%file_3n,'.bin')) then
+    if(s%find(s%str(this%file_3n),s%str('.bin'))) then
       call this%read_scalar_me3j_binary(thr)
       return
     end if
@@ -960,15 +960,15 @@ contains
     type(ThreeBodyForce), intent(inout) :: thr
     type(sys) :: s
 
-    if(s%find(this%file_3n,'.txt')) then
-      !call this%read_tensor_3bme_ascii(thr)
-      return
-    end if
-
-    if(s%find(this%file_3n,'.bin')) then
-      !call this%read_tensor_3bme_bin(thr)
-      return
-    end if
+!    if(s%find(this%file_3n,'.txt')) then
+!      !call this%read_tensor_3bme_ascii(thr)
+!      return
+!    end if
+!
+!    if(s%find(this%file_3n,'.bin')) then
+!      !call this%read_tensor_3bme_bin(thr)
+!      return
+!    end if
   end subroutine ReadTensor3BFile
 
   subroutine read_tensor_3bme_ascii(this,thr)

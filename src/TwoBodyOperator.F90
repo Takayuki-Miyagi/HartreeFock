@@ -167,6 +167,7 @@ module TwoBodyOperator
     procedure :: read_scalar_snt_ascii
     procedure :: read_scalar_navratil_ascii
     procedure :: read_scalar_navratil_ascii_gz
+    procedure :: read_tensor_me2j_gzip
   end type Read2BodyFiles
 
 contains
@@ -231,9 +232,9 @@ contains
         zket = two%jpz(chket)%z
         nket = two%jpz(chket)%n_state
 
-        if(triag(jbra, jket, 2*jr)) cycle
+        if(triag(jbra, jket, jr)) cycle
         if(pbra * pket * pr /= 1) cycle
-        if(zbra - 2*zr - zket /= 0) cycle
+        if(abs(zbra-zket) /= zr) cycle
         call this%MatCh(chbra,chket)%init(two%jpz(chbra),two%jpz(chket))
       end do
     end do
@@ -403,7 +404,7 @@ contains
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
     type(sys) :: s
-    character(:), allocatable :: msg
+    type(str) :: msg
     integer :: jbra, pbra, zbra, jket, pket, zket
 
     msg = ""
@@ -416,11 +417,11 @@ contains
         pket = this%two%jpz(chket)%p
         zket = this%two%jpz(chket)%z
         if(.not. this%MatCh(chbra,chket)%is) cycle
-        msg = trim(this%oprtr) // " (" // trim(s%str(jbra)) // &
-            & "," // trim(s%str(pbra)) // "," // trim(s%str(zbra)) // &
-            & ")  (" // trim(s%str(jket)) // "," // &
-            & trim(s%str(pket)) // "," // trim(s%str(zket)) // ")"
-        call this%MatCh(chbra,chket)%prt(msg=msg,iunit=wunit)
+        msg = s%str(trim(this%oprtr)) + " (" + s%str(jbra) + &
+            & "," + s%str(pbra) + "," + s%str(zbra) + &
+            & ")  (" + s%str(jket) + "," + &
+            & s%str(pket) + "," + s%str(zket) + ")"
+        call this%MatCh(chbra,chket)%prnt(msg=msg%val,iunit=wunit)
       end do
     end do
   end subroutine PrintTwoBodyPart
@@ -456,7 +457,7 @@ contains
       return
     end if
 
-    if(Z12 - Z34 - this%zr /= 0) then
+    if(abs(Z12 - Z34) /= this%zr) then
       write(*,*) "Warning: in GetTwBME_tensor: Tz"
       return
     end if
@@ -626,7 +627,7 @@ contains
       return
     end if
 
-    if(Z12 - Z34 - this%zr /= 0) then
+    if(abs(Z12 - Z34) /= this%zr) then
       write(*,*) "Warning: in SetTwBME_general: Tz"
       return
     end if
@@ -2032,37 +2033,37 @@ contains
     type(sys) :: s
 
 
-    if(s%find(this%file_nn, '.me2j.bin')) then
+    if(s%find(s%str(this%file_nn), s%str('.me2j.bin'))) then
       call this%read_scalar_me2j_bin(two)
       return
     end if
 
-    if(s%find(this%file_nn, '.me2j')) then
+    if(s%find(s%str(this%file_nn), s%str('.me2j'))) then
       call this%read_scalar_me2j_ascii(two)
       return
     end if
 
-    if(s%find(this%file_nn, '.myg.bin')) then
+    if(s%find(s%str(this%file_nn), s%str('.myg.bin'))) then
       call this%read_scalar_myg_bin(two)
       return
     end if
 
-    if(s%find(this%file_nn, '.myg')) then
+    if(s%find(s%str(this%file_nn), s%str('.myg'))) then
       call this%read_scalar_myg_ascii(two)
       return
     end if
 
-    if(s%find(this%file_nn, '.snt')) then
+    if(s%find(s%str(this%file_nn), s%str('.snt'))) then
       call this%read_scalar_snt_ascii(two)
       return
     end if
 
-    if(s%find(this%file_nn, 'TBMEA2') .and. s%find(this%file_nn, '.gz')) then
+    if(s%find(s%str(this%file_nn), s%str('TBMEA2')) .and. s%find(s%str(this%file_nn), s%str('.gz'))) then
       call this%read_scalar_navratil_ascii_gz(two)
       return
     end if
 
-    if(s%find(this%file_nn, 'TBMEA2')) then
+    if(s%find(s%str(this%file_nn), s%str('TBMEA2'))) then
       call this%read_scalar_navratil_ascii(two)
       return
     end if
@@ -2094,11 +2095,11 @@ contains
     call sps_me2j%init(this%emax2, this%lmax2)
     nelm = count_scalar_me2j(sps_me2j,ms%emax,this%e2max2)
     allocate(v(nelm))
-    if( s%find(this%file_nn, '.gz') ) then
+    if( s%find(s%str(this%file_nn), s%str('.gz')) ) then
       call get_vector_me2j_gz(this%file_nn,v)
     end if
 
-    if( .not. s%find(this%file_nn, '.gz') ) then
+    if( .not. s%find(s%str(this%file_nn), s%str('.gz')) ) then
       open(runit, file=this%file_nn, action='read',iostat=io)
       if(io /= 0) then
         write(*,'(2a)') 'File open error: ', trim(this%file_nn)
@@ -2393,7 +2394,7 @@ contains
       write(*,'(10f12.6)') v((i-1)*10+1:i*10)
 #endif
     end do
-    if(mod(nelm,10) == 0) return
+    if(mod(nelm,int(10,kind(nelm))) == 0) return
     read(ut,*) v(lines*10+1:nelm)
 #ifdef TwoBodyOperatorDebug
     fm = "("//trim(s%str(nelm_tail)) // 'f12.6'//")"
@@ -2717,9 +2718,171 @@ contains
   subroutine ReadTensor2BFile(this,two)
     class(Read2BodyFiles), intent(in) :: this
     type(TwoBodyPart), intent(inout) :: two
-    return
+    type(sys) :: s
+
+    if(s%find(s%str(this%file_nn), s%str('.me2j.gz'))) then
+      call this%read_tensor_me2j_gzip(two)
+      return
+    end if
+    write(*,*) "In ReadTensor2BFile, file format cannot be detected."
   end subroutine ReadTensor2BFile
 
+  subroutine read_tensor_me2j_gzip(this,two)
+    class(Read2BodyFiles), intent(in) :: this
+    type(TwoBodyPart), intent(inout) :: two
+    type(TwoBodySpace), pointer :: ms
+    type(Orbits), pointer :: sps
+    type(OrbitsIsospin) :: sps_me2j
+    integer :: a, b, c, d, Jab, Jcd
+    integer(8) :: iline, cnt
+    type(SingleParticleOrbitIsospin), pointer :: oa, ob, oc, od
+    integer :: ap, bp, cp, dp
+    integer :: an, bn, cn, dn
+    integer :: rankJ, rankP, rankZ, emax_read, e2max_read, lmax_read
+    real(8) :: me_pp, me_nn, me_np, me_pn
+    real(8) :: me_pppp, me_pppn, me_ppnp, me_ppnn, me_pnpn, me_pnnp, me_pnnn, me_npnp, me_npnn, me_nnnn
+    character(512) :: line = ""
+    type(c_ptr) :: fp, err
+    real(8), allocatable :: me1(:), me2(:)
+    ms => two%two
+
+    fp = gzip_open(this%file_nn,"r")
+    line = ""
+    err = gzip_readline(fp, line, len(line)) ! header
+
+    line = ""
+    err = gzip_readline(fp, line, len(line)) ! J, P, Z, emax, e2max
+    read(line,*) rankJ, rankP, rankZ, emax_read, e2max_read, lmax_read
+    if( two%jr /= rankJ ) stop "Error: rank mismatch J"
+    if( two%pr /= rankP ) stop "Error: rank mismatch P"
+    if( two%zr /= rankZ ) stop "Error: rank mismatch Z"
+    call sps_me2j%init( emax_read, lmax_read )
+
+    err = gzip_readline(fp, line, len(line)) ! Zero-body
+    allocate(me1( 4*count_general_me_onebody( two,sps_me2j)))
+    allocate(me2( 10*count_general_me_twobody(two,sps_me2j)))
+    do iline = 1, count_general_me_onebody( two, sps_me2j )
+      err = gzip_readline(fp, line, len(line))
+      read(line,*) me1(4*(iline-1)+1:  4*iline)
+    end do
+    do iline = 1, count_general_me_twobody( two, sps_me2j )
+      err = gzip_readline(fp, line, len(line))
+      read(line,*) me2(10*(iline-1)+1:  10*iline)
+    end do
+    err = gzip_close(fp)
+
+    cnt = 0
+    do a = 1, sps_me2j%norbs
+      oa => sps_me2j%GetOrbit(a)
+      if( oa%e > ms%emax ) exit
+      do b = 1, a
+        ob => sps_me2j%GetOrbit(b)
+        if( oa%e + ob%e > e2max_read ) cycle
+
+        do c = 1, sps_me2j%norbs
+          oc => sps_me2j%GetOrbit(c)
+          do d = 1, c
+            od => sps_me2j%GetOrbit(d)
+            if( oc%e + od%e > e2max_read ) cycle
+            if((-1)**(oa%l+ob%l+oc%l+od%l) * two%pr /= 1) cycle
+
+            do Jab = abs(oa%j-ob%j)/2, (oa%j+ob%j)/2
+              do Jcd = abs(oc%j-od%j)/2, (oc%j+od%j)/2
+                if( triag(Jab,Jcd,two%jr ) ) cycle
+                me_pppp = me2(cnt+1)
+                me_pppn = me2(cnt+2)
+                me_ppnp = me2(cnt+3)
+                me_ppnn = me2(cnt+4)
+                me_pnpn = me2(cnt+5)
+                me_pnnp = me2(cnt+6)
+                me_pnnn = me2(cnt+7)
+                me_npnp = me2(cnt+8)
+                me_npnn = me2(cnt+9)
+                me_nnnn = me2(cnt+10)
+                cnt = cnt + 10
+                if( oa%e > ms%emax ) cycle
+                if( ob%e > ms%emax ) cycle
+                if( oc%e > ms%emax ) cycle
+                if( od%e > ms%emax ) cycle
+                if( oa%e+ob%e > ms%E2max ) cycle
+                if( oc%e+od%e > ms%E2max ) cycle
+                ap = sps_me2j%iso2pn(ms%sps,a,-1)
+                an = sps_me2j%iso2pn(ms%sps,a, 1)
+                bp = sps_me2j%iso2pn(ms%sps,b,-1)
+                bn = sps_me2j%iso2pn(ms%sps,b, 1)
+                cp = sps_me2j%iso2pn(ms%sps,c,-1)
+                cn = sps_me2j%iso2pn(ms%sps,c, 1)
+                dp = sps_me2j%iso2pn(ms%sps,d,-1)
+                dn = sps_me2j%iso2pn(ms%sps,d, 1)
+                if(abs(me_pppp) > 1.d-10) call two%SetTwBME_tensor(ap,bp,cp,dp,Jab,Jcd,me_pppp)
+                if(abs(me_pppn) > 1.d-10) call two%SetTwBME_tensor(ap,bp,cp,dn,Jab,Jcd,me_pppn)
+                if(abs(me_ppnp) > 1.d-10) call two%SetTwBME_tensor(ap,bp,cn,dp,Jab,Jcd,me_ppnp)
+                if(abs(me_ppnn) > 1.d-10) call two%SetTwBME_tensor(ap,bp,cn,dn,Jab,Jcd,me_ppnn)
+                if(abs(me_pnpn) > 1.d-10) call two%SetTwBME_tensor(ap,bn,cp,dn,Jab,Jcd,me_pnpn)
+                if(abs(me_pnnp) > 1.d-10) call two%SetTwBME_tensor(ap,bn,cn,dp,Jab,Jcd,me_pnnp)
+                if(abs(me_pnnn) > 1.d-10) call two%SetTwBME_tensor(ap,bn,cn,dn,Jab,Jcd,me_pnnn)
+                if(abs(me_npnp) > 1.d-10) call two%SetTwBME_tensor(an,bp,cn,dp,Jab,Jcd,me_npnp)
+                if(abs(me_npnn) > 1.d-10) call two%SetTwBME_tensor(an,bp,cn,dn,Jab,Jcd,me_npnn)
+                if(abs(me_nnnn) > 1.d-10) call two%SetTwBME_tensor(an,bn,cn,dn,Jab,Jcd,me_nnnn)
+              end do
+            end do
+          end do
+        end do
+      end do
+    end do
+    deallocate( me1, me2 )
+    call sps_me2j%fin()
+  end subroutine read_tensor_me2j_gzip
+
+  function count_general_me_onebody(this, isps) result(r)
+    type(TwoBodyPart), intent(in) :: this
+    type(OrbitsIsospin), intent(in) :: isps
+    integer :: r
+    integer :: a, b
+    type(SingleParticleOrbitIsospin), pointer :: oa, ob
+    r = 0
+    do a = 1, isps%norbs
+      oa => isps%GetOrbit(a)
+      do b = 1, isps%norbs
+        ob => isps%GetOrbit(b)
+        if((-1)**(oa%l+ob%l) * this%pr /= 1) cycle
+        if( triag(oa%j,ob%j,2*this%jr ) ) cycle
+        r = r + 1
+      end do
+    end do
+  end function count_general_me_onebody
+
+  function count_general_me_twobody(this, isps) result(r)
+    type(TwoBodyPart), intent(in) :: this
+    type(OrbitsIsospin), intent(in) :: isps
+    type(TwoBodySpace), pointer :: ms
+    integer(8) :: r
+    integer :: a, b, c, d, Jab, Jcd
+    type(SingleParticleOrbitIsospin), pointer :: oa, ob, oc, od
+    ms => this%two
+    r = 0
+    do a = 1, isps%norbs
+      oa => isps%GetOrbit(a)
+      do b = 1, a
+        ob => isps%GetOrbit(b)
+
+        do c = 1, isps%norbs
+          oc => isps%GetOrbit(c)
+          do d = 1, c
+            od => isps%GetOrbit(d)
+            if((-1)**(oa%l+ob%l+oc%l+od%l) * this%pr /= 1) cycle
+
+            do Jab = abs(oa%j-ob%j)/2, (oa%j+ob%j)/2
+              do Jcd = abs(oc%j-od%j)/2, (oc%j+od%j)/2
+                if( triag(Jab,Jcd,this%jr ) ) cycle
+                r = r + 1
+              end do
+            end do
+          end do
+        end do
+      end do
+    end do
+  end function count_general_me_twobody
 end module TwoBodyOperator
 
 !program test

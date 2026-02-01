@@ -126,7 +126,7 @@ contains
 
         if(triag(jbra, jket, 2*jr)) cycle
         if(pbra * pket * pr /= 1) cycle
-        if(zbra - 2*zr - zket /= 0) cycle
+        if(abs(zbra-zket) /= 2*zr) cycle
         call this%MatCh(chbra,chket)%init(one%jpz(chbra),one%jpz(chket))
       end do
     end do
@@ -250,7 +250,7 @@ contains
     do bra = 1, chbra%n_state
       ia = chbra%n2spi(bra)
       do ket = 1, chket%n_state
-        ib = chbra%n2spi(ket)
+        ib = chket%n2spi(ket)
 
         this%m(bra,ket) = mat_elm()
 
@@ -330,7 +330,7 @@ contains
     integer, intent(in), optional :: wunit
     integer :: chbra, chket
     type(sys) :: s
-    character(:), allocatable :: msg
+    type(str) :: msg
     integer :: jbra, pbra, zbra, jket, pket, zket
 
     msg = ""
@@ -343,11 +343,11 @@ contains
         pket = this%one%jpz(chket)%p
         zket = this%one%jpz(chket)%z
         if(.not. this%MatCh(chbra,chket)%is) cycle
-        msg = trim(this%oprtr) // " (" // trim(s%str(jbra)) // &
-            & "," // trim(s%str(pbra)) // "," // trim(s%str(zbra)) // &
-            & ")  (" // trim(s%str(jket)) // "," // &
-            & trim(s%str(pket)) // "," // trim(s%str(zket)) // ")"
-        call this%MatCh(chbra,chket)%prt(msg=msg,iunit=wunit)
+        msg = s%str(trim(this%oprtr)) + " (" + s%str(jbra) + &
+            & "," + s%str(pbra) + "," + s%str(zbra) + &
+            & ")  (" + s%str(jket) + "," + &
+            & s%str(pket) + "," + s%str(zket) + ")"
+        call this%MatCh(chbra,chket)%prnt(msg=msg%val,iunit=wunit)
       end do
     end do
   end subroutine PrintOneBodyPart
@@ -415,11 +415,11 @@ contains
     integer, intent(in) :: emax, lmax
     type(sys) :: s
 
-    if(s%find(filename, ".gen")) then
+    if(s%find(s%str(filename), s%str(".gen"))) then
       call read_one_body_gennari(this, filename, emax, lmax)
       return
     end if
-
+    write(*,*) "In ReadOneBodyFile, file format cannot be detected."
   end subroutine ReadOneBodyFile
 
   subroutine read_one_body_gennari(this, filename, emax, lmax)
