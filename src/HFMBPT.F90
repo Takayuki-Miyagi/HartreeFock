@@ -2309,7 +2309,7 @@ contains
                     if(K2min > K2max) cycle
 
                     denom = get_denominator2(h,h1,h2,p1,p2) * &
-                        &   get_denominator3(h,h1,h2,h5,p1,p2,p3) * &
+                        &   get_denominator3(h,h1,h3,h5,p1,p2,p3) * &
                         &   get_denominator2(h,h4,h5,p2,p3)
                     vv = 0.d0
                     do K1 = K1min, K1max
@@ -7068,7 +7068,7 @@ contains
                                         & h%two%GetTwBME_mscheme(h1,mh1,h3,mh3,p1,mp1,h4,mh4,0) * &
                                         & h%two%GetTwBME_mscheme(h4,mh4,h5,mh5,p2,mp2,p3,mp3,0) / &
                                         & (get_denominator2(h,h1,h2,p1,p2) * &
-                                        &  get_denominator3(h,h1,h2,h5,p1,p2,p3) * &
+                                        &  get_denominator3(h,h1,h3,h5,p1,p2,p3) * &
                                         &  get_denominator2(h,h4,h5,p2,p3))
 
                                   end do
