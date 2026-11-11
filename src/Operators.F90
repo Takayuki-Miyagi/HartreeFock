@@ -388,7 +388,7 @@ contains
   end subroutine PrintOperator
 
   function Truncate(op, ms_new) result(op_new)
-    class(Ops), intent(inout) :: op
+    class(Ops), intent(in) :: op
     type(MSpace), intent(in), target :: ms_new
     type(Ops) :: op_new
     integer :: i, j, k, l, m, n

@@ -167,8 +167,9 @@ program HFMain
             & PT%e_0+PT%e_2+PT%e_3
 
         if(p%is_Op_out) then ! This can be an input of an NCSM calculation
-          call htr%UnNormalOrdering2B()
           call msNAT%init(Nucl=ms%Nucl, Core=ms%Core, hw=ms%hw, emax=p%emax_mbpt, e2max=p%e2max_mbpt, e3max=0)
+          call PT%truncation_perturbative_estimate(htr, msNAT)
+          call htr%UnNormalOrdering2B()
           h = htr%truncate(msNAT)
           call w%SetFileName(p%OpFileName, h)
           call w%writef(p,h)
@@ -204,9 +205,10 @@ program HFMain
       end if
     end select
     htr = HF%BasisTransform(h,NOXB=p%NOXB)
-    call htr%UnNormalOrdering2B()
 
     call msNAT%init(Nucl=ms%Nucl, Core=ms%Core, hw=ms%hw, emax=p%emax_mbpt, e2max=p%e2max_mbpt, e3max=0)
+    call PT%truncation_perturbative_estimate(htr, msNAT)
+    call htr%UnNormalOrdering2B()
     h = htr%truncate(msNAT)
     if(p%is_Op_out) then ! This can be an input of an NCSM calculation
       call w%SetFileName(p%OpFileName, h)

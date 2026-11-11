@@ -96,6 +96,7 @@ module HFMBPT
     procedure :: energy_fourth
     procedure :: energy_fourth_M
     procedure :: MBPTCriteria
+    procedure :: truncation_perturbative_estimate
   end type MBPTEnergy
 
   type :: MBPTDMat
@@ -4517,6 +4518,115 @@ contains
     this%perturbativity1b = max_denom1b
     this%perturbativity2b = max_denom2b
   end subroutine MBPTCriteria
+
+  subroutine truncation_perturbative_estimate(this, h, small_ms)
+    class(MBPTEnergy), intent(inout) :: this
+    type(Ops), intent(in) :: h
+    type(MSpace), intent(in) :: small_ms
+    type(Ops) :: small_h
+    real(8) :: corr_large, corr_small
+
+    small_h = h%truncate(small_ms)
+
+    corr_large = energy_second_1(h) + energy_second_2(h)
+    corr_small = energy_second_1(small_h) + energy_second_2(small_h)
+    write(*,'(a,f16.8)') "Model-space truncation error (perturbative estimate): ", corr_large-corr_small
+  contains
+    function energy_second_1(h) result(r)
+      ! a, b : particle
+      ! i, j : hole
+      !     _____________
+      !    /\           /\
+      !   /  \         /  \
+      !   |  |         |  |
+      ! a |  | i     b |  | j
+      !   |  |         |  |
+      !   \  /         \  /
+      !    \/___________\/
+      !
+      ! \sum_{i>j,a>b} <ij||ab> <ab||ij> / denominator
+      type(Ops), intent(in) :: h
+      type(MSPace), pointer :: ms
+      type(TwoBodyChannel), pointer :: ch_two
+      type(ThreeBodyChannel), pointer :: ch_three
+      type(Orbits), pointer :: sps
+      integer :: ch, ab, ij, J2, n
+      integer :: a, b, c, i, j, k, abc, ijk, Jab, Jij
+      type(SingleParticleOrbit), pointer :: oa, ob, oc, oi, oj, ok
+      real(8) :: vsum, v, ti, r
+
+      ti = omp_get_wtime()
+      ms => h%ms
+      sps => ms%sps
+      vsum = 0.d0
+      do ch = 1, ms%two%NChan
+        ch_two => ms%two%jpz(ch)
+        J2 = ch_two%j
+        n = ch_two%n_state
+        if(ch_two%n_hh_state < 1) cycle
+        if(ch_two%n_pp_state < 1) cycle
+        v = 0.d0
+        !$omp parallel
+        !$omp do private(ab,a,b,ij,i,j) reduction(+:v)
+        do ab = 1, ch_two%n_pp_state
+          a = ch_two%n2spi1(ch_two%pp_s(ab))
+          b = ch_two%n2spi2(ch_two%pp_s(ab))
+          do ij = 1, ch_two%n_hh_state
+            i = ch_two%n2spi1(ch_two%hh_s(ij))
+            j = ch_two%n2spi2(ch_two%hh_s(ij))
+
+            v = v + h%two%GetTwBME(i,j,a,b,J2)**2 / &
+            & get_denominator2(h,i,j,a,b)
+          end do
+        end do
+        !$omp end do
+        !$omp end parallel
+        vsum = vsum + v * dble(2*J2+1)
+      end do
+      r = vsum
+      call timer%Add("Second order MBPT",omp_get_wtime()-ti)
+    end function energy_second_1
+
+    function energy_second_2(h) result(r)
+      ! a : particle
+      ! i : hole
+      !     ____________\/
+      !    /\           /\
+      !   /  \
+      !   |  |
+      ! a |  | i
+      !   |  |
+      !   \  /
+      !    \/___________\/
+      !                 /\
+      ! \sum_{i a} <i||a> <a||i> / denominator
+      type(Ops), intent(in) :: h
+      type(MSPace), pointer :: ms
+      type(Orbits), pointer :: sps
+      integer :: a, i
+      type(SingleParticleOrbit), pointer :: oa, oi
+      real(8) :: vsum, ti, r, denom
+
+      ti = omp_get_wtime()
+      ms => h%ms
+      sps => ms%sps
+      vsum = 0.d0
+      do a = 1, sps%norbs
+        oa => sps%GetOrbit(a)
+        if(oa%GetOccupation() > 1.d-6) cycle
+        do i = 1, sps%norbs
+          oi => sps%GetOrbit(i)
+          if(oi%GetOccupation() < 1.d-6) cycle
+          denom = 1.d0 / get_denominator1(h,i,a)
+          vsum = vsum + h%one%GetOBME(a,i)**2 * denom
+
+        end do
+      end do
+      r = vsum
+      call timer%Add("Second order MBPT",omp_get_wtime()-ti)
+    end function energy_second_2
+
+  end subroutine truncation_perturbative_estimate
 
   subroutine CalcScalarCorr(this,hamil,opr,is_MBPT_full,EN_denominator_in,part_of_hamil)
     class(MBPTScalar), intent(inout) :: this
